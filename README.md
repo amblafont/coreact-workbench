@@ -1,3 +1,8 @@
+To get an idea of what a script for declaring sorts could look like, you can generate `default_sorts.js` with `npm run build:sorts`:
+this is the one loaded by default in the web app.
+
+# Initial description
+
 This is a description of a JS library for drawing SVG shapes, with data. The API is based on d3.js. The library is implemented in TypeScript.
 
 The library provides a class called SortStore. An object of type SortStore has a method newSort with 4 required arguments (and an optional 5th, `initContext`):
