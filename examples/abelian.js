@@ -262,7 +262,7 @@ function drawArrow(srcPos, tgtPos, data, context) {
     { width: "number", bend: { type: "slider", min: -500, max: 500, default: 0 } }, (data, context) => {
         return drawArrow(data.source.position, data.target.position, data, context);
     })
-        .newSort("element", { vertex: "Vertex", cone: "cone" }, { position: "position" }, (data, context) => {
+        .newSort("element", { vertex: "Vertex", cone: "cone" }, { position: { type: "relativePosition", target: "vertex.position" } }, (data, context) => {
         const x = data.position[0], y = data.position[1];
         const s = 8;
         const group = context.append("g");

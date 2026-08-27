@@ -6,7 +6,7 @@ interface SortStore {
     newSort(
         name: string,
         deps: Record<string, string>,
-        dataAttrs: Record<string, string | { type: string; min: number; max: number; default: number }>,
+        dataAttrs: Record<string, string | { type: string; min: number; max: number; default: number } | { type: string; target: string }>,
         draw: (data: any, context: D3Context) => any,
         initContext?: (context: D3Context) => void
     ): SortStore;

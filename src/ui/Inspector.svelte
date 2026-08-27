@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { Artefact } from '../index';
+    import { getAttributeType, getRelativePositionMeta } from '../index';
     import DataAttributeFields from './DataAttributeFields.svelte';
     import { drawing, sortStore } from './store';
     import {
@@ -118,6 +119,19 @@
             apply(next);
         }
     }
+
+    function makeIsDepReady(deps: Record<string, Artefact>, sortName: string): (attrName: string) => boolean {
+        const sortDef = sortStore.getSort(sortName);
+        return (attrName: string) => {
+            if (!sortDef) return false;
+            const attrType = sortDef.attributes[attrName];
+            if (!attrType || getAttributeType(attrType) !== 'relativePosition') return true;
+            const rpMeta = getRelativePositionMeta(attrType);
+            if (!rpMeta) return false;
+            const depKey = rpMeta.target.split('.')[0];
+            return depKey in deps;
+        };
+    }
 </script>
 
 <!-- ================= Merge Mode View ================= -->
@@ -214,7 +228,7 @@
 {:else if $draftArtefact}
     {@const draft = $draftArtefact}
     {@const draftSortDef = sortStore.getSort(draft.sortName)}
-    {@const draftProxy = { data: draft.data } as Artefact}
+    {@const draftProxy = { data: draft.data, dependencies: draft.dependencies, sortName: draft.sortName } as Artefact}
     {#if draftSortDef}
         {@const allDeps = Object.entries(draftSortDef.dependencies)}
         <h3 style="margin-top: 0;">New {draft.sortName}</h3>
@@ -297,6 +311,7 @@
                 }}
                 isPickerActive={(attrName) => isPositionPickerActive(draftProxy, attrName)}
                 onPickPosition={(attrName) => togglePositionPicker(draftProxy, attrName)}
+                isDepReady={makeIsDepReady(draft.dependencies, draft.sortName)}
             />
 
             <div class="action-btns">
@@ -371,6 +386,7 @@
                     updatePosition(art, attrName, newVal, axis, (v) => setArtefactDataField(art, attrName, v))}
                 isPickerActive={(attrName) => isPositionPickerActive(art, attrName)}
                 onPickPosition={(attrName) => togglePositionPicker(art, attrName)}
+                isDepReady={makeIsDepReady(art.dependencies, art.sortName)}
             />
 
             <button

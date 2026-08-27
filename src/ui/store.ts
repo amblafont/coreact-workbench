@@ -16,7 +16,8 @@ import {
     type RuleApplication,
     type DataAttributeValue,
     getAttributeType,
-    getSliderMeta
+    getSliderMeta,
+    getRelativePositionMeta
 } from '../index';
 import { RocqRecorder } from '../rocq_recording';
 import { exportDrawingsToRocq, drawingExportNames } from '../rocq_export';
@@ -145,9 +146,43 @@ export function startPositionPicker(target: PositionPicker): void {
 export function applyPickedPosition(x: number, y: number): void {
     const picker = get(positionPicker);
     if (!picker) return;
-    picker.artefact.data[picker.attrName] = [x, y];
+    const sortDef = sortStore.getSort(picker.artefact.sortName);
+    const attrType = sortDef?.attributes[picker.attrName];
+
+    // Detect draft context: the picker artefact's data is the draft's data
+    const draft = get(draftArtefact);
+    const isDraft = !!draft && picker.artefact.data === draft.data;
+
+    if (attrType && getAttributeType(attrType) === 'relativePosition') {
+        const rpMeta = getRelativePositionMeta(attrType);
+        if (rpMeta) {
+            const [depKey, fieldPath] = rpMeta.target.split(".");
+            const depArtefact = picker.artefact.dependencies?.[depKey];
+            if (depArtefact) {
+                const depResolved = depArtefact.getResolvedData();
+                let depPos: any = depResolved;
+                for (const seg of fieldPath.split('.')) depPos = depPos?.[seg];
+                if (Array.isArray(depPos) && depPos.length === 2) {
+                    const value: [number, number] = [x - depPos[0], y - depPos[1]];
+                    if (isDraft) {
+                        setDraftDataField(picker.attrName, value);
+                    } else {
+                        picker.artefact.data[picker.attrName] = value;
+                        refresh();
+                    }
+                    stopPositionPicker();
+                    return;
+                }
+            }
+        }
+    }
+    if (isDraft) {
+        setDraftDataField(picker.attrName, [x, y]);
+    } else {
+        picker.artefact.data[picker.attrName] = [x, y];
+        refresh();
+    }
     stopPositionPicker();
-    refresh();
 }
 
 export function getSinglePositionAttr(sortDef: SortDefinition): string | null {
@@ -218,6 +253,8 @@ export function startDraftForSort(sortDef: SortDefinition): void {
         const typeName = getAttributeType(attrType);
         if (typeName === 'position') {
             initialData[attrName] = [300, 300];
+        } else if (typeName === 'relativePosition') {
+            initialData[attrName] = [0, 0];
         } else if (typeName === 'slider') {
             const meta = getSliderMeta(attrType);
             initialData[attrName] = meta ? meta.default : 0;
@@ -571,6 +608,22 @@ export function pickDraftDependency(artefact: Artefact): void {
         });
         dependencyPickingFor.set(findNextUnfilledDependency(get(draftArtefact) as DraftArtefact));
         refresh();
+        // Auto-activate picker for relativePosition attrs targeting this dep key
+        if (sortDef) {
+            for (const [attrName, attrType] of Object.entries(sortDef.attributes)) {
+                if (getAttributeType(attrType) !== 'relativePosition') continue;
+                const rpMeta = getRelativePositionMeta(attrType);
+                if (!rpMeta || rpMeta.target.split('.')[0] !== picking) continue;
+                const draftNow = get(draftArtefact);
+                if (draftNow) {
+                    startPositionPicker({
+                        artefact: { data: draftNow.data, dependencies: draftNow.dependencies, sortName: draftNow.sortName } as Artefact,
+                        attrName
+                    });
+                }
+                break;
+            }
+        }
     } else {
         pushToast('error', `Expected sort '${expectedSort}', but selected '${artefact.sortName}'.`);
     }

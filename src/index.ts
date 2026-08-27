@@ -7,7 +7,12 @@ export interface SliderAttribute {
     default: number;
 }
 
-export type AttributeType = "number" | "string" | "boolean" | "position" | SliderAttribute;
+export interface RelativePositionAttribute {
+    type: "relativePosition";
+    target: string; // "depKey.positionAttr" e.g. "source.position"
+}
+
+export type AttributeType = "number" | "string" | "boolean" | "position" | SliderAttribute | RelativePositionAttribute;
 
 export function getAttributeType(at: AttributeType): string {
     return typeof at === "string" ? at : at.type;
@@ -15,6 +20,10 @@ export function getAttributeType(at: AttributeType): string {
 
 export function getSliderMeta(at: AttributeType): SliderAttribute | null {
     return typeof at !== "string" && at.type === "slider" ? at : null;
+}
+
+export function getRelativePositionMeta(at: AttributeType): RelativePositionAttribute | null {
+    return typeof at !== "string" && at.type === "relativePosition" ? at : null;
 }
 
 export interface SortDefinition {
@@ -71,7 +80,7 @@ export class SortStore {
         }
 
         // Validate attribute types
-        const validTypeNames = ["number", "string", "boolean", "position", "slider"];
+        const validTypeNames = ["number", "string", "boolean", "position", "slider", "relativePosition"];
         for (const [attrName, attrType] of Object.entries(attributes)) {
             const typeName = getAttributeType(attrType);
             if (!validTypeNames.includes(typeName)) {
@@ -81,6 +90,29 @@ export class SortStore {
                 const meta = getSliderMeta(attrType);
                 if (!meta || typeof meta.min !== "number" || typeof meta.max !== "number" || typeof meta.default !== "number") {
                     throw new Error(`Consistency Check Failed: Slider attribute '${attrName}' in sort '${name}' must have numeric min, max, and default.`);
+                }
+            }
+            if (typeName === "relativePosition") {
+                const meta = getRelativePositionMeta(attrType);
+                if (!meta || typeof meta.target !== "string") {
+                    throw new Error(`Consistency Check Failed: relativePosition attribute '${attrName}' in sort '${name}' must have a string 'target' field.`);
+                }
+                const parts = meta.target.split(".");
+                if (parts.length !== 2 || !parts[0] || !parts[1]) {
+                    throw new Error(`Consistency Check Failed: relativePosition attribute '${attrName}' target '${meta.target}' must be in 'depKey.positionAttr' format.`);
+                }
+                const [depKey] = parts;
+                const depSortName = dependencies[depKey];
+                if (!depSortName) {
+                    throw new Error(`Consistency Check Failed: relativePosition attribute '${attrName}' target references unknown dependency '${depKey}' in sort '${name}'.`);
+                }
+                const depSortDef = this.sorts.get(depSortName);
+                if (!depSortDef) {
+                    throw new Error(`Consistency Check Failed: relativePosition attribute '${attrName}' target references dependency sort '${depSortName}' which is not defined.`);
+                }
+                const depAttrType = depSortDef.attributes[parts[1]];
+                if (getAttributeType(depAttrType) !== "position") {
+                    throw new Error(`Consistency Check Failed: relativePosition attribute '${attrName}' target field '${parts[1]}' in dependency sort '${depSortName}' is not of type 'position'.`);
                 }
             }
         }
@@ -135,7 +167,7 @@ export class Artefact {
         public layerId: string = "root"
     ) {}
 
-    getResolvedData(isLayerVisible?: (layerId: string) => boolean, reverseInfo?: ReverseDependencyInfo): Record<string, any> {
+    getResolvedData(isLayerVisible?: (layerId: string) => boolean, reverseInfo?: ReverseDependencyInfo, sortDef?: SortDefinition): Record<string, any> {
         const result = { ...this.data };
         if (reverseInfo) {
             const parentFields = reverseInfo.fieldsFor.get(this.sortName);
@@ -148,7 +180,24 @@ export class Artefact {
             }
         }
         for (const [key, depArtefact] of Object.entries(this.dependencies)) {
-            result[key] = depArtefact.getResolvedData(isLayerVisible, reverseInfo);
+            result[key] = depArtefact.getResolvedData(isLayerVisible, reverseInfo, sortDef);
+        }
+        // Resolve relativePosition fields: add offset to the dependency's position
+        if (sortDef) {
+            for (const [attrName, attrType] of Object.entries(sortDef.attributes)) {
+                const rpMeta = getRelativePositionMeta(attrType);
+                if (!rpMeta) continue;
+                const offset = result[attrName];
+                if (!Array.isArray(offset) || offset.length !== 2) continue;
+                const [depKey, fieldPath] = rpMeta.target.split(".");
+                let resolved: any = result[depKey];
+                for (const segment of fieldPath.split(".")) {
+                    resolved = resolved?.[segment];
+                }
+                if (Array.isArray(resolved) && resolved.length === 2) {
+                    result[attrName] = [resolved[0] + offset[0], resolved[1] + offset[1]];
+                }
+            }
         }
         return result;
     }
@@ -164,8 +213,8 @@ export class Artefact {
         return result;
     }
 
-    draw(context: D3Context, isLayerVisible?: (layerId: string) => boolean, reverseInfo?: ReverseDependencyInfo): void {
-        this.svgElement = this.drawFunction(this.getResolvedData(isLayerVisible, reverseInfo), context);
+    draw(context: D3Context, isLayerVisible?: (layerId: string) => boolean, reverseInfo?: ReverseDependencyInfo, sortDef?: SortDefinition): void {
+        this.svgElement = this.drawFunction(this.getResolvedData(isLayerVisible, reverseInfo, sortDef), context);
     }
 }
 
@@ -846,9 +895,9 @@ export class Drawing {
             // Primitive type checking
             const typeName = getAttributeType(attrType);
             const expectedJsType = typeName === "slider" ? "number" : typeName;
-            if (expectedJsType === "position") {
+            if (expectedJsType === "position" || expectedJsType === "relativePosition") {
                 if (!Array.isArray(value) || value.length !== 2 || typeof value[0] !== "number" || typeof value[1] !== "number") {
-                    throw new Error(`Consistency Check Failed: Data attribute '${attrName}' expected to be of primitive type 'position' ([number, number]), but got ${JSON.stringify(value)}.`);
+                    throw new Error(`Consistency Check Failed: Data attribute '${attrName}' expected to be of primitive type '${typeName}' ([number, number]), but got ${JSON.stringify(value)}.`);
                 }
             } else if (typeof value !== expectedJsType) {
                 throw new Error(`Consistency Check Failed: Data attribute '${attrName}' expected to be '${typeName}', but got '${typeof value}'.`);
@@ -898,7 +947,8 @@ export class Drawing {
             const layerArtefacts = this.artefacts.filter(a => a.layerId === layer.id);
             const isLayerVisible = (layerId: string) => this.isLayerVisible(layerId);
             for (const artefact of layerArtefacts) {
-                artefact.draw(layerGroup, isLayerVisible, reverseInfo);
+                const sortDef = this.sortStore.getSort(artefact.sortName);
+                artefact.draw(layerGroup, isLayerVisible, reverseInfo, sortDef);
                 if (this.focusedLayerId !== null) {
                     const focused = this.isFocused(artefact);
                     if (artefact.svgElement && artefact.svgElement.attr) {

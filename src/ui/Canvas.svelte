@@ -104,7 +104,7 @@
                 sortDef.drawFunction,
                 draft.layerId
             );
-            tempArt.draw(svgContext! as unknown as D3Context);
+            tempArt.draw(svgContext! as unknown as D3Context, undefined, undefined, sortDef);
             if (tempArt.svgElement) {
                 tempArt.svgElement.attr('opacity', 0.7);
             }
