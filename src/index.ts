@@ -111,7 +111,8 @@ export class SortStore {
                     throw new Error(`Consistency Check Failed: relativePosition attribute '${attrName}' target references dependency sort '${depSortName}' which is not defined.`);
                 }
                 const depAttrType = depSortDef.attributes[parts[1]];
-                if (getAttributeType(depAttrType) !== "position") {
+                const depTypeName = getAttributeType(depAttrType);
+                if (depTypeName !== "position" && depTypeName !== "relativePosition") {
                     throw new Error(`Consistency Check Failed: relativePosition attribute '${attrName}' target field '${parts[1]}' in dependency sort '${depSortName}' is not of type 'position'.`);
                 }
             }

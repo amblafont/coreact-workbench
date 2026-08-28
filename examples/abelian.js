@@ -40,11 +40,14 @@ function drawArrow(srcPos, tgtPos, data, context) {
     const tipY = tgtPos[1] - uy1 * R;
     const px = -uy1, py = ux1;
     const lineGroup = context.append("g");
-    lineGroup.append("path")
+    const linePath = lineGroup.append("path")
         .attr("d", `M ${startX},${startY} Q ${cx},${cy} ${baseX},${baseY}`)
         .attr("fill", "none")
         .attr("stroke", "#999")
         .attr("stroke-width", data.width);
+    if (data.dashed) {
+        linePath.attr("stroke-dasharray", "6,4");
+    }
     lineGroup.append("path")
         .attr("d", `M ${baseX - px * halfW},${baseY - py * halfW} L ${tipX},${tipY} L ${baseX + px * halfW},${baseY + py * halfW} Z`)
         .attr("fill", "#999")
@@ -60,6 +63,65 @@ function drawArrow(srcPos, tgtPos, data, context) {
             .text(data.label);
     }
     return lineGroup;
+}
+function bendMid(srcPos, tgtPos, bend) {
+    const dx = tgtPos[0] - srcPos[0];
+    const dy = tgtPos[1] - srcPos[1];
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const nx = len > 0 ? -dy / len : 0;
+    const ny = len > 0 ? dx / len : 0;
+    const mx = (srcPos[0] + tgtPos[0]) / 2;
+    const my = (srcPos[1] + tgtPos[1]) / 2;
+    return { cx: mx + bend * nx, cy: my + bend * ny };
+}
+function drawDoubleArrow(srcPos, tgtPos, data, context) {
+    const bend = typeof data.bend === "number" ? data.bend : 0;
+    const dx = tgtPos[0] - srcPos[0];
+    const dy = tgtPos[1] - srcPos[1];
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const ux = len > 0 ? dx / len : 1;
+    const uy = len > 0 ? dy / len : 0;
+    const { cx, cy } = bendMid(srcPos, tgtPos, bend);
+    const px = -uy, py = ux;
+    const offset = 4;
+    const group = context.append("g");
+    for (const side of [-1, 1]) {
+        const startX = srcPos[0] + ux * 20 + px * offset * side;
+        const startY = srcPos[1] + uy * 20 + py * offset * side;
+        const endX = tgtPos[0] - ux * 16 + px * offset * side;
+        const endY = tgtPos[1] - uy * 16 + py * offset * side;
+        group.append("path")
+            .attr("d", `M ${startX},${startY} Q ${cx + px * offset * side},${cy + py * offset * side} ${endX},${endY}`)
+            .attr("fill", "none")
+            .attr("stroke", "#333")
+            .attr("stroke-width", 2)
+            .attr("marker-end", "url(#arrowhead-double)");
+    }
+    return group;
+}
+function drawArc(srcPos, tgtPos, data, context) {
+    const bend = typeof data.bend === "number" ? data.bend : 0;
+    const dx = tgtPos[0] - srcPos[0];
+    const dy = tgtPos[1] - srcPos[1];
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const nx = len > 0 ? -dy / len : 0;
+    const ny = len > 0 ? dx / len : 0;
+    const mx = (srcPos[0] + tgtPos[0]) / 2;
+    const my = (srcPos[1] + tgtPos[1]) / 2;
+    const cx = mx + bend * nx;
+    const cy = my + bend * ny;
+    const chord = Math.hypot(dx, dy);
+    const sagitta = Math.abs(bend);
+    const radius = chord > 0 ? (sagitta * sagitta + chord * chord / 4) / (2 * sagitta) : chord / 2;
+    const r = radius > 0 ? radius : chord / 2;
+    const sweep = bend >= 0 ? 1 : 0;
+    const group = context.append("g");
+    group.append("path")
+        .attr("d", `M ${srcPos[0]},${srcPos[1]} A ${r} ${r} 0 0 ${sweep} ${tgtPos[0]},${tgtPos[1]}`)
+        .attr("fill", "none")
+        .attr("stroke", "#333")
+        .attr("stroke-width", 2);
+    return group;
 }
 {
     sortStore
@@ -275,5 +337,68 @@ function drawArrow(srcPos, tgtPos, data, context) {
             .attr("x2", x - s).attr("y2", y + s)
             .attr("stroke", "#c0392b").attr("stroke-width", 2);
         return group;
+    })
+        .newSort("map", { source: "element", target: "element" },
+    { width: "number", bend: { type: "slider", min: -500, max: 500, default: 0 } }, (data, context) => {
+        return drawArrow(data.source.position, data.target.position, data, context);
+    })
+        .newSort("welldefined", { source: "element", target: "element" },
+    { bend: { type: "slider", min: -500, max: 500, default: 0 } }, (data, context) => {
+        return drawDoubleArrow(data.source.position, data.target.position, data, context);
+    }, (context) => {
+        let defs = context.select("defs");
+        if (defs.empty()) {
+            defs = context.append("defs");
+        }
+        defs.append("marker")
+            .attr("id", "arrowhead-double")
+            .attr("viewBox", "0 -5 10 10")
+            .attr("refX", 9)
+            .attr("refY", 0)
+            .attr("orient", "auto")
+            .attr("markerWidth", 8)
+            .attr("markerHeight", 8)
+            .append("path")
+            .attr("d", "M0,-5L10,0L0,5")
+            .attr("fill", "#333");
+    })
+        .newSort("instance", { source: "element", target: "element", cone_mor: "cone_mor" },
+    { width: "number", bend: { type: "slider", min: -500, max: 500, default: 0 } }, (data, context) => {
+        return drawArrow(data.source.position, data.target.position, { ...data, dashed: true }, context);
+    })
+        .newSort("zero_ob", { vertex: "Vertex" }, { position: { type: "relativePosition", target: "vertex.position" } }, (data, context) => {
+        return context.append("text")
+            .attr("x", data.position[0])
+            .attr("y", data.position[1])
+            .attr("text-anchor", "middle")
+            .attr("dy", ".3em")
+            .attr("fill", "#333")
+            .attr("font-family", "sans-serif")
+            .attr("font-size", "14px")
+            .text("0");
+    })
+        .newSort("zero_elt", { element: "element" }, { position: { type: "relativePosition", target: "element.position" } }, (data, context) => {
+        return context.append("text")
+            .attr("x", data.position[0])
+            .attr("y", data.position[1])
+            .attr("text-anchor", "middle")
+            .attr("dy", ".3em")
+            .attr("fill", "#333")
+            .attr("font-family", "sans-serif")
+            .attr("font-size", "14px")
+            .text("0");
+    })
+        .newSort("forall_elt", { element: "element" }, {}, (data, context) => {
+        const x = data.element.position[0], y = data.element.position[1];
+        const s = 6;
+        return context.append("line")
+            .attr("x1", x - s).attr("y1", y + 12)
+            .attr("x2", x + s).attr("y2", y + 12)
+            .attr("stroke", "#333")
+            .attr("stroke-width", 2);
+    })
+        .newSort("exact_seq", { first: "Edge", second: "Edge" },
+    { bend: { type: "slider", min: -500, max: 500, default: 0 } }, (data, context) => {
+        return drawArc(data.first.target.position, data.second.source.position, data, context);
     });
 }
