@@ -40,6 +40,18 @@ function drawArrow(srcPos, tgtPos, data, context) {
     const tipY = tgtPos[1] - uy1 * R;
     const px = -uy1, py = ux1;
     const lineGroup = context.append("g");
+    if (data.mapsto) {
+        const barHalfLen = 5;
+        const bx = -uy0, by = ux0;
+        lineGroup.append("line")
+            .attr("x1", startX - bx * barHalfLen)
+            .attr("y1", startY - by * barHalfLen)
+            .attr("x2", startX + bx * barHalfLen)
+            .attr("y2", startY + by * barHalfLen)
+            .attr("stroke", "#999")
+            .attr("stroke-width", data.width)
+            .attr("stroke-linecap", "round");
+    }
     const linePath = lineGroup.append("path")
         .attr("d", `M ${startX},${startY} Q ${cx},${cy} ${baseX},${baseY}`)
         .attr("fill", "none")
@@ -374,9 +386,9 @@ function drawArc(srcPos, tgtPos, data, context) {
             .attr("stroke", "#c0392b").attr("stroke-width", 2);
         return group;
     })
-        .newSort("map", { source: "element", target: "element" },
+        .newSort("map", { source: "element", target: "element", edge: "Edge" },
     { width: "number", bend: { type: "slider", min: -500, max: 500, default: 0 } }, (data, context) => {
-        return drawArrow(data.source.position, data.target.position, data, context);
+        return drawArrow(data.source.position, data.target.position, { ...data, mapsto: true }, context);
     })
         .newSort("welldefined", { source: "element", target: "element" },
     { bend: { type: "slider", min: -500, max: 500, default: 0 } }, (data, context) => {
