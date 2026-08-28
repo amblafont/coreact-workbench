@@ -2,7 +2,7 @@
     import type { Artefact } from '../index';
     import { getAttributeType, getRelativePositionMeta } from '../index';
     import DataAttributeFields from './DataAttributeFields.svelte';
-    import { drawing, sortStore } from './store';
+    import { drawing, sortStore, allLayers } from './store';
     import {
         mergeMode,
         mergeFirstArtefact,
@@ -241,7 +241,7 @@
                     value={draft.layerId}
                     onchange={(e) => setDraftLayer((e.currentTarget as HTMLSelectElement).value)}
                 >
-                    {#each drawing.getAllLayers() as l}
+                    {#each $allLayers as l}
                         <option value={l.id}>{l.name}</option>
                     {/each}
                 </select>
@@ -353,7 +353,7 @@
                         }
                     }}
                 >
-                    {#each drawing.getAllLayers() as l}
+                    {#each $allLayers as l}
                         <option value={l.id}>{l.name}</option>
                     {/each}
                 </select>
