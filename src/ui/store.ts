@@ -159,7 +159,8 @@ export function applyPickedPosition(x: number, y: number): void {
             const [depKey, fieldPath] = rpMeta.target.split(".");
             const depArtefact = picker.artefact.dependencies?.[depKey];
             if (depArtefact) {
-                const depResolved = depArtefact.getResolvedData();
+                const depSortDef = sortStore.getSort(depArtefact.sortName);
+                const depResolved = depArtefact.getResolvedData(undefined, undefined, depSortDef, (n) => sortStore.getSort(n));
                 let depPos: any = depResolved;
                 for (const seg of fieldPath.split('.')) depPos = depPos?.[seg];
                 if (Array.isArray(depPos) && depPos.length === 2) {

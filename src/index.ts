@@ -168,7 +168,12 @@ export class Artefact {
         public layerId: string = "root"
     ) {}
 
-    getResolvedData(isLayerVisible?: (layerId: string) => boolean, reverseInfo?: ReverseDependencyInfo, sortDef?: SortDefinition): Record<string, any> {
+    getResolvedData(
+        isLayerVisible?: (layerId: string) => boolean,
+        reverseInfo?: ReverseDependencyInfo,
+        sortDef?: SortDefinition,
+        getSortDef?: (sortName: string) => SortDefinition | undefined
+    ): Record<string, any> {
         const result = { ...this.data };
         if (reverseInfo) {
             const parentFields = reverseInfo.fieldsFor.get(this.sortName);
@@ -181,7 +186,8 @@ export class Artefact {
             }
         }
         for (const [key, depArtefact] of Object.entries(this.dependencies)) {
-            result[key] = depArtefact.getResolvedData(isLayerVisible, reverseInfo, sortDef);
+            const depSortDef = getSortDef ? getSortDef(depArtefact.sortName) : undefined;
+            result[key] = depArtefact.getResolvedData(isLayerVisible, reverseInfo, depSortDef, getSortDef);
         }
         // Resolve relativePosition fields: add offset to the dependency's position
         if (sortDef) {
@@ -214,8 +220,8 @@ export class Artefact {
         return result;
     }
 
-    draw(context: D3Context, isLayerVisible?: (layerId: string) => boolean, reverseInfo?: ReverseDependencyInfo, sortDef?: SortDefinition): void {
-        this.svgElement = this.drawFunction(this.getResolvedData(isLayerVisible, reverseInfo, sortDef), context);
+    draw(context: D3Context, isLayerVisible?: (layerId: string) => boolean, reverseInfo?: ReverseDependencyInfo, sortDef?: SortDefinition, getSortDef?: (sortName: string) => SortDefinition | undefined): void {
+        this.svgElement = this.drawFunction(this.getResolvedData(isLayerVisible, reverseInfo, sortDef, getSortDef), context);
     }
 }
 
@@ -949,7 +955,7 @@ export class Drawing {
             const isLayerVisible = (layerId: string) => this.isLayerVisible(layerId);
             for (const artefact of layerArtefacts) {
                 const sortDef = this.sortStore.getSort(artefact.sortName);
-                artefact.draw(layerGroup, isLayerVisible, reverseInfo, sortDef);
+                artefact.draw(layerGroup, isLayerVisible, reverseInfo, sortDef, (n) => this.sortStore.getSort(n));
                 if (this.focusedLayerId !== null) {
                     const focused = this.isFocused(artefact);
                     if (artefact.svgElement && artefact.svgElement.attr) {

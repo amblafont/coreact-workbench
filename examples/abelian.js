@@ -64,6 +64,12 @@ function drawArrow(srcPos, tgtPos, data, context) {
     }
     return lineGroup;
 }
+function unitVec(from, to) {
+    const dx = to[0] - from[0];
+    const dy = to[1] - from[1];
+    const len = Math.hypot(dx, dy);
+    return len > 0 ? [dx / len, dy / len] : [0, 0];
+}
 function bendMid(srcPos, tgtPos, bend) {
     const dx = tgtPos[0] - srcPos[0];
     const dy = tgtPos[1] - srcPos[1];
@@ -111,13 +117,43 @@ function drawArc(srcPos, tgtPos, data, context) {
     const cx = mx + bend * nx;
     const cy = my + bend * ny;
     const chord = Math.hypot(dx, dy);
-    const sagitta = Math.abs(bend);
-    const radius = chord > 0 ? (sagitta * sagitta + chord * chord / 4) / (2 * sagitta) : chord / 2;
-    const r = radius > 0 ? radius : chord / 2;
-    const sweep = bend >= 0 ? 1 : 0;
     const group = context.append("g");
+    if (chord < 1e-6) {
+        return group;
+    }
+    // Center-controlled point: chord midpoint offset perpendicular by bend
+    const p = [cx, cy];
+    // Circumcircle through srcPos, p and tgtPos
+    const ax = srcPos[0] - tgtPos[0];
+    const ay = srcPos[1] - tgtPos[1];
+    const bx = p[0] - tgtPos[0];
+    const by = p[1] - tgtPos[1];
+    const det = 2 * (ax * by - ay * bx);
+    if (Math.abs(det) < 1e-6) {
+        // Collinear points (e.g. bend === 0): draw a straight line
+        group.append("path")
+            .attr("d", `M ${srcPos[0]},${srcPos[1]} L ${tgtPos[0]},${tgtPos[1]}`)
+            .attr("fill", "none")
+            .attr("stroke", "#333")
+            .attr("stroke-width", 2);
+        return group;
+    }
+    const centX = (by * (ax * ax + ay * ay) - ay * (bx * bx + by * by)) / det + tgtPos[0];
+    const centY = (ax * (bx * bx + by * by) - bx * (ax * ax + ay * ay)) / det + tgtPos[1];
+    const r = Math.hypot(centX - srcPos[0], centY - srcPos[1]);
+    // Signed turn in (-PI, PI]
+    const norm = (d) => ((d + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+    const a0 = Math.atan2(srcPos[1] - centY, srcPos[0] - centX);
+    const ap = Math.atan2(p[1] - centY, p[0] - centX);
+    const a2 = Math.atan2(tgtPos[1] - centY, tgtPos[0] - centX);
+    // Turn from start to control and control to end. If they share a sign the
+    // minor arc from start to end passes through the control point.
+    const dPa = norm(ap - a0);
+    const dAp = norm(a2 - ap);
+    const sweep = dPa >= 0 ? 1 : 0;
+    const largeArc = (dPa >= 0) !== (dAp >= 0) ? 1 : 0;
     group.append("path")
-        .attr("d", `M ${srcPos[0]},${srcPos[1]} A ${r} ${r} 0 0 ${sweep} ${tgtPos[0]},${tgtPos[1]}`)
+        .attr("d", `M ${srcPos[0]},${srcPos[1]} A ${r} ${r} 0 ${largeArc} ${sweep} ${tgtPos[0]},${tgtPos[1]}`)
         .attr("fill", "none")
         .attr("stroke", "#333")
         .attr("stroke-width", 2);
@@ -398,7 +434,17 @@ function drawArc(srcPos, tgtPos, data, context) {
             .attr("stroke-width", 2);
     })
         .newSort("exact_seq", { first: "Edge", second: "Edge" },
-    { bend: { type: "slider", min: -500, max: 500, default: 0 } }, (data, context) => {
-        return drawArc(data.first.target.position, data.second.source.position, data, context);
+    { bend: { type: "slider", min: -500, max: 500, default: 0 }, offset: { type: "slider", min: 0, max: 500, default: 20 } }, (data, context) => {
+        const offset = typeof data.offset === "number" ? data.offset : 20;
+        const s1 = data.first.source.position, t1 = data.first.target.position;
+        const c1 = bendMid(s1, t1, typeof data.first.bend === "number" ? data.first.bend : 0);
+        const u1 = unitVec([c1.cx, c1.cy], t1);
+        const s2 = data.second.source.position, t2 = data.second.target.position;
+        const c2 = bendMid(s2, t2, typeof data.second.bend === "number" ? data.second.bend : 0);
+        const u2 = unitVec(s2, [c2.cx, c2.cy]);
+        const gap = VERTEX_RADIUS + offset;
+        const start = [t1[0] - u1[0] * gap, t1[1] - u1[1] * gap];
+        const end = [s2[0] + u2[0] * gap, s2[1] + u2[1] * gap];
+        return drawArc(start, end, data, context);
     });
 }
