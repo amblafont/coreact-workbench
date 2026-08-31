@@ -1212,6 +1212,7 @@ export interface SavedDrawing {
     artefacts: ArtefactData[];
     isRule: boolean;
     isFirstOrder: boolean;
+    parentName?: string;
 }
 
 export class DrawingStore {
@@ -1477,7 +1478,8 @@ export class DrawingStore {
             layers: p.layers,
             artefacts: p.artefacts,
             isRule: markedAsRule,
-            isFirstOrder: markedAsRule && DrawingStore.firstOrderFromLayers(p.layers)
+            isFirstOrder: markedAsRule && DrawingStore.firstOrderFromLayers(p.layers),
+            parentName: typeof p.parentName === 'string' ? p.parentName : undefined
         };
     }
 
@@ -1556,11 +1558,33 @@ export class DrawingStore {
         this.drawings.delete(oldName);
         saved.name = trimmed;
         this.drawings.set(trimmed, saved);
+        for (const [, other] of this.drawings) {
+            if (other.parentName === oldName) {
+                other.parentName = trimmed;
+            }
+        }
         return saved;
     }
 
     public deleteDrawing(name: string): boolean {
+        const children: string[] = [];
+        for (const [childName, child] of this.drawings) {
+            if (child.parentName === name) {
+                children.push(childName);
+            }
+        }
+        for (const childName of children) {
+            this.drawings.delete(childName);
+        }
         return this.drawings.delete(name);
+    }
+
+    public setDrawingParent(name: string, parentName: string): void {
+        const saved = this.drawings.get(name);
+        if (!saved) {
+            throw new Error(`Consistency Check Failed: Drawing '${name}' does not exist.`);
+        }
+        saved.parentName = parentName;
     }
 
     public clear(): void {
@@ -2516,4 +2540,196 @@ export function applySecondOrderRule(rule: Drawing, host: Drawing, application: 
     }
 
     return { hostArtefacts, hostCreated: created, derivedRules };
+}
+
+export interface ReverseRule {
+    premiseName: string;
+    drawing: Drawing;
+}
+
+export function generateFirstOrderReverseRules(rule: Drawing): ReverseRule[] {
+    const layers = rule.getAllLayers();
+    const rootLayers = layers.filter(l => l.parentId === null);
+    if (rootLayers.length !== 1) {
+        throw new Error("Consistency Check Failed: Generating reverse rules requires the rule to have exactly one root layer.");
+    }
+    const ruleRoot = rootLayers[0];
+    const childLayers = layers.filter(l => l.parentId === ruleRoot.id);
+    if (childLayers.length < 2) {
+        throw new Error("Consistency Check Failed: Generating reverse rules requires the rule to be second-order (at least two child layers of root).");
+    }
+
+    const conclusion = childLayers.find(child => {
+        return layers.filter(l => l.parentId === child.id).length === 0;
+    });
+    if (!conclusion) {
+        throw new Error("Consistency Check Failed: Second-order rule must have exactly one child layer of the root without children.");
+    }
+
+    const premiseLayers = childLayers.filter(child => child !== conclusion);
+    const results: ReverseRule[] = [];
+
+    for (const premise of premiseLayers) {
+        const childOfPremise = layers.filter(l => l.parentId === premise.id)[0];
+        if (!childOfPremise) {
+            throw new Error(`Consistency Check Failed: Premise layer '${premise.name}' has no child layer.`);
+        }
+
+        const derived = new Drawing(rule.sortStore);
+        const derivedRootId = "root";
+        const origToCopy = new Map<Artefact, Artefact>();
+
+        const rootArts = rule.getArtefacts()
+            .filter(a => a.layerId === ruleRoot.id && a.sortName !== "Equality");
+        const remainingRoot = [...rootArts];
+        while (remainingRoot.length > 0) {
+            const idx = remainingRoot.findIndex(a =>
+                Object.values(a.dependencies).every(dep =>
+                    dep.layerId === ruleRoot.id && origToCopy.has(dep)
+                )
+            );
+            if (idx === -1) {
+                const label = remainingRoot[0]?.data.label || remainingRoot[0]?.sortName || "unknown";
+                throw new Error(`Consistency Check Failed: Cannot resolve root artefact '${label}' when building reverse rule for premise '${premise.name}'.`);
+            }
+            const a = remainingRoot.splice(idx, 1)[0];
+            const copiedDeps: Record<string, Artefact> = {};
+            for (const [key, dep] of Object.entries(a.dependencies)) {
+                copiedDeps[key] = origToCopy.get(dep)!;
+            }
+            const copy = derived.newArtefact(a.sortName, copiedDeps, JSON.parse(JSON.stringify(a.data)), derivedRootId);
+            origToCopy.set(a, copy);
+        }
+
+        const rootEqualities = rule.getArtefacts()
+            .filter(a => a.layerId === ruleRoot.id && a.sortName === "Equality");
+        for (const eq of rootEqualities) {
+            const mappedChildren = artefactChildren(eq)
+                .map(c => origToCopy.get(c))
+                .filter((c): c is Artefact => c !== undefined);
+            const uniqueChildren = Array.from(new Set(mappedChildren));
+            if (uniqueChildren.length >= 2) {
+                derived.addEqualityArtefactUnchecked(uniqueChildren, derivedRootId, JSON.parse(JSON.stringify(eq.data)));
+            }
+        }
+
+        const conclusionArts = rule.getArtefacts()
+            .filter(a => a.layerId === conclusion.id && a.sortName !== "Equality");
+        const remainingConclusion = [...conclusionArts];
+        while (remainingConclusion.length > 0) {
+            const idx = remainingConclusion.findIndex(a =>
+                Object.values(a.dependencies).every(dep =>
+                    ((dep.layerId === ruleRoot.id || dep.layerId === conclusion.id) && origToCopy.has(dep))
+                )
+            );
+            if (idx === -1) {
+                const label = remainingConclusion[0]?.data.label || remainingConclusion[0]?.sortName || "unknown";
+                throw new Error(`Consistency Check Failed: Cannot resolve conclusion artefact '${label}' when building reverse rule for premise '${premise.name}'.`);
+            }
+            const a = remainingConclusion.splice(idx, 1)[0];
+            const copiedDeps: Record<string, Artefact> = {};
+            for (const [key, dep] of Object.entries(a.dependencies)) {
+                copiedDeps[key] = origToCopy.get(dep)!;
+            }
+            const copy = derived.newArtefact(a.sortName, copiedDeps, JSON.parse(JSON.stringify(a.data)), derivedRootId);
+            origToCopy.set(a, copy);
+        }
+
+        const conclusionEqualities = rule.getArtefacts()
+            .filter(a => a.layerId === conclusion.id && a.sortName === "Equality");
+        for (const eq of conclusionEqualities) {
+            const mappedChildren = artefactChildren(eq)
+                .map(c => origToCopy.get(c))
+                .filter((c): c is Artefact => c !== undefined);
+            const uniqueChildren = Array.from(new Set(mappedChildren));
+            if (uniqueChildren.length >= 2) {
+                derived.addEqualityArtefactUnchecked(uniqueChildren, derivedRootId, JSON.parse(JSON.stringify(eq.data)));
+            }
+        }
+
+        const premiseArts = rule.getArtefacts()
+            .filter(a => a.layerId === premise.id && a.sortName !== "Equality");
+        const remainingPremise = [...premiseArts];
+        while (remainingPremise.length > 0) {
+            const idx = remainingPremise.findIndex(a =>
+                Object.values(a.dependencies).every(dep =>
+                    ((dep.layerId === ruleRoot.id || dep.layerId === premise.id) && origToCopy.has(dep))
+                )
+            );
+            if (idx === -1) {
+                const label = remainingPremise[0]?.data.label || remainingPremise[0]?.sortName || "unknown";
+                throw new Error(`Consistency Check Failed: Cannot resolve premise artefact '${label}' when building reverse rule for premise '${premise.name}'.`);
+            }
+            const a = remainingPremise.splice(idx, 1)[0];
+            const copiedDeps: Record<string, Artefact> = {};
+            for (const [key, dep] of Object.entries(a.dependencies)) {
+                copiedDeps[key] = origToCopy.get(dep)!;
+            }
+            const copy = derived.newArtefact(a.sortName, copiedDeps, JSON.parse(JSON.stringify(a.data)), derivedRootId);
+            origToCopy.set(a, copy);
+        }
+
+        const premiseEqualities = rule.getArtefacts()
+            .filter(a => a.layerId === premise.id && a.sortName === "Equality");
+        for (const eq of premiseEqualities) {
+            const mappedChildren = artefactChildren(eq)
+                .map(c => origToCopy.get(c))
+                .filter((c): c is Artefact => c !== undefined);
+            const uniqueChildren = Array.from(new Set(mappedChildren));
+            if (uniqueChildren.length >= 2) {
+                derived.addEqualityArtefactUnchecked(uniqueChildren, derivedRootId, JSON.parse(JSON.stringify(eq.data)));
+            }
+        }
+
+        derived.addLayer(childOfPremise.id, childOfPremise.name, derivedRootId, childOfPremise.color, childOfPremise.colorEnabled);
+
+        const goalArts = rule.getArtefacts()
+            .filter(a => a.layerId === childOfPremise.id && a.sortName !== "Equality");
+        const goalToCopy = new Map<Artefact, Artefact>();
+        const remainingGoal = [...goalArts];
+        while (remainingGoal.length > 0) {
+            const idx = remainingGoal.findIndex(a =>
+                Object.values(a.dependencies).every(dep =>
+                    (origToCopy.has(dep)) ||
+                    (dep.layerId === childOfPremise.id && goalToCopy.has(dep))
+                )
+            );
+            if (idx === -1) {
+                const label = remainingGoal[0]?.data.label || remainingGoal[0]?.sortName || "unknown";
+                throw new Error(`Consistency Check Failed: Cannot resolve goal artefact '${label}' when building reverse rule for premise '${premise.name}'.`);
+            }
+            const a = remainingGoal.splice(idx, 1)[0];
+            const copiedDeps: Record<string, Artefact> = {};
+            for (const [key, dep] of Object.entries(a.dependencies)) {
+                if (origToCopy.has(dep)) {
+                    copiedDeps[key] = origToCopy.get(dep)!;
+                } else {
+                    copiedDeps[key] = goalToCopy.get(dep)!;
+                }
+            }
+            const copy = derived.newArtefact(a.sortName, copiedDeps, JSON.parse(JSON.stringify(a.data)), childOfPremise.id);
+            goalToCopy.set(a, copy);
+        }
+
+        const goalEqualities = rule.getArtefacts()
+            .filter(a => a.layerId === childOfPremise.id && a.sortName === "Equality");
+        for (const eq of goalEqualities) {
+            const mappedChildren = artefactChildren(eq)
+                .map(c => {
+                    if (origToCopy.has(c)) return origToCopy.get(c);
+                    if (goalToCopy.has(c)) return goalToCopy.get(c);
+                    return undefined;
+                })
+                .filter((c): c is Artefact => c !== undefined);
+            const uniqueChildren = Array.from(new Set(mappedChildren));
+            if (uniqueChildren.length >= 2) {
+                derived.addEqualityArtefactUnchecked(uniqueChildren, childOfPremise.id, JSON.parse(JSON.stringify(eq.data)));
+            }
+        }
+
+        derived.setIsRule(true);
+        results.push({ premiseName: premise.name, drawing: derived });
+    }
+
+    return results;
 }

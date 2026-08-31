@@ -9,6 +9,7 @@ import {
     findSecondOrderRuleApplications,
     applyFirstOrderRule,
     applySecondOrderRule,
+    generateFirstOrderReverseRules,
     filterRedundantRuleApplications,
     filterNoProgressRuleApplications,
     type SortDefinition,
@@ -1026,5 +1027,43 @@ export function applyRuleAt(savedRuleName: string, appIndex: number): void {
         refresh();
     } catch (err) {
         pushToast('error', `Error applying rule '${savedRule.name}':\n${(err as Error).message}`);
+    }
+}
+
+export function generateReverseRulesFor(savedRuleName: string): void {
+    const savedRule = drawingStore.getDrawing(savedRuleName);
+    if (!savedRule) {
+        pushToast('error', `Drawing '${savedRuleName}' does not exist.`);
+        return;
+    }
+    if (!savedRule.isRule || savedRule.isFirstOrder) {
+        pushToast('error', `Drawing '${savedRuleName}' is not a second-order rule.`);
+        return;
+    }
+    try {
+        const ruleDrawing = new Drawing(sortStore);
+        drawingStore.loadDrawing(savedRuleName, ruleDrawing);
+        const results = generateFirstOrderReverseRules(ruleDrawing);
+        if (results.length === 0) {
+            pushToast('info', `Second-order rule '${savedRuleName}' has no premise layers; nothing generated.`);
+            return;
+        }
+        const createdNames: string[] = [];
+        for (const result of results) {
+            let name = `${savedRuleName} > ${result.premiseName} (reverse)`;
+            let suffix = 2;
+            while (drawingStore.getDrawing(name)) {
+                name = `${savedRuleName} > ${result.premiseName} (reverse) (${suffix})`;
+                suffix++;
+            }
+            drawingStore.saveDrawing(name, result.drawing);
+            drawingStore.setDrawingParent(name, savedRuleName);
+            createdNames.push(name);
+            console.log(`Generated reverse rule '${name}': isRule=${result.drawing.isRule}, artefacts=${result.drawing.getArtefacts().length}.`);
+        }
+        pushToast('info', `Generated ${createdNames.length} reverse rule(s) for '${savedRuleName}':\n- ${createdNames.join('\n- ')}`);
+        refresh();
+    } catch (err) {
+        pushToast('error', `Error generating reverse rules for '${savedRuleName}':\n${(err as Error).message}`);
     }
 }

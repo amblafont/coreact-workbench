@@ -447,6 +447,26 @@ body {
 .rule-badge-invalid {
     background-color: #e74c3c;
 }
+.drawing-children {
+    margin-left: 14px;
+    padding-left: 8px;
+    border-left: 2px solid #e2e6ea;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.drawing-child-row {
+    background-color: #fbfcfd;
+    border-color: #dee2e6;
+}
+.gen-reverse-btn {
+    border-color: #16a085;
+    color: #16a085;
+}
+.gen-reverse-btn:hover {
+    background-color: #16a085;
+    color: white;
+}
 .rule-app-name .first-order-badge {
     margin-left: 6px;
 }

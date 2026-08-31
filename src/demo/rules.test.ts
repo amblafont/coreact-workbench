@@ -5,6 +5,7 @@ import {
     findSecondOrderRuleApplications,
     applyFirstOrderRule,
     applySecondOrderRule,
+    generateFirstOrderReverseRules,
     filterRedundantRuleApplications,
     filterNoProgressRuleApplications,
     EqualityArtefact,
@@ -147,6 +148,80 @@ describe('second-order rules', () => {
         const arrow = hostMonoArtefacts[0].dependencies['arrow'];
         expect(arrow.data.label).toBe('he1');
         expect(dr.drawing.getArtefacts().filter(a => a.sortName === 'isMono').length).toBe(0);
+    });
+});
+
+describe('generating first-order reverse rules from second-order rules', () => {
+    it('generates one reverse rule per premise layer', () => {
+        const rule = buildSecondOrderRule();
+        const results = generateFirstOrderReverseRules(rule);
+
+        expect(results.length).toBe(1);
+        expect(results[0].premiseName).toBe('Premise A');
+    });
+
+    it('reverse rule is a valid first-order rule with merged root and premise goal as conclusion', () => {
+        const rule = buildSecondOrderRule();
+        const [result] = generateFirstOrderReverseRules(rule);
+        const reverse = result.drawing;
+
+        expect(reverse.isRule).toBe(true);
+        expect(reverse.checkRuleConditions().isRule).toBe(true);
+
+        const rootLayers = reverse.getAllLayers().filter(l => l.parentId === null);
+        expect(rootLayers.length).toBe(1);
+        const rootChildren = reverse.getAllLayers().filter(l => l.parentId === rootLayers[0].id);
+        expect(rootChildren.length).toBe(1);
+        // first-order: exactly one leaf child of root
+        const childOfPremise = rootChildren[0];
+
+        // The merged root contains pattern + conclusion + premise artefacts
+        const rootArtefacts = reverse.getArtefacts().filter(a => a.layerId === rootLayers[0].id);
+        const rootLabels = rootArtefacts.map(a => a.data.label);
+        // original root pattern
+        expect(rootLabels).toContain('sv0');
+        expect(rootLabels).toContain('sf');
+        // conclusion artefacts
+        expect(rootLabels).toContain('sh');
+        expect(rootLabels).toContain('sdv');
+
+        // The conclusion layer is the premise's goal child ('premise-b' artefacts)
+        const goalArtefacts = reverse.getArtefacts().filter(a => a.layerId === childOfPremise.id);
+        expect(goalArtefacts.some(a => a.data.label === 'sb')).toBe(true);
+    });
+
+    it('generated reverse rule can be applied to a host containing the merged root pattern', () => {
+        const rule = buildSecondOrderRule();
+        const [result] = generateFirstOrderReverseRules(rule);
+        const reverse = result.drawing;
+        reverse.setIsRule(true);
+
+        // Build a host whose root layer matches the reverse rule's merged root:
+        // original pattern (v0,v1,v2, f, g), conclusion (h, isMono f), premise vertex (dv)
+        const host = makeDrawing();
+        const v0 = makeVertex(host, 'v0');
+        const v1 = makeVertex(host, 'v1');
+        const v2 = makeVertex(host, 'v2');
+        const f = makeEdge(host, 'f', v0, v1);
+        makeEdge(host, 'g', v1, v2);
+        makeEdge(host, 'h', v0, v2);
+        host.newArtefact('isMono', { arrow: f }, {}, 'root');
+        makeVertex(host, 'dv');
+
+        const apps = findFirstOrderRuleApplications(reverse, host);
+        expect(apps.length).toBeGreaterThanOrEqual(1);
+
+        // Applying should add the premise goal edge ('sb' shape: dv -> v1)
+        const before = host.getArtefacts().filter(a => a.sortName === 'Edge').length;
+        const applied = applyFirstOrderRule(reverse, host, apps[0]).artefacts;
+        expect(applied.length).toBeGreaterThan(0);
+        const after = host.getArtefacts().filter(a => a.sortName === 'Edge').length;
+        expect(after).toBe(before + 1);
+    });
+
+    it('rejects applying reverse-rule generation to a first-order rule', () => {
+        const rule = buildIsMonoInChildLayerRule();
+        expect(() => generateFirstOrderReverseRules(rule)).toThrowError(/Consistency Check Failed/);
     });
 });
 
