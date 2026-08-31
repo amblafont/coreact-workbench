@@ -226,12 +226,13 @@ export function findNextUnfilledDependency(draft: DraftArtefact): string | null 
 export function setDraftDataField(name: string, value: DataAttributeValue): void {
     draftArtefact.update(d => {
         if (!d) return d;
+        const nextData = { ...d.data };
         if (name === 'label' && value === '') {
-            delete d.data[name];
+            delete nextData[name];
         } else {
-            d.data[name] = value;
+            nextData[name] = value;
         }
-        return d;
+        return { ...d, data: nextData };
     });
     refresh();
 }
@@ -239,8 +240,7 @@ export function setDraftDataField(name: string, value: DataAttributeValue): void
 export function setDraftLayer(layerId: string): void {
     draftArtefact.update(d => {
         if (!d) return d;
-        d.layerId = layerId;
-        return d;
+        return { ...d, layerId };
     });
     refresh();
 }
@@ -593,8 +593,7 @@ export function pickDraftDependency(artefact: Artefact): void {
                 return d;
             }
             const nextIdx = Object.keys(d.dependencies).length;
-            d.dependencies[`${nextIdx}`] = artefact;
-            return d;
+            return { ...d, dependencies: { ...d.dependencies, [`${nextIdx}`]: artefact } };
         });
         refresh();
         return;
@@ -604,7 +603,7 @@ export function pickDraftDependency(artefact: Artefact): void {
     const expectedSort = sortDef?.dependencies[picking];
     if (expectedSort && artefact.sortName === expectedSort) {
         draftArtefact.update(d => {
-            if (d) d.dependencies[picking] = artefact;
+            if (d) return { ...d, dependencies: { ...d.dependencies, [picking]: artefact } };
             return d;
         });
         dependencyPickingFor.set(findNextUnfilledDependency(get(draftArtefact) as DraftArtefact));

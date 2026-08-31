@@ -38,6 +38,16 @@
     let otherCandidates: Artefact[] = [];
     let mergePreviewLabel = '';
 
+    // The inspected Artefact is a plain mutable object; mutations signal via
+    // `version`. Rebuild `inspectModel` as a fresh reference on every bump so
+    // the DataAttributeFields child re-renders its in-place-mutated data.
+    let inspectModel: Artefact | null = null;
+    $: {
+        const a = $inspectedArtefact;
+        $version;
+        inspectModel = a ? { data: a.data, dependencies: a.dependencies, sortName: a.sortName } as Artefact : null;
+    }
+
     $: {
         $version;
         const first = $mergeFirstArtefact;
@@ -379,7 +389,7 @@
 
             <DataAttributeFields
                 prefix="inspect"
-                model={art}
+                model={inspectModel!}
                 attributes={artSortDef.attributes}
                 onValueChange={(attrName, value) => setArtefactDataField(art, attrName, value)}
                 onSetPosition={(attrName, axis, newVal) =>
