@@ -1,6 +1,6 @@
 <script lang="ts">
     import type { Layer } from '../index';
-    import { drawing, allLayers, layerProvability } from './store';
+    import { drawing, allLayers, layerProvability, focusedLayerId } from './store';
     import {
         toggleLayerVisibility,
         toggleLayerFocus,
@@ -16,19 +16,17 @@
     export let layer: Layer;
 
     let childLayers: Layer[] = [];
-    let focusedId: string | null = null;
     let isEffectivelyVisible = true;
     let provableResult: { provable: boolean; reason: string } | undefined;
 
     $: childLayers = $allLayers.filter(l => l.parentId === layer.id);
-    $: focusedId = drawing.getFocusedLayerId();
     $: isEffectivelyVisible = drawing.isLayerVisible(layer.id);
     $: provableResult = $layerProvability.get(layer.id);
 </script>
 
 <div class="layer-item {layer.parentId === null ? 'root-layer' : ''}">
     <div
-        class="layer-row {focusedId === layer.id ? 'focused' : ''} {!isEffectivelyVisible ? 'layer-hidden' : ''}"
+        class="layer-row {$focusedLayerId === layer.id ? 'focused' : ''} {!isEffectivelyVisible ? 'layer-hidden' : ''}"
     >
         <div class="layer-row-header">
             <span class="layer-title" title="ID: {layer.id}{!isEffectivelyVisible ? ' (hidden)' : ''}">
@@ -52,10 +50,10 @@
                 onclick={() => toggleLayerVisibility(layer)}
             >{layer.visible ? 'Hide' : 'Show'}</button>
             <button
-                class="layer-btn focus-btn {focusedId === layer.id ? 'active' : ''}"
+                class="layer-btn focus-btn {$focusedLayerId === layer.id ? 'active' : ''}"
                 title="Focus on this layer (dims other layers to 50% opacity)"
                 onclick={() => toggleLayerFocus(layer.id)}
-            >{focusedId === layer.id ? 'Focusing' : 'Focus'}</button>
+            >{$focusedLayerId === layer.id ? 'Focusing' : 'Focus'}</button>
             <button class="layer-btn" title={`Rename layer '${layer.name}'`} onclick={() => renameLayer(layer)}>
                 Rename
             </button>

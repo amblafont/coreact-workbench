@@ -71,6 +71,7 @@ export interface PositionPicker {
 
 export const positionPicker = writable<PositionPicker | null>(null);
 
+export const focusedLayerId = writable<string | null>(null);
 export const mergeMode = writable(false);
 export const mergeFirstArtefact = writable<Artefact | null>(null);
 export const mergeSecondArtefact = writable<Artefact | null>(null);
@@ -449,6 +450,8 @@ export function equalityChildren(art: { dependencies: Record<string, Artefact> }
 
 export function resetInteractionState(): void {
     inspectedArtefact.set(null);
+    focusedLayerId.set(null);
+    drawing.setFocusedLayer(null);
     draftArtefact.set(null);
     dependencyPickingFor.set(null);
     layerProvability.set(new Map());
@@ -824,6 +827,7 @@ export function clearAll(): void {
         return;
     }
     drawing.clear();
+    focusedLayerId.set(null);
     activeDrawingName.set(null);
     resetInteractionState();
     refresh();
@@ -882,6 +886,9 @@ export function deleteLayer(layer: { id: string; name: string }): void {
         : `Delete layer '${layer.name}'?`;
     if (confirm(msg)) {
         drawing.removeLayer(layer.id);
+        if (get(focusedLayerId) && descendants.has(get(focusedLayerId)!)) {
+            focusedLayerId.set(null);
+        }
         refresh();
     }
 }
@@ -892,9 +899,12 @@ export function toggleLayerVisibility(layer: { id: string; visible: boolean }): 
 }
 
 export function toggleLayerFocus(layerId: string): void {
-    if (drawing.getFocusedLayerId() === layerId) {
+    const current = get(focusedLayerId);
+    if (current === layerId) {
+        focusedLayerId.set(null);
         drawing.setFocusedLayer(null);
     } else {
+        focusedLayerId.set(layerId);
         drawing.setFocusedLayer(layerId);
     }
     refresh();

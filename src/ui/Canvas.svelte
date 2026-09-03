@@ -12,6 +12,7 @@
         positionPicker,
         applyPickedPosition,
         mergeMode,
+        focusedLayerId,
         mergeBaseOpacityFor,
         mergeHoverArtefact,
         inspectedArtefact,
@@ -23,25 +24,28 @@
     let svgContext: d3.Selection<SVGSVGElement, unknown, null, undefined> | null = null;
 
     let mergeOn = false;
+    let focusedId: string | null = null;
     let mergeHover: Artefact | null = null;
     let inspected: Artefact | null = null;
     let menuHover: Artefact | null = null;
     let ruleHover: Set<Artefact> | null = null;
-
+ 
     $: {
         mergeOn = $mergeMode;
+        focusedId = $focusedLayerId;
         mergeHover = $mergeHoverArtefact;
         inspected = $inspectedArtefact;
         menuHover = $menuHoverArtefact;
         ruleHover = $ruleHoverArtefacts;
         if (svgContext) {
-            if (mergeOn || ruleHover || menuHover || inspected) {
+            if (mergeOn || ruleHover || menuHover || inspected || focusedId) {
                 applyOverlays();
             } else {
                 redraw();
             }
         }
     }
+
 
     function canvasOpacity(art: Artefact): number | null {
         if (mergeOn) {
@@ -60,6 +64,9 @@
         const target = menuHover ?? inspected;
         if (target) {
             return target.getSelfAndDependencies().has(art) ? 1 : 0.5;
+        }
+        if (focusedId) {
+            return art.layerId === focusedId ? 1.0 : 0.5;
         }
         return null;
     }
