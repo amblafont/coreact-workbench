@@ -1665,7 +1665,7 @@ function findRuleApplicationsInternal(
                 imgs.push(img);
             }
             for (let i = 1; i < imgs.length; i++) {
-                if (strictMatching ? imgs[0] !== imgs[i] : !host.areEqual(imgs[0], imgs[i], imgs[0].layerId)) {
+                if (!host.areEqual(imgs[0], imgs[i], imgs[0].layerId)) {
                     return false;
                 }
             }

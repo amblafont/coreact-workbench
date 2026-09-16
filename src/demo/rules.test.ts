@@ -293,6 +293,27 @@ describe('matching up to host equalities', () => {
         expect(findRuleApplications(rule, hostShared, true).length).toBe(2);
         expect(findRuleApplications(rule, hostEqualEdges, true).length).toBe(0);
     });
+
+    it('strict matching still accepts provably equal images for rule-root equality artefacts', () => {
+        const rule = makeDrawing();
+        const rv0 = makeVertex(rule, 'rv0');
+        const rv1 = makeVertex(rule, 'rv1');
+        const ra = makeEdge(rule, 'ra', rv0, rv1);
+        const rb = makeEdge(rule, 'rb', rv0, rv1);
+        rule.newEqualityArtefact([ra, rb], 'root');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        rule.setIsRule(true);
+
+        const host = makeDrawing();
+        const hv0 = makeVertex(host, 'hv0');
+        const hv1 = makeVertex(host, 'hv1');
+        const hx = makeEdge(host, 'hx', hv0, hv1);
+        const hy = makeEdge(host, 'hy', hv0, hv1);
+        host.newEqualityArtefact([hx, hy], 'root');
+
+        expect(findFirstOrderRuleApplications(rule, host).length).toBe(1);
+        expect(findFirstOrderRuleApplications(rule, host, true).length).toBe(2);
+    });
 });
 
 describe('redundant match filtering', () => {
