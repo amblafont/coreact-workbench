@@ -280,6 +280,19 @@ describe('matching up to host equalities', () => {
         expect(findRuleApplications(rule, hostEqualEdges).length).toBe(2);
         expect(findRuleApplications(rule, hostDistinctEdges).length).toBe(0);
     });
+
+    it('strict matching keeps same-object matches but filters out up-to-equality matches', () => {
+        const rule = buildSharedEdgeTrianglesRule();
+
+        const hostShared = makeDrawing();
+        buildTrianglePairHost(hostShared, 'shared');
+
+        const hostEqualEdges = makeDrawing();
+        buildTrianglePairHost(hostEqualEdges, 'equal');
+
+        expect(findRuleApplications(rule, hostShared, true).length).toBe(2);
+        expect(findRuleApplications(rule, hostEqualEdges, true).length).toBe(0);
+    });
 });
 
 describe('redundant match filtering', () => {

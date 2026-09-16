@@ -1014,6 +1014,12 @@ export function toggleFilterNoProgressMatches(): void {
     filterNoProgressMatches.update(v => !v);
 }
 
+export const filterStrictMatches = writable(false);
+
+export function toggleFilterStrictMatches(): void {
+    filterStrictMatches.update(v => !v);
+}
+
 // ---------------------------------------------------------------------------
 // Applyable rules (computed reactively by RuleApplications.svelte)
 // ---------------------------------------------------------------------------
@@ -1040,8 +1046,8 @@ export function computeRuleApplications(): RuleAppEntry[] {
         let applications: RuleApplication[];
         try {
             applications = savedRule.isFirstOrder
-                ? findFirstOrderRuleApplications(ruleDrawing, drawing)
-                : findSecondOrderRuleApplications(ruleDrawing, drawing);
+                ? findFirstOrderRuleApplications(ruleDrawing, drawing, get(filterStrictMatches))
+                : findSecondOrderRuleApplications(ruleDrawing, drawing, get(filterStrictMatches));
         } catch {
             continue;
         }

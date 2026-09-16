@@ -1,10 +1,10 @@
 <script lang="ts">
     import type { Artefact } from '../index';
     import { get } from 'svelte/store';
-    import { computeRuleApplications, applyRuleAt, mergeMode, ruleHoverArtefacts, version, filterRedundantMatches, toggleFilterRedundantMatches, filterNoProgressMatches, toggleFilterNoProgressMatches } from './store';
+    import { computeRuleApplications, applyRuleAt, mergeMode, ruleHoverArtefacts, version, filterRedundantMatches, toggleFilterRedundantMatches, filterNoProgressMatches, toggleFilterNoProgressMatches, filterStrictMatches, toggleFilterStrictMatches } from './store';
 
     let entries: ReturnType<typeof computeRuleApplications> = [];
-    $: $version, $filterRedundantMatches, $filterNoProgressMatches, entries = computeRuleApplications();
+    $: $version, $filterRedundantMatches, $filterNoProgressMatches, $filterStrictMatches, entries = computeRuleApplications();
 
     function matchLabels(entry: (typeof entries)[number], app: (typeof entry.applications)[number]): string[] {
         const ruleDrawing = entry.ruleDrawing;
@@ -54,6 +54,10 @@
     <label class="rule-checkbox-label">
         <input type="checkbox" checked={$filterNoProgressMatches} onchange={toggleFilterNoProgressMatches} />
         Filter no-progress matches
+    </label>
+    <label class="rule-checkbox-label">
+        <input type="checkbox" checked={$filterStrictMatches} onchange={toggleFilterStrictMatches} />
+        Strict matching
     </label>
 </div>
 

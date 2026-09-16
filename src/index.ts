@@ -1630,7 +1630,8 @@ function extractEqualityConstraints(rule: Drawing): Array<{ children: Artefact[]
 function findRuleApplicationsInternal(
     host: Drawing,
     patternArts: Artefact[],
-    equalityConstraints: Array<{ children: Artefact[] }>
+    equalityConstraints: Array<{ children: Artefact[] }>,
+    strictMatching: boolean
 ): RuleApplication[] {
     const results: RuleApplication[] = [];
 
@@ -1664,7 +1665,7 @@ function findRuleApplicationsInternal(
                 imgs.push(img);
             }
             for (let i = 1; i < imgs.length; i++) {
-                if (!host.areEqual(imgs[0], imgs[i], imgs[0].layerId)) {
+                if (strictMatching ? imgs[0] !== imgs[i] : !host.areEqual(imgs[0], imgs[i], imgs[0].layerId)) {
                     return false;
                 }
             }
@@ -1706,7 +1707,7 @@ function findRuleApplicationsInternal(
                         ok = false;
                         break;
                     }
-                    if (hostDep !== img && !host.areEqual(hostDep, img, cand.layerId)) {
+                    if (strictMatching ? hostDep !== img : hostDep !== img && !host.areEqual(hostDep, img, cand.layerId)) {
                         ok = false;
                         break;
                     }
@@ -1726,7 +1727,7 @@ function findRuleApplicationsInternal(
 
     const uniqueResults: RuleApplication[] = [];
     for (const r of results) {
-        if (!uniqueResults.some(u => applicationsEquivalent(host, patternSet, r, u))) {
+        if (!uniqueResults.some(u => applicationsEquivalent(host, patternSet, r, u, strictMatching))) {
             uniqueResults.push(r);
         }
     }
@@ -1737,13 +1738,14 @@ function applicationsEquivalent(
     host: Drawing,
     patternSet: Set<Artefact>,
     a: RuleApplication,
-    b: RuleApplication
+    b: RuleApplication,
+    strictMatching: boolean
 ): boolean {
     for (const p of patternSet) {
         const img1 = a.matchedArtefacts.get(p);
         const img2 = b.matchedArtefacts.get(p);
         if (!img1 || !img2) return false;
-        if (img1 !== img2 && !host.areEqual(img1, img2, img1.layerId)) return false;
+        if (strictMatching ? img1 !== img2 : img1 !== img2 && !host.areEqual(img1, img2, img1.layerId)) return false;
     }
     return true;
 }
@@ -1758,14 +1760,14 @@ function validateRuleDrawing(rule: Drawing): void {
     }
 }
 
-function findRootRuleApplications(rule: Drawing, host: Drawing): RuleApplication[] {
+function findRootRuleApplications(rule: Drawing, host: Drawing, strictMatching: boolean): RuleApplication[] {
     const rootLayers = rule.getAllLayers().filter(l => l.parentId === null);
     if (rootLayers.length !== 1) {
         return [];
     }
     const root = rootLayers[0];
     const rootArts = rule.getArtefacts().filter(a => a.sortName !== "Equality" && a.layerId === root.id);
-    return findRuleApplicationsInternal(host, rootArts, extractEqualityConstraints(rule));
+    return findRuleApplicationsInternal(host, rootArts, extractEqualityConstraints(rule), strictMatching);
 }
 
 export function filterRedundantRuleApplications(rule: Drawing, host: Drawing, applications: RuleApplication[]): RuleApplication[] {
@@ -2038,13 +2040,13 @@ function hostRootLayerIdOf(artefacts: Artefact[]): string {
     return artefacts.length > 0 ? artefacts[0].layerId : "root";
 }
 
-export function findRuleApplications(rule: Drawing, host: Drawing): RuleApplication[] {
+export function findRuleApplications(rule: Drawing, host: Drawing, strictMatching = false): RuleApplication[] {
     validateRuleDrawing(rule);
 
-    return findRootRuleApplications(rule, host);
+    return findRootRuleApplications(rule, host, strictMatching);
 }
 
-export function findFirstOrderRuleApplications(rule: Drawing, host: Drawing): RuleApplication[] {
+export function findFirstOrderRuleApplications(rule: Drawing, host: Drawing, strictMatching = false): RuleApplication[] {
     validateRuleDrawing(rule);
 
     const layers = rule.getAllLayers();
@@ -2058,10 +2060,10 @@ export function findFirstOrderRuleApplications(rule: Drawing, host: Drawing): Ru
         return [];
     }
 
-    return findRootRuleApplications(rule, host);
+    return findRootRuleApplications(rule, host, strictMatching);
 }
 
-export function findSecondOrderRuleApplications(rule: Drawing, host: Drawing): RuleApplication[] {
+export function findSecondOrderRuleApplications(rule: Drawing, host: Drawing, strictMatching = false): RuleApplication[] {
     validateRuleDrawing(rule);
 
     const layers = rule.getAllLayers();
@@ -2075,7 +2077,7 @@ export function findSecondOrderRuleApplications(rule: Drawing, host: Drawing): R
         return [];
     }
 
-    return findRootRuleApplications(rule, host);
+    return findRootRuleApplications(rule, host, strictMatching);
 }
 
 function resolveHostRootId(
