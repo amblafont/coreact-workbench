@@ -15,6 +15,9 @@ interface SortStore {
 const VERTEX_RADIUS = 20;
 const HOOK_MARGIN = 4;
 
+const BEND_ATTR: { type: string; min: number; max: number; default: number } =
+    { type: "slider", min: -500, max: 500, default: 0 };
+
 // Distance from the source vertex center to the beginning of the isMono
 // semi-circle hook, measured along the initial edge tangent.
 function hookStartOffset(width: number): number {
@@ -99,7 +102,7 @@ function edgeMidpoint(srcPos: number[], tgtPos: number[], bend: number, width: n
         .newSort(
             "Edge",
             { source: "Vertex", target: "Vertex" }, // Dependencies 
-            { width: "number", bend: { type: "slider", min: -500, max: 500, default: 0 } },
+            { width: "number", bend: BEND_ATTR },
             (data: any, context: import('./types').D3Context) => {
                 const srcPos = data.source.position;
                 const tgtPos = data.target.position;
@@ -292,6 +295,90 @@ function edgeMidpoint(srcPos: number[], tgtPos: number[], bend: number, width: n
 
                 group.append("path")
                     .attr("d", `M ${w1X},${w1Y} L ${midX},${midY} L ${w2X},${w2Y}`)
+                    .attr("fill", "none")
+                    .attr("stroke", "#8e44ad")
+                    .attr("stroke-width", 2)
+                    .attr("stroke-linecap", "round")
+                    .attr("stroke-linejoin", "round");
+
+                return group;
+            }
+        )
+        .newSort(
+            "Square",
+            { p1: "Edge", p2: "Edge", q1: "Edge", q2: "Edge" },
+            { bend: BEND_ATTR },
+            (data: any, context: import('./types').D3Context) => {
+                // 2-cell between the midpoints of the opposite arrows p1 and q1.
+                const a = edgeMidpoint(
+                    data.p1.source.position, data.p1.target.position,
+                    typeof data.p1.bend === "number" ? data.p1.bend : 0,
+                    typeof data.p1.width === "number" ? data.p1.width : 2,
+                    !!data.p1.isMono
+                );
+                const b = edgeMidpoint(
+                    data.q1.source.position, data.q1.target.position,
+                    typeof data.q1.bend === "number" ? data.q1.bend : 0,
+                    typeof data.q1.width === "number" ? data.q1.width : 2,
+                    !!data.q1.isMono
+                );
+
+                const bend = typeof data.bend === "number" ? data.bend : 0;
+
+                const dx = b[0] - a[0];
+                const dy = b[1] - a[1];
+                const len = Math.sqrt(dx * dx + dy * dy);
+
+                // Perpendicular unit vector to the chord
+                const nx = len > 0 ? -dy / len : 0;
+                const ny = len > 0 ? dx / len : 0;
+
+                const mx = (a[0] + b[0]) / 2;
+                const my = (a[1] + b[1]) / 2;
+
+                // Control point for the bent 2-cell
+                const cx = mx + bend * nx;
+                const cy = my + bend * ny;
+
+                // End tangent at t=1, for orienting the chevron hat
+                let ux = b[0] - cx, uy = b[1] - cy;
+                const uLen = Math.hypot(ux, uy);
+                ux = uLen > 0 ? ux / uLen : (len > 0 ? dx / len : 1);
+                uy = uLen > 0 ? uy / uLen : (len > 0 ? dy / len : 0);
+
+                // Perpendicular to the end tangent
+                const px = -uy;
+                const py = ux;
+
+                const offset = 6;
+                const hatWidth = 10;
+                const hatLength = 10;
+                const lineEndOffset = hatLength * (offset / hatWidth);
+
+                const w1X = b[0] - ux * hatLength - px * hatWidth;
+                const w1Y = b[1] - uy * hatLength - py * hatWidth;
+                const w2X = b[0] - ux * hatLength + px * hatWidth;
+                const w2Y = b[1] - uy * hatLength + py * hatWidth;
+
+                const group = context.append("g");
+
+                for (const side of [-1, 1]) {
+                    const startX = a[0] + nx * offset * side;
+                    const startY = a[1] + ny * offset * side;
+                    const ctrlX = cx + nx * offset * side;
+                    const ctrlY = cy + ny * offset * side;
+                    const endX = b[0] - ux * lineEndOffset + nx * offset * side;
+                    const endY = b[1] - uy * lineEndOffset + ny * offset * side;
+
+                    group.append("path")
+                        .attr("d", `M ${startX},${startY} Q ${ctrlX},${ctrlY} ${endX},${endY}`)
+                        .attr("fill", "none")
+                        .attr("stroke", "#8e44ad")
+                        .attr("stroke-width", 2);
+                }
+
+                group.append("path")
+                    .attr("d", `M ${w1X},${w1Y} L ${b[0]},${b[1]} L ${w2X},${w2Y}`)
                     .attr("fill", "none")
                     .attr("stroke", "#8e44ad")
                     .attr("stroke-width", 2)
