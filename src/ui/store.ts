@@ -274,14 +274,31 @@ export function startDraftForSort(sortDef: SortDefinition): void {
     const allLayersList = drawing.getAllLayers();
     const defaultLayerId = focusedId || (allLayersList.length > 0 ? allLayersList[0].id : 'root');
 
-    draftArtefact.set({
+    const draft: DraftArtefact = {
         sortName: sortDef.name,
         dependencies: {},
         data: initialData,
         layerId: defaultLayerId
-    });
-    dependencyPickingFor.set(null);
+    };
+    draftArtefact.set(draft);
     stopPositionPicker();
+
+    if (sortDef.name === 'Equality') {
+        dependencyPickingFor.set('Equality');
+    } else {
+        const firstDep = findNextUnfilledDependency(draft);
+        dependencyPickingFor.set(firstDep);
+        if (firstDep) {
+            const expectedSort = sortDef.dependencies[firstDep];
+            const pickableCount = drawing.getArtefacts()
+                .filter(a => a.sortName === expectedSort)
+                .filter(a => !focusedId || a.layerId === focusedId)
+                .length;
+            if (pickableCount === 0) {
+                pushToast('info', `No '${expectedSort}' artefacts to pick yet — create one first.`);
+            }
+        }
+    }
 
     const singlePositionAttr = getSinglePositionAttr(sortDef);
     if (singlePositionAttr) {
