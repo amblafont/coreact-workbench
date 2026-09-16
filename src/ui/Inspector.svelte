@@ -42,10 +42,14 @@
     // `version`. Rebuild `inspectModel` as a fresh reference on every bump so
     // the DataAttributeFields child re-renders its in-place-mutated data.
     let inspectModel: Artefact | null = null;
+    let inspectLabel = '';
+    let inspectLayerId = 'root';
     $: {
         const a = $inspectedArtefact;
         $version;
         inspectModel = a ? { data: a.data, dependencies: a.dependencies, sortName: a.sortName } as Artefact : null;
+        inspectLabel = a ? (typeof a.data.label === 'string' ? a.data.label : '') : '';
+        inspectLayerId = a ? (typeof a.layerId === 'string' ? a.layerId : 'root') : 'root';
     }
 
     $: {
@@ -353,7 +357,7 @@
                 <label for="inspect-layer-select">Layer</label>
                 <select
                     id="inspect-layer-select"
-                    value={art.layerId}
+                    value={inspectLayerId}
                     onchange={(e) => {
                         const newLayerId = (e.currentTarget as HTMLSelectElement).value;
                         try {
@@ -374,7 +378,7 @@
                 <input
                     id="inspect-label-input"
                     type="text"
-                    value={art.data.label || ''}
+                    value={inspectLabel}
                     placeholder={art.sortName === 'Equality'
                         ? equalityChildren(art).map(c => c.data.label || c.sortName).join(' = ')
                         : undefined}

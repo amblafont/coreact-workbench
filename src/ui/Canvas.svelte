@@ -82,6 +82,18 @@
         }
     }
 
+    function applyOverlaysFromStores(): void {
+        const a = get(inspectedArtefact);
+        const mh = get(menuHoverArtefact);
+        const mge = get(mergeHoverArtefact);
+        const rh = get(ruleHoverArtefacts);
+        const fi = get(focusedLayerId);
+        const mo = get(mergeMode);
+        const prev = { mergeOn, focusedId, mergeHover, inspected, menuHover, ruleHover };
+        mergeOn = mo; focusedId = fi; mergeHover = mge; inspected = a; menuHover = mh; ruleHover = rh;
+        try { applyOverlays(); } finally { Object.assign({ mergeOn, focusedId, mergeHover, inspected, menuHover, ruleHover }, prev); }
+    }
+
     function drawDraftPreview(): void {
         const draft = get(draftArtefact);
         if (!draft) return;
@@ -140,7 +152,7 @@
         svgContext.on('click', onSvgClick);
         const unsub = version.subscribe(() => {
             redraw();
-            applyOverlays();
+            applyOverlaysFromStores();
         });
         return () => {
             unsub();
