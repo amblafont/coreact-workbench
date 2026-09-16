@@ -18,6 +18,7 @@
         isProvablyEqualCandidate,
         onArtefactNodeClick,
         removeArtefactNode,
+        duplicateArtefactNode,
         moveArtefactUp,
         moveArtefactDown,
         canMoveArtefactUp,
@@ -53,7 +54,7 @@
     $: $version, layerObj = drawing.getLayer(artefact.layerId);
     $: $version, isLayerVis = layerObj ? drawing.isLayerVisible(layerObj.id) : true;
     $: $version, layerBadgeText = layerObj ? layerObj.name + (isLayerVis ? '' : ' (hidden)') : artefact.layerId;
-    $: $version, provablyEqualCandidate = isProvablyEqualCandidate(artefact);
+    $: $version, $dependencyPickingFor, provablyEqualCandidate = isProvablyEqualCandidate(artefact);
     $: $version, inspectedNode =
         $inspectedArtefact === artefact
         || ($mergeMode && ($mergeFirstArtefact === artefact || $mergeSecondArtefact === artefact));
@@ -105,6 +106,10 @@
 
     function onRemove(): void {
         removeArtefactNode(artefact, parentArtefact);
+    }
+
+    function onDuplicate(): void {
+        duplicateArtefactNode(artefact);
     }
 </script>
 
@@ -201,6 +206,26 @@
                     }
                 }}
             >↓</span>
+        {/if}
+        {#if rootNode && !$dependencyPickingFor && artefact.sortName !== 'Equality'}
+            <span
+                class="move-btn"
+                role="button"
+                tabindex="0"
+                title="Duplicate artefact"
+                aria-label="Duplicate artefact"
+                onclick={(e) => {
+                    e.stopPropagation();
+                    onDuplicate();
+                }}
+                onkeydown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onDuplicate();
+                    }
+                }}
+            >⧉</span>
         {/if}
         <span
             class="remove-btn"

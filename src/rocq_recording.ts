@@ -272,6 +272,55 @@ export class RocqRecorder {
         }
     }
 
+    public recordDuplicate(
+        hostDrawing: Drawing,
+        original: Artefact,
+        created: Artefact,
+        hostActiveName: string,
+        sortStore: SortStore
+    ): void {
+        if (!this.active || hostActiveName !== this.drawingName) {
+            return;
+        }
+
+        const savedHost = DrawingStore.drawingToSavedDrawing(hostActiveName, hostDrawing);
+        const hostNames = drawingExportNames(savedHost, sortStore);
+
+        const originalId = artefactToDataId(hostDrawing, original);
+        const originalField = hostNames.fieldNames.get(originalId);
+        if (!originalField) {
+            throw new Error(`Consistency Check Failed: No field name assigned for original artefact '${original.data.label || original.sortName}'.`);
+        }
+
+        const createdId = artefactToDataId(hostDrawing, created);
+        const createdField = hostNames.fieldNames.get(createdId);
+        if (!createdField) {
+            throw new Error(`Consistency Check Failed: No field name assigned for created duplicate artefact '${created.data.label || created.sortName}'.`);
+        }
+
+        const sortDef = sortStore.getSort(created.sortName);
+        if (!sortDef) {
+            throw new Error(`Consistency Check Failed: Sort '${created.sortName}' is not defined.`);
+        }
+
+        const depFieldNames: string[] = [];
+        for (const [depKey] of Object.entries(sortDef.dependencies)) {
+            const dep = created.dependencies[depKey];
+            if (!dep) {
+                throw new Error(`Consistency Check Failed: Missing dependency '${depKey}' for duplicated artefact.`);
+            }
+            const depId = artefactToDataId(hostDrawing, dep);
+            const depField = hostNames.fieldNames.get(depId);
+            if (!depField) {
+                throw new Error(`Consistency Check Failed: No field name assigned for dependency '${depKey}' of duplicated artefact.`);
+            }
+            depFieldNames.push(depField);
+        }
+
+        const typeStr = depFieldNames.length === 0 ? created.sortName : `${created.sortName} ${depFieldNames.join(" ")}`;
+        this.lines.push(`set (${createdField} := ${originalField} : ${typeStr}).`);
+    }
+
     public recordProveSuccess(hostDrawing: Drawing, layerId: string | null, match: Map<Artefact, Artefact> | null, hostActiveName: string): void {
         if (!this.active || hostActiveName !== this.drawingName) {
             return;

@@ -174,6 +174,112 @@ describe('artefact merge', () => {
     });
 });
 
+describe('artefact duplicate', () => {
+    it('duplicates a vertex and adds an equality artefact relating them', () => {
+        const drawing = makeDrawing();
+        const v0 = drawing.newArtefact('Vertex', {}, { position: [100, 200], label: 'v0' }, 'root');
+
+        const { artefact: v0Dup, equality } = drawing.duplicateArtefact(v0, {}, { position: [150, 250], label: 'v0_copy' }, 'root');
+
+        expect(v0Dup).toBeDefined();
+        expect(v0Dup.sortName).toBe('Vertex');
+        expect(v0Dup.data.label).toBe('v0_copy');
+        expect(v0Dup.data.position).toEqual([150, 250]);
+        expect(v0Dup).not.toBe(v0);
+
+        expect(equality).toBeDefined();
+        expect(equality.sortName).toBe('Equality');
+        expect(drawing.areEqual(v0, v0Dup, 'root')).toBe(true);
+        expect(drawing.areProvablyEqual(v0, v0Dup)).toBe(true);
+    });
+
+    it('duplicates an edge with identical dependencies and relates them with equality', () => {
+        const drawing = makeDrawing();
+        const v0 = makeVertex(drawing, 'v0');
+        const v1 = makeVertex(drawing, 'v1');
+        const e0 = makeEdge(drawing, 'e0', v0, v1);
+
+        const { artefact: e0Dup, equality } = drawing.duplicateArtefact(
+            e0,
+            { source: v0, target: v1 },
+            { width: 3, bend: 0, label: 'e0_copy' },
+            'root'
+        );
+
+        expect(e0Dup).toBeDefined();
+        expect(e0Dup.sortName).toBe('Edge');
+        expect(e0Dup.data.width).toBe(3);
+        expect(e0Dup.dependencies.source).toBe(v0);
+        expect(e0Dup.dependencies.target).toBe(v1);
+
+        expect(equality).toBeDefined();
+        expect(drawing.areEqual(e0, e0Dup, 'root')).toBe(true);
+        expect(drawing.areProvablyEqual(e0, e0Dup)).toBe(true);
+    });
+
+    it('duplicates an edge with provably equal alternative dependencies', () => {
+        const drawing = makeDrawing();
+        const v0 = makeVertex(drawing, 'v0');
+        const v0Alt = makeVertex(drawing, 'v0Alt');
+        const v1 = makeVertex(drawing, 'v1');
+
+        // Relate v0 and v0Alt by equality
+        drawing.newEqualityArtefact([v0, v0Alt], 'root');
+        expect(drawing.areEqual(v0, v0Alt, 'root')).toBe(true);
+
+        const e0 = makeEdge(drawing, 'e0', v0, v1);
+
+        // Duplicate e0 using v0Alt instead of v0 as source
+        const { artefact: e0Dup } = drawing.duplicateArtefact(
+            e0,
+            { source: v0Alt, target: v1 },
+            { width: 2, bend: 0, label: 'e0_dup' },
+            'root'
+        );
+
+        expect(e0Dup.dependencies.source).toBe(v0Alt);
+        expect(drawing.areEqual(e0, e0Dup, 'root')).toBe(true);
+    });
+
+    it('rejects duplicating with dependencies that are not provably equal', () => {
+        const drawing = makeDrawing();
+        const v0 = makeVertex(drawing, 'v0');
+        const v1 = makeVertex(drawing, 'v1');
+        const v2 = makeVertex(drawing, 'v2');
+        const e0 = makeEdge(drawing, 'e0', v0, v1);
+
+        expect(() => {
+            drawing.duplicateArtefact(
+                e0,
+                { source: v2, target: v1 },
+                { width: 2, bend: 0, label: 'bad_dup' },
+                'root'
+            );
+        }).toThrowError(/Consistency Check Failed: Dependency 'source' for duplicate of 'e0' must be provably equal/);
+    });
+
+    it('rejects duplicating an equality artefact', () => {
+        const drawing = makeDrawing();
+        const v0 = makeVertex(drawing, 'v0');
+        const v1 = makeVertex(drawing, 'v1');
+        const eq = drawing.newEqualityArtefact([v0, v1], 'root');
+
+        expect(() => {
+            drawing.duplicateArtefact(eq, {}, {}, 'root');
+        }).toThrowError(/Consistency Check Failed: Cannot duplicate an equality artefact/);
+    });
+
+    it('rejects duplicating an artefact that is not in the drawing', () => {
+        const drawing1 = makeDrawing();
+        const drawing2 = makeDrawing();
+        const v = makeVertex(drawing1, 'v');
+
+        expect(() => {
+            drawing2.duplicateArtefact(v, {}, { position: [0, 0] }, 'root');
+        }).toThrowError(/Consistency Check Failed: Cannot duplicate an artefact that does not exist/);
+    });
+});
+
 describe('layer provability', () => {
     it('is provable without isMono artefacts and non-provable when an isMono artefact is established in the layer', () => {
         const drawing = makeDrawing();

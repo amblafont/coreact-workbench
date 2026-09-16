@@ -60,6 +60,7 @@ export interface DraftArtefact {
     dependencies: Record<string, Artefact>;
     data: Record<string, DataAttributeValue>;
     layerId: string;
+    duplicateOf?: Artefact;
 }
 
 export const draftArtefact = writable<DraftArtefact | null>(null);
@@ -310,6 +311,42 @@ export function startDraftForSort(sortDef: SortDefinition): void {
     refresh();
 }
 
+export function startDuplicateArtefact(art: Artefact): void {
+    if (art.sortName === 'Equality') {
+        pushToast('error', 'Cannot duplicate an equality artefact.');
+        return;
+    }
+    const sortDef = sortStore.getSort(art.sortName);
+    if (!sortDef) {
+        pushToast('error', `Sort '${art.sortName}' is not defined.`);
+        return;
+    }
+
+    inspectedArtefact.set(null);
+    cancelMergeMode();
+    stopPositionPicker();
+
+    const copiedData: Record<string, DataAttributeValue> = JSON.parse(JSON.stringify(art.data));
+
+    const draft: DraftArtefact = {
+        sortName: art.sortName,
+        dependencies: {},
+        data: copiedData,
+        layerId: art.layerId,
+        duplicateOf: art
+    };
+    draftArtefact.set(draft);
+
+    const firstDep = findNextUnfilledDependency(draft);
+    dependencyPickingFor.set(firstDep);
+
+    refresh();
+}
+
+export function duplicateArtefactNode(art: Artefact): void {
+    startDuplicateArtefact(art);
+}
+
 export function cancelDraft(): void {
     draftArtefact.set(null);
     dependencyPickingFor.set(null);
@@ -322,7 +359,17 @@ export function createDraftArtefact(): Artefact | null {
     if (!draft) return null;
     try {
         const finalDeps: Record<string, Artefact> = { ...draft.dependencies };
-        const created = drawing.newArtefact(draft.sortName, finalDeps, draft.data, draft.layerId);
+        let created: Artefact;
+        if (draft.duplicateOf) {
+            const dupResult = drawing.duplicateArtefact(draft.duplicateOf, finalDeps, draft.data, draft.layerId);
+            created = dupResult.artefact;
+            if (rocqRecorder.isActive()) {
+                const activeName = get(activeDrawingName) ?? 'Unsaved Drawing';
+                rocqRecorder.recordDuplicate(drawing, draft.duplicateOf, created, activeName, sortStore);
+            }
+        } else {
+            created = drawing.newArtefact(draft.sortName, finalDeps, draft.data, draft.layerId);
+        }
         draftArtefact.set(null);
         dependencyPickingFor.set(null);
         stopPositionPicker();
@@ -451,11 +498,26 @@ export function mergeBaseOpacityFor(art: Artefact): number {
     return 0.35;
 }
 
+export function isDuplicateEligible(art: Artefact): boolean {
+    const draft = get(draftArtefact);
+    const picking = get(dependencyPickingFor);
+    if (!draft?.duplicateOf || !picking) return false;
+    const sortDef = sortStore.getSort(draft.sortName);
+    const expectedSort = sortDef?.dependencies[picking];
+    if (!expectedSort || art.sortName !== expectedSort) return false;
+    const origDep = draft.duplicateOf.dependencies[picking];
+    if (!origDep) return false;
+    return drawing.areEqual(origDep, art, draft.layerId);
+}
+
 export function isProvablyEqualCandidate(art: Artefact): boolean {
     const first = get(mergeFirstArtefact);
-    return get(mergeMode) && !!first && art !== first
+    if (get(mergeMode) && !!first && art !== first
         && drawing.areDependenciesEqual(first, art)
-        && drawing.areProvablyEqual(first, art);
+        && drawing.areProvablyEqual(first, art)) {
+        return true;
+    }
+    return isDuplicateEligible(art);
 }
 
 // ---------------------------------------------------------------------------
@@ -649,6 +711,17 @@ export function pickDraftDependency(artefact: Artefact): void {
     const sortDef = sortStore.getSort(draft.sortName);
     const expectedSort = sortDef?.dependencies[picking];
     if (expectedSort && artefact.sortName === expectedSort) {
+        if (draft.duplicateOf) {
+            const origDep = draft.duplicateOf.dependencies[picking];
+            if (!origDep) {
+                pushToast('error', `Original artefact is missing dependency '${picking}'.`);
+                return;
+            }
+            if (!drawing.areEqual(origDep, artefact, draft.layerId)) {
+                pushToast('error', `Selected dependency '${artefact.data.label || artefact.sortName}' is not provably equal to the original dependency '${origDep.data.label || origDep.sortName}'.`);
+                return;
+            }
+        }
         draftArtefact.update(d => {
             if (d) return { ...d, dependencies: { ...d.dependencies, [picking]: artefact } };
             return d;

@@ -950,6 +950,49 @@ export class Drawing {
         return artefact;
     }
 
+    public duplicateArtefact(
+        original: Artefact,
+        dependencies: Record<string, Artefact>,
+        data: Record<string, any>,
+        layerId?: string
+    ): { artefact: Artefact; equality: EqualityArtefact } {
+        if (!this.artefacts.includes(original)) {
+            throw new Error("Consistency Check Failed: Cannot duplicate an artefact that does not exist in the drawing.");
+        }
+        if (original.sortName === "Equality" || original instanceof EqualityArtefact) {
+            throw new Error("Consistency Check Failed: Cannot duplicate an equality artefact.");
+        }
+
+        const targetLayerId = layerId || original.layerId;
+        if (!this.layers.has(targetLayerId)) {
+            throw new Error(`Consistency Check Failed: Layer '${targetLayerId}' does not exist.`);
+        }
+
+        const sortDef = this.sortStore.getSort(original.sortName);
+        if (!sortDef) {
+            throw new Error(`Consistency Check Failed: Sort '${original.sortName}' is not defined.`);
+        }
+
+        for (const [depKey] of Object.entries(sortDef.dependencies)) {
+            const origDep = original.dependencies[depKey];
+            const newDep = dependencies[depKey];
+            if (!newDep) {
+                throw new Error(`Consistency Check Failed: Missing dependency '${depKey}' for artefact of sort '${original.sortName}'.`);
+            }
+            if (!origDep) {
+                throw new Error(`Consistency Check Failed: Original artefact is missing dependency '${depKey}'.`);
+            }
+            if (!this.areEqual(origDep, newDep, targetLayerId)) {
+                throw new Error(`Consistency Check Failed: Dependency '${depKey}' for duplicate of '${original.data.label || original.sortName}' must be provably equal to the original's dependency '${origDep.data.label || origDep.sortName}'.`);
+            }
+        }
+
+        const created = this.newArtefact(original.sortName, dependencies, data, targetLayerId);
+        const equality = this.newEqualityArtefact([original, created], targetLayerId);
+
+        return { artefact: created, equality };
+    }
+
     draw(context: D3Context): void {
         // 1. Initialize context for all defined sorts (e.g., for SVG defs/markers)
         for (const sortDef of this.sortStore.getAllSorts()) {

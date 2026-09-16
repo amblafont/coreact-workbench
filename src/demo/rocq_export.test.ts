@@ -414,4 +414,54 @@ describe('rocq export', () => {
         const script = recorder.stop();
         expect(script).toContain('exact (');
     });
+
+    it('records an edge duplication as set (new := old : Sort deps...)', () => {
+        const sortStore = newSortStore();
+        const host = new Drawing(sortStore);
+        const a = makeVertex(host, 'a');
+        const b = makeVertex(host, 'b');
+        const f = makeEdge(host, 'f', a, b);
+
+        const store = new DrawingStore();
+        store.saveDrawing('MainDrawing', host);
+
+        const recorder = new RocqRecorder();
+        recorder.start(host, 'MainDrawing', sortStore);
+
+        const { artefact: f2 } = host.duplicateArtefact(f, { source: a, target: b }, { width: 2, bend: 0, label: 'f_copy' }, 'root');
+        recorder.recordDuplicate(host, f, f2, 'MainDrawing', sortStore);
+
+        const script = recorder.stop();
+        expect(script).toContain('set (f_copy := f : Edge a b).');
+    });
+
+    it('records a vertex duplication without dependencies as set (new := old : Vertex)', () => {
+        const sortStore = newSortStore();
+        const host = new Drawing(sortStore);
+        const a = makeVertex(host, 'a');
+
+        const store = new DrawingStore();
+        store.saveDrawing('MainDrawing', host);
+
+        const recorder = new RocqRecorder();
+        recorder.start(host, 'MainDrawing', sortStore);
+
+        const { artefact: a2 } = host.duplicateArtefact(a, {}, { position: [100, 100], label: 'a_copy' }, 'root');
+        recorder.recordDuplicate(host, a, a2, 'MainDrawing', sortStore);
+
+        const script = recorder.stop();
+        expect(script).toContain('set (a_copy := a : Vertex).');
+    });
+
+    it('does not record duplication when recording is not active', () => {
+        const sortStore = newSortStore();
+        const host = new Drawing(sortStore);
+        const a = makeVertex(host, 'a');
+
+        const recorder = new RocqRecorder();
+        const { artefact: a2 } = host.duplicateArtefact(a, {}, { position: [100, 100], label: 'a_copy' }, 'root');
+        recorder.recordDuplicate(host, a, a2, 'MainDrawing', sortStore);
+
+        expect(recorder.isActive()).toBe(false);
+    });
 });

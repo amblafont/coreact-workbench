@@ -26,6 +26,7 @@
         setInspectedLabel,
         setArtefactDataField,
         startMergeMode,
+        startDuplicateArtefact,
         togglePositionPicker,
         isPositionPickerActive,
         equalityChildren,
@@ -245,7 +246,18 @@
     {@const draftProxy = { data: draft.data, dependencies: draft.dependencies, sortName: draft.sortName } as Artefact}
     {#if draftSortDef}
         {@const allDeps = Object.entries(draftSortDef.dependencies)}
-        <h3 style="margin-top: 0;">New {draft.sortName}</h3>
+        <h3 style="margin-top: 0;">
+            {#if draft.duplicateOf}
+                Duplicate {draft.sortName}
+            {:else}
+                New {draft.sortName}
+            {/if}
+        </h3>
+        {#if draft.duplicateOf}
+            <p style="color: #666; font-size: 0.82rem; margin-top: 2px; margin-bottom: 10px; font-style: italic;">
+                Duplicating '{draft.duplicateOf.data.label || draft.duplicateOf.sortName}' — dependencies must be provably equal to original.
+            </p>
+        {/if}
 
         <div>
             <div class="form-group">
@@ -407,6 +419,13 @@
                 type="button"
                 class="btn btn-merge"
                 style="margin-top: 15px; width: 100%;"
+                onclick={() => startDuplicateArtefact(art)}
+            >Duplicate this artefact...</button>
+
+            <button
+                type="button"
+                class="btn btn-merge"
+                style="margin-top: 8px; width: 100%;"
                 onclick={() => startMergeMode(art)}
             >Merge with another artefact...</button>
         </div>

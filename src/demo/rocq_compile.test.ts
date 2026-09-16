@@ -287,4 +287,25 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         const script = recorder.stop();
         compile('main', exportDrawingsToRocq(store.getAllDrawings(), sortStore) + '\n' + script);
     });
+
+    it('compiles a host with a recorded duplicate artefact move', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+
+        const host = new Drawing(sortStore);
+        const a = makeVertex(host, 'a');
+        const b = makeVertex(host, 'b');
+        const f = makeEdge(host, 'f', a, b);
+        store.saveDrawing('Main', host);
+
+        const recorder = new RocqRecorder();
+        recorder.start(host, 'Main', sortStore);
+
+        const { artefact: f2 } = host.duplicateArtefact(f, { source: a, target: b }, { width: 2, bend: 0, label: 'f_copy' }, 'root');
+        recorder.recordDuplicate(host, f, f2, 'Main', sortStore);
+        recorder.recordProveSuccess(host, null, null, 'Main');
+        const script = recorder.stop();
+
+        compile('duplicate_move', exportDrawingsToRocq(store.getAllDrawings(), sortStore) + '\n' + script);
+    });
 });
