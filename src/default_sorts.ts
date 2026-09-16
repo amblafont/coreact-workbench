@@ -237,40 +237,37 @@ function hookStartOffset(width: number): number {
 
                 const group = context.append("g");
 
+                // Single open chevron (hat) at the tip
+                const hatWidth = 10;
+                const hatLength = 10;
+                const w1X = midX - ux * hatLength - px * hatWidth;
+                const w1Y = midY - uy * hatLength - py * hatWidth;
+                const w2X = midX - ux * hatLength + px * hatWidth;
+                const w2Y = midY - uy * hatLength + py * hatWidth;
+
                 for (const side of [-1, 1]) {
                     const startX = startPos[0] + ux * startGap + px * offset * side;
                     const startY = startPos[1] + uy * startGap + py * offset * side;
-                    const endX = midX + px * offset * side;
-                    const endY = midY + py * offset * side;
+                    const lineEndOffset = hatLength * (offset / hatWidth);
+                    const endX = midX - ux * lineEndOffset + px * offset * side;
+                    const endY = midY - uy * lineEndOffset + py * offset * side;
 
                     group.append("path")
                         .attr("d", `M ${startX},${startY} L ${endX},${endY}`)
                         .attr("fill", "none")
                         .attr("stroke", "#8e44ad")
-                        .attr("stroke-width", 2)
-                        .attr("marker-end", "url(#arrowhead-2cell)");
+                        .attr("stroke-width", 2);
                 }
+
+                group.append("path")
+                    .attr("d", `M ${w1X},${w1Y} L ${midX},${midY} L ${w2X},${w2Y}`)
+                    .attr("fill", "none")
+                    .attr("stroke", "#8e44ad")
+                    .attr("stroke-width", 2)
+                    .attr("stroke-linecap", "round")
+                    .attr("stroke-linejoin", "round");
 
                 return group;
-            },
-            (context: import('./types').D3Context) => {
-                // initContext: Set up SVG Defs for the 2-cell Arrowhead Marker
-                let defs = context.select<SVGDefsElement>("defs");
-                if (defs.empty()) {
-                    defs = context.append("defs");
-                }
-
-                defs.append("marker")
-                    .attr("id", "arrowhead-2cell")
-                    .attr("viewBox", "0 -5 10 10")
-                    .attr("refX", 9) // Tip of the arrow lands at the middle of edge "o"
-                    .attr("refY", 0)
-                    .attr("orient", "auto")
-                    .attr("markerWidth", 8)
-                    .attr("markerHeight", 8)
-                    .append("path")
-                    .attr("d", "M0,-5L10,0L0,5")
-                    .attr("fill", "#8e44ad");
             }
         )
         .newSort(
