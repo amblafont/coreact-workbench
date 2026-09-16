@@ -72,6 +72,10 @@ export class SortStore {
         drawFunction: (data: any, context: D3Context) => D3Context | null,
         initContext?: (context: D3Context) => void
     ): this {
+        if (this.sorts.has(name)) {
+            throw new Error(`Consistency Check Failed: Sort '${name}' is already defined.`);
+        }
+
         // Consistency check: all dependencies must be already defined sorts
         for (const [depKey, depSortName] of Object.entries(dependencies)) {
             if (!this.sorts.has(depSortName)) {
