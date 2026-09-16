@@ -22,6 +22,50 @@ function hookStartOffset(width: number): number {
     return Math.sqrt(Math.pow(VERTEX_RADIUS + HOOK_MARGIN + r, 2) - r * r);
 }
 
+// Midpoint of the drawn quadratic Bézier edge at t = 0.5.
+// Accounts for the vertex-clearing offsets at both ends.
+function edgeMidpoint(srcPos: number[], tgtPos: number[], bend: number, width: number, isMono: boolean): [number, number] {
+    const dx = tgtPos[0] - srcPos[0];
+    const dy = tgtPos[1] - srcPos[1];
+    const len = Math.sqrt(dx * dx + dy * dy);
+
+    const nx = len > 0 ? -dy / len : 0;
+    const ny = len > 0 ? dx / len : 0;
+
+    const mx = (srcPos[0] + tgtPos[0]) / 2;
+    const my = (srcPos[1] + tgtPos[1]) / 2;
+
+    const cx = mx + bend * nx;
+    const cy = my + bend * ny;
+
+    // Initial tangent at t=0
+    let ux0 = cx - srcPos[0], uy0 = cy - srcPos[1];
+    const u0Len = Math.hypot(ux0, uy0);
+    ux0 = u0Len > 0 ? ux0 / u0Len : (len > 0 ? dx / len : 1);
+    uy0 = u0Len > 0 ? uy0 / u0Len : (len > 0 ? dy / len : 0);
+
+    // Final tangent at t=1
+    let ux1 = tgtPos[0] - cx, uy1 = tgtPos[1] - cy;
+    const u1Len = Math.hypot(ux1, uy1);
+    ux1 = u1Len > 0 ? ux1 / u1Len : (len > 0 ? dx / len : 1);
+    uy1 = u1Len > 0 ? uy1 / u1Len : (len > 0 ? dy / len : 0);
+
+    const R = 20;
+    const startDist = isMono ? hookStartOffset(width) : R;
+    const startX = srcPos[0] + ux0 * startDist;
+    const startY = srcPos[1] + uy0 * startDist;
+
+    const halfW = width * 2;
+    const L = halfW * 2.5;
+    const baseX = tgtPos[0] - ux1 * (R + L);
+    const baseY = tgtPos[1] - uy1 * (R + L);
+
+    const midX = 0.25 * startX + 0.5 * cx + 0.25 * baseX;
+    const midY = 0.25 * startY + 0.5 * cy + 0.25 * baseY;
+
+    return [midX, midY];
+}
+
 {
     sortStore
         .newSort(
@@ -77,10 +121,6 @@ function hookStartOffset(width: number): number {
                 const cx = mx + bend * nx;
                 const cy = my + bend * ny;
 
-                // Curve midpoint at t = 0.5
-                const midX = 0.25 * srcPos[0] + 0.5 * cx + 0.25 * tgtPos[0];
-                const midY = 0.25 * srcPos[1] + 0.5 * cy + 0.25 * tgtPos[1];
-
                 const R = 20;
 
                 // Initial tangent at t=0
@@ -109,6 +149,9 @@ function hookStartOffset(width: number): number {
                 const L = halfW * 2.5;
                 const baseX = tgtPos[0] - ux1 * (R + L);
                 const baseY = tgtPos[1] - uy1 * (R + L);
+
+                // Midpoint of the drawn Bézier curve at t = 0.5
+                const [midX, midY] = edgeMidpoint(srcPos, tgtPos, bend, width, !!data.isMono);
 
                 const tipX = tgtPos[0] - ux1 * R;
                 const tipY = tgtPos[1] - uy1 * R;
@@ -202,24 +245,12 @@ function hookStartOffset(width: number): number {
                 const startPos = data["1"].target.position;
 
                 // Compute the middle of edge "o" using the same quadratic Bézier
-                // midpoint formula as the Edge sort's label placement.
-                const srcPos = data["o"].source.position;
-                const tgtPos = data["o"].target.position;
-                const bend = typeof data["o"].bend === "number" ? data["o"].bend : 0;
-
-                const dx = tgtPos[0] - srcPos[0];
-                const dy = tgtPos[1] - srcPos[1];
-                const len = Math.sqrt(dx * dx + dy * dy);
-                const nx = len > 0 ? -dy / len : 0;
-                const ny = len > 0 ? dx / len : 0;
-
-                const mx = (srcPos[0] + tgtPos[0]) / 2;
-                const my = (srcPos[1] + tgtPos[1]) / 2;
-                const cx = mx + bend * nx;
-                const cy = my + bend * ny;
-
-                const midX = 0.25 * srcPos[0] + 0.5 * cx + 0.25 * tgtPos[0];
-                const midY = 0.25 * srcPos[1] + 0.5 * cy + 0.25 * tgtPos[1];
+                // midpoint formula as the Edge sort.
+                const oSrcPos = data["o"].source.position;
+                const oTgtPos = data["o"].target.position;
+                const oBend = typeof data["o"].bend === "number" ? data["o"].bend : 0;
+                const oWidth = typeof data["o"].width === "number" ? data["o"].width : 2;
+                const [midX, midY] = edgeMidpoint(oSrcPos, oTgtPos, oBend, oWidth, !!data["o"].isMono);
 
                 // Unit direction from the target of edge "1" to the middle of edge "o"
                 const vx = midX - startPos[0];
