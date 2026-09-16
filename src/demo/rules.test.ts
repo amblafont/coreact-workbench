@@ -8,6 +8,7 @@ import {
     generateFirstOrderReverseRules,
     filterRedundantRuleApplications,
     filterNoProgressRuleApplications,
+    filterSolvesGoalRuleApplications,
     EqualityArtefact,
     type Drawing
 } from '../index';
@@ -511,6 +512,134 @@ describe('no-progress match filtering', () => {
 
         const filtered = filterNoProgressRuleApplications(rule, host, apps);
         expect(filtered.length).toBe(0);
+    });
+});
+
+describe('solves-the-goal filter', () => {
+    function buildReversedEdgeRule(): Drawing {
+        const rule = makeDrawing();
+        const rv0 = makeVertex(rule, 'rv0');
+        const rv1 = makeVertex(rule, 'rv1');
+        makeEdge(rule, 're1', rv0, rv1);
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        makeEdge(rule, 'rg', rv1, rv0, 'conclusion');
+        rule.setIsRule(true);
+        return rule;
+    }
+
+    it('keeps the matching whose conclusion makes the child layer (the goal) provable', () => {
+        const rule = buildReversedEdgeRule();
+        const host = makeDrawing();
+        host.addLayer('goal', 'Goal', 'root');
+        const hv0 = makeVertex(host, 'hv0');
+        const hv1 = makeVertex(host, 'hv1');
+        makeEdge(host, 'he1', hv0, hv1);
+        makeEdge(host, 'hg', hv1, hv0, 'goal');
+
+        expect(host.checkLayerProvable('goal').provable).toBe(false);
+
+        const apps = findFirstOrderRuleApplications(rule, host);
+        expect(apps.length).toBe(1);
+
+        const filtered = filterSolvesGoalRuleApplications(rule, host, apps);
+        expect(filtered.length).toBe(1);
+    });
+
+    it('filters a matching whose conclusion does not make the child layer provable', () => {
+        const rule = makeDrawing();
+        const rv0 = makeVertex(rule, 'rv0');
+        const rv1 = makeVertex(rule, 'rv1');
+        const rv2 = makeVertex(rule, 'rv2');
+        makeEdge(rule, 're1', rv0, rv1);
+        makeEdge(rule, 're2', rv1, rv2);
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        makeEdge(rule, 're3', rv0, rv2, 'conclusion');
+        rule.setIsRule(true);
+
+        const host = makeDrawing();
+        host.addLayer('goal', 'Goal', 'root');
+        const hv0 = makeVertex(host, 'hv0');
+        const hv1 = makeVertex(host, 'hv1');
+        const hv2 = makeVertex(host, 'hv2');
+        makeEdge(host, 'he1', hv0, hv1);
+        const he2 = makeEdge(host, 'he2', hv1, hv2);
+        host.newArtefact('isMono', { arrow: he2 }, {}, 'goal');
+
+        expect(host.checkLayerProvable('goal').provable).toBe(false);
+
+        const apps = findFirstOrderRuleApplications(rule, host);
+        expect(apps.length).toBe(1);
+
+        const filtered = filterSolvesGoalRuleApplications(rule, host, apps);
+        expect(filtered.length).toBe(0);
+    });
+
+    it('keeps all matchings when the child layer is already provable', () => {
+        const rule = buildReversedEdgeRule();
+        const host = makeDrawing();
+        host.addLayer('goal', 'Goal', 'root');
+        const hv0 = makeVertex(host, 'hv0');
+        const hv1 = makeVertex(host, 'hv1');
+        makeEdge(host, 'he1', hv0, hv1);
+        makeEdge(host, 'he2', hv1, hv0);
+        makeEdge(host, 'hg', hv1, hv0, 'goal');
+
+        expect(host.checkLayerProvable('goal').provable).toBe(true);
+
+        const apps = findFirstOrderRuleApplications(rule, host);
+        expect(apps.length).toBe(2);
+
+        const filtered = filterSolvesGoalRuleApplications(rule, host, apps);
+        expect(filtered.length).toBe(2);
+    });
+
+    it('keeps a match whose second-order conclusion makes the child layer provable', () => {
+        const rule = makeDrawing();
+        const rv0 = makeVertex(rule, 'rv0');
+        const rv1 = makeVertex(rule, 'rv1');
+        const rv2 = makeVertex(rule, 'rv2');
+        makeEdge(rule, 're1', rv0, rv1);
+        makeEdge(rule, 're2', rv1, rv2);
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        makeEdge(rule, 're3', rv0, rv2, 'conclusion');
+        rule.addLayer('premise', 'Premise', 'root');
+        const pv = rule.newArtefact('Vertex', {}, { position: [150, 150], label: 'pv' }, 'premise');
+        rule.addLayer('premise-goal', 'Premise Goal', 'premise');
+        makeEdge(rule, 'pg', pv, rv1, 'premise-goal');
+        rule.setIsRule(true);
+
+        const host = makeDrawing();
+        host.addLayer('goal', 'Goal', 'root');
+        const hv0 = makeVertex(host, 'hv0');
+        const hv1 = makeVertex(host, 'hv1');
+        const hv2 = makeVertex(host, 'hv2');
+        makeEdge(host, 'he1', hv0, hv1);
+        makeEdge(host, 'he2', hv1, hv2);
+        makeEdge(host, 'hg', hv0, hv2, 'goal');
+
+        expect(host.checkLayerProvable('goal').provable).toBe(false);
+
+        const apps = findSecondOrderRuleApplications(rule, host);
+        expect(apps.length).toBe(1);
+
+        const filtered = filterSolvesGoalRuleApplications(rule, host, apps);
+        expect(filtered.length).toBe(1);
+    });
+
+    it('returns the applications unchanged when the host layout is not root plus a single child', () => {
+        const rule = buildReversedEdgeRule();
+
+        const twoChildrenHost = makeDrawing();
+        const a = makeVertex(twoChildrenHost, 'a');
+        const b = makeVertex(twoChildrenHost, 'b');
+        makeEdge(twoChildrenHost, 'he1', a, b);
+        twoChildrenHost.addLayer('child1', 'Child 1', 'root');
+        twoChildrenHost.addLayer('child2', 'Child 2', 'root');
+
+        const apps = findFirstOrderRuleApplications(rule, twoChildrenHost);
+        expect(apps.length).toBe(1);
+
+        expect(filterSolvesGoalRuleApplications(rule, twoChildrenHost, apps)).toBe(apps);
     });
 });
 

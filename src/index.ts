@@ -2070,6 +2070,133 @@ function hostRootLayerIdOf(artefacts: Artefact[]): string {
     return artefacts.length > 0 ? artefacts[0].layerId : "root";
 }
 
+function cloneDrawing(host: Drawing): { clone: Drawing; origToClone: Map<Artefact, Artefact> } {
+    const clone = new Drawing(host.sortStore);
+    clone.clear(false);
+    const origToClone = new Map<Artefact, Artefact>();
+
+    // Restore layers in parent-before-child order.
+    const remainingLayers = [...host.getAllLayers()];
+    let layerProgress = true;
+    while (remainingLayers.length > 0 && layerProgress) {
+        layerProgress = false;
+        for (let i = 0; i < remainingLayers.length; i++) {
+            const l = remainingLayers[i];
+            if (l.parentId === null || clone.getLayer(l.parentId) !== undefined) {
+                clone.addLayer(l.id, l.name, l.parentId, l.color, l.colorEnabled, l.visible);
+                remainingLayers.splice(i, 1);
+                layerProgress = true;
+                break;
+            }
+        }
+    }
+    if (remainingLayers.length > 0) {
+        throw new Error("Consistency Check Failed: Could not restore layer hierarchy while cloning drawing.");
+    }
+
+    // Restore artefacts in dependency order.
+    const remainingArtefacts = [...host.getArtefacts()];
+    while (remainingArtefacts.length > 0) {
+        const idx = remainingArtefacts.findIndex(a =>
+            Object.values(a.dependencies).every(dep => origToClone.has(dep))
+        );
+        if (idx === -1) {
+            throw new Error("Consistency Check Failed: Could not resolve dependencies while cloning drawing.");
+        }
+        const a = remainingArtefacts.splice(idx, 1)[0];
+        if (a.sortName === "Equality") {
+            const children = artefactChildren(a)
+                .map(c => origToClone.get(c))
+                .filter((c): c is Artefact => c !== undefined);
+            const uniqueChildren = Array.from(new Set(children));
+            if (uniqueChildren.length >= 2) {
+                const copy = clone.addEqualityArtefactUnchecked(
+                    uniqueChildren,
+                    a.layerId,
+                    JSON.parse(JSON.stringify(a.data))
+                );
+                origToClone.set(a, copy);
+            }
+        } else {
+            const copiedDeps: Record<string, Artefact> = {};
+            for (const [key, dep] of Object.entries(a.dependencies)) {
+                const copy = origToClone.get(dep);
+                if (!copy) {
+                    throw new Error(`Consistency Check Failed: No copy created for artefact '${dep.data.label || dep.sortName}'.`);
+                }
+                copiedDeps[key] = copy;
+            }
+            const copy = clone.newArtefact(a.sortName, copiedDeps, JSON.parse(JSON.stringify(a.data)), a.layerId);
+            origToClone.set(a, copy);
+        }
+    }
+
+    return { clone, origToClone };
+}
+
+export function filterSolvesGoalRuleApplications(rule: Drawing, host: Drawing, applications: RuleApplication[]): RuleApplication[] {
+    // The filter only applies to a drawing consisting of a root layer with a single
+    // child layer and no other layers.
+    const layers = host.getAllLayers();
+    const rootLayers = layers.filter(l => l.parentId === null);
+    if (rootLayers.length !== 1) {
+        return applications;
+    }
+    const root = rootLayers[0];
+    const childLayers = layers.filter(l => l.parentId === root.id);
+    if (childLayers.length !== 1) {
+        return applications;
+    }
+    const child = childLayers[0];
+    if (layers.length !== 2) {
+        return applications;
+    }
+
+    // The conclusion layer is the unique root child whose artefacts are re-created
+    // in the host root when the rule is applied (single child for first-order rules,
+    // leaf child for second-order rules; mirrors filterNoProgressRuleApplications).
+    const ruleLayers = rule.getAllLayers();
+    const ruleRoots = ruleLayers.filter(l => l.parentId === null);
+    if (ruleRoots.length !== 1) {
+        return applications;
+    }
+    const ruleRoot = ruleRoots[0];
+    const ruleChildren = ruleLayers.filter(l => l.parentId === ruleRoot.id);
+    if (ruleChildren.length === 0) {
+        return applications;
+    }
+    const conclusionLayer = ruleChildren.length === 1
+        ? ruleChildren[0]
+        : ruleChildren.find(c => !ruleLayers.some(l => l.parentId === c.id));
+    if (!conclusionLayer) {
+        return applications;
+    }
+
+    const filtered: RuleApplication[] = [];
+    for (const app of applications) {
+        try {
+            const { clone, origToClone } = cloneDrawing(host);
+            const remapped = new Map<Artefact, Artefact>();
+            for (const [patternArt, hostArt] of app.matchedArtefacts) {
+                remapped.set(patternArt, origToClone.get(hostArt) ?? hostArt);
+            }
+            const simulated: RuleApplication = {
+                matchedArtefacts: remapped,
+                hostArtefacts: new Set<Artefact>()
+            };
+            applyRuleConclusion(rule, clone, simulated, conclusionLayer);
+            if (clone.checkLayerProvable(child.id).provable) {
+                filtered.push(app);
+            }
+        } catch {
+            // If goal-solvability cannot be determined for this application, keep it
+            // so it is not incorrectly hidden.
+            filtered.push(app);
+        }
+    }
+    return filtered;
+}
+
 export function findRuleApplications(rule: Drawing, host: Drawing, strictMatching = false): RuleApplication[] {
     validateRuleDrawing(rule);
 
@@ -2157,7 +2284,7 @@ function topologicallyOrderPattern(pattern: Artefact[]): Artefact[] | null {
     return orderedSet.size === pattern.length ? ordered : null;
 }
 
-function applyRuleConclusion(rule: Drawing, host: Drawing, application: RuleApplication, childLayer: Layer): { artefacts: Artefact[]; created: Map<Artefact, Artefact> } {
+export function applyRuleConclusion(rule: Drawing, host: Drawing, application: RuleApplication, childLayer: Layer): { artefacts: Artefact[]; created: Map<Artefact, Artefact> } {
     const layers = rule.getAllLayers();
     const rootLayers = layers.filter(l => l.parentId === null);
     if (rootLayers.length !== 1) {

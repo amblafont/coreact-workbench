@@ -659,6 +659,10 @@ body {
     color: #555;
     cursor: pointer;
 }
+.rule-checkbox-label.disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
 .layer-children {
     margin-left: 10px;
 }

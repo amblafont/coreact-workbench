@@ -12,6 +12,7 @@ import {
     generateFirstOrderReverseRules,
     filterRedundantRuleApplications,
     filterNoProgressRuleApplications,
+    filterSolvesGoalRuleApplications,
     type SortDefinition,
     type SavedDrawing,
     type RuleApplication,
@@ -1059,6 +1060,22 @@ export function toggleFilterStrictMatches(): void {
     filterStrictMatches.update(v => !v);
 }
 
+export const filterSolvesGoalMatches = writable(false);
+
+export function toggleFilterSolvesGoalMatches(): void {
+    filterSolvesGoalMatches.update(v => !v);
+}
+
+export const solvesGoalFilterApplicable = derived(version, () => {
+    const layers = drawing.getAllLayers();
+    const rootLayers = layers.filter(l => l.parentId === null);
+    if (rootLayers.length !== 1) return false;
+    const root = rootLayers[0];
+    const childLayers = layers.filter(l => l.parentId === root.id);
+    if (childLayers.length !== 1) return false;
+    return layers.length === 2;
+});
+
 // ---------------------------------------------------------------------------
 // Applyable rules (computed reactively by RuleApplications.svelte)
 // ---------------------------------------------------------------------------
@@ -1069,6 +1086,7 @@ export interface RuleAppEntry {
     applications: RuleApplication[];
     hiddenRedundant: number;
     hiddenNoProgress: number;
+    hiddenSolvesGoal: number;
 }
 
 export function computeRuleApplications(): RuleAppEntry[] {
@@ -1105,7 +1123,14 @@ export function computeRuleApplications(): RuleAppEntry[] {
             hiddenNoProgress = total - applications.length;
         }
 
-        entries.push({ savedRule, ruleDrawing, applications, hiddenRedundant, hiddenNoProgress });
+        let hiddenSolvesGoal = 0;
+        if (get(filterSolvesGoalMatches) && applications.length > 0) {
+            const total = applications.length;
+            applications = filterSolvesGoalRuleApplications(ruleDrawing, drawing, applications);
+            hiddenSolvesGoal = total - applications.length;
+        }
+
+        entries.push({ savedRule, ruleDrawing, applications, hiddenRedundant, hiddenNoProgress, hiddenSolvesGoal });
     }
     return entries;
 }

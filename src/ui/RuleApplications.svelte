@@ -1,10 +1,10 @@
 <script lang="ts">
     import type { Artefact } from '../index';
     import { get } from 'svelte/store';
-    import { computeRuleApplications, applyRuleAt, mergeMode, ruleHoverArtefacts, version, filterRedundantMatches, toggleFilterRedundantMatches, filterNoProgressMatches, toggleFilterNoProgressMatches, filterStrictMatches, toggleFilterStrictMatches } from './store';
+    import { computeRuleApplications, applyRuleAt, mergeMode, ruleHoverArtefacts, version, filterRedundantMatches, toggleFilterRedundantMatches, filterNoProgressMatches, toggleFilterNoProgressMatches, filterStrictMatches, toggleFilterStrictMatches, filterSolvesGoalMatches, toggleFilterSolvesGoalMatches, solvesGoalFilterApplicable } from './store';
 
     let entries: ReturnType<typeof computeRuleApplications> = [];
-    $: $version, $filterRedundantMatches, $filterNoProgressMatches, $filterStrictMatches, entries = computeRuleApplications();
+    $: $version, $filterRedundantMatches, $filterNoProgressMatches, $filterStrictMatches, $filterSolvesGoalMatches, entries = computeRuleApplications();
 
     function matchLabels(entry: (typeof entries)[number], app: (typeof entry.applications)[number]): string[] {
         const ruleDrawing = entry.ruleDrawing;
@@ -59,6 +59,10 @@
         <input type="checkbox" checked={$filterStrictMatches} onchange={toggleFilterStrictMatches} />
         Strict matching
     </label>
+    <label class="rule-checkbox-label" class:disabled={!$solvesGoalFilterApplicable} title={$solvesGoalFilterApplicable ? 'Only show matchings whose conclusion would make the child layer provable' : 'Requires a drawing with exactly one root and one child layer'}>
+        <input type="checkbox" checked={$filterSolvesGoalMatches} disabled={!$solvesGoalFilterApplicable} onchange={toggleFilterSolvesGoalMatches} />
+        Solves the goal
+    </label>
 </div>
 
 {#each entries as entry (entry.savedRule.name)}
@@ -100,6 +104,11 @@
     {#if entry.hiddenNoProgress > 0}
         <div class="rule-app-hidden-note">
             {entry.hiddenNoProgress} no-progress match{entry.hiddenNoProgress === 1 ? '' : 'es'} hidden
+        </div>
+    {/if}
+    {#if entry.hiddenSolvesGoal > 0}
+        <div class="rule-app-hidden-note">
+            {entry.hiddenSolvesGoal} match{entry.hiddenSolvesGoal === 1 ? '' : 'es'} not solving the goal hidden
         </div>
     {/if}
 {/each}
