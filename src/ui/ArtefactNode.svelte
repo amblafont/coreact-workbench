@@ -8,6 +8,7 @@
         mergeHoverArtefact,
         inspectedArtefact,
         menuHoverArtefact,
+        dependencyPickingFor,
         version
     } from './store';
     import {
@@ -16,7 +17,11 @@
         mergeBaseOpacityFor,
         isProvablyEqualCandidate,
         onArtefactNodeClick,
-        removeArtefactNode
+        removeArtefactNode,
+        moveArtefactUp,
+        moveArtefactDown,
+        canMoveArtefactUp,
+        canMoveArtefactDown
     } from './store';
     import ArtefactNode from './ArtefactNode.svelte';
 
@@ -38,6 +43,8 @@
     let inspectedNode = false;
     let nodeOpacity = 1;
     let depEntries: [string, Artefact][] = [];
+    let canUp = false;
+    let canDown = false;
 
     $: $version, children = equalityChildren(artefact);
     $: $version, baseLabel = getArtefactLabel(artefact);
@@ -52,6 +59,8 @@
         || ($mergeMode && ($mergeFirstArtefact === artefact || $mergeSecondArtefact === artefact));
 
     $: $version, depEntries = Object.entries(artefact.dependencies) as [string, Artefact][];
+    $: $version, $dependencyPickingFor, canUp = rootNode && !$dependencyPickingFor && canMoveArtefactUp(artefact);
+    $: $version, $dependencyPickingFor, canDown = rootNode && !$dependencyPickingFor && canMoveArtefactDown(artefact);
 
     $: {
         $version;
@@ -152,6 +161,46 @@
         {/if}
         {#if provablyEqualCandidate}
             <span class="eq-badge" title="Provably equal (via equality artefacts)">≡</span>
+        {/if}
+        {#if rootNode && !$dependencyPickingFor}
+            <span
+                class="move-btn"
+                class:disabled={!canUp}
+                role="button"
+                tabindex="0"
+                title="Move up"
+                aria-label="Move artefact up"
+                onclick={(e) => {
+                    e.stopPropagation();
+                    if (canUp) moveArtefactUp(artefact);
+                }}
+                onkeydown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (canUp) moveArtefactUp(artefact);
+                    }
+                }}
+            >↑</span>
+            <span
+                class="move-btn"
+                class:disabled={!canDown}
+                role="button"
+                tabindex="0"
+                title="Move down"
+                aria-label="Move artefact down"
+                onclick={(e) => {
+                    e.stopPropagation();
+                    if (canDown) moveArtefactDown(artefact);
+                }}
+                onkeydown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (canDown) moveArtefactDown(artefact);
+                    }
+                }}
+            >↓</span>
         {/if}
         <span
             class="remove-btn"

@@ -1040,6 +1040,32 @@ export class Drawing {
         return this.artefacts;
     }
 
+    moveArtefact(artefact: Artefact, delta: -1 | 1): void {
+        const idx = this.artefacts.indexOf(artefact);
+        if (idx === -1) {
+            throw new Error("Consistency Check Failed: Artefact does not belong to drawing.");
+        }
+        let neighbourIdx = idx + delta;
+        while (neighbourIdx >= 0 && neighbourIdx < this.artefacts.length) {
+            const neighbour = this.artefacts[neighbourIdx];
+            if (neighbour.sortName === artefact.sortName && neighbour.layerId === artefact.layerId) {
+                if (Math.abs(neighbourIdx - idx) === 1) {
+                    this.artefacts[idx] = neighbour;
+                    this.artefacts[neighbourIdx] = artefact;
+                } else {
+                    this.artefacts.splice(idx, 1);
+                    if (delta === -1) {
+                        this.artefacts.splice(neighbourIdx + 1, 0, artefact);
+                    } else {
+                        this.artefacts.splice(neighbourIdx - 1, 0, artefact);
+                    }
+                }
+                return;
+            }
+            neighbourIdx += delta;
+        }
+    }
+
     removeArtefact(target: Artefact): void {
         this.artefacts = this.artefacts.filter(art => !art.getSelfAndDependencies().has(target));
         // Remove any equality artefacts whose children count fell below 2

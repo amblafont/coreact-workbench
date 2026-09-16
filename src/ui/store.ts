@@ -686,6 +686,45 @@ export function removeArtefactNode(artefact: Artefact, parentArtefact: Artefact 
     refresh();
 }
 
+function hasSameSortLayerNeighbour(artefact: Artefact, delta: -1 | 1): boolean {
+    const arts = drawing.getArtefacts();
+    const idx = arts.indexOf(artefact);
+    if (idx === -1) return false;
+    let i = idx + delta;
+    while (i >= 0 && i < arts.length) {
+        const other = arts[i];
+        if (other.sortName === artefact.sortName && other.layerId === artefact.layerId) return true;
+        i += delta;
+    }
+    return false;
+}
+
+export function canMoveArtefactUp(artefact: Artefact): boolean {
+    return hasSameSortLayerNeighbour(artefact, -1);
+}
+
+export function canMoveArtefactDown(artefact: Artefact): boolean {
+    return hasSameSortLayerNeighbour(artefact, 1);
+}
+
+export function moveArtefactUp(artefact: Artefact): void {
+    try {
+        drawing.moveArtefact(artefact, -1);
+        refresh();
+    } catch (err) {
+        pushToast('error', (err as Error).message);
+    }
+}
+
+export function moveArtefactDown(artefact: Artefact): void {
+    try {
+        drawing.moveArtefact(artefact, 1);
+        refresh();
+    } catch (err) {
+        pushToast('error', (err as Error).message);
+    }
+}
+
 export function onArtefactNodeClick(art: Artefact): void {
     if (get(mergeMode)) {
         selectMergeArtefact(art);

@@ -368,6 +368,27 @@ body {
     background-color: #fadbd8;
 }
 
+.move-btn {
+    color: #7f8c8d;
+    cursor: pointer;
+    font-weight: bold;
+    padding: 0 3px;
+    border-radius: 3px;
+    font-size: 0.9em;
+    opacity: 0.3;
+    transition: opacity 0.2s, background-color 0.2s;
+}
+.node-header:hover .move-btn:not(.disabled) {
+    opacity: 1;
+}
+.move-btn:hover {
+    background-color: #e8eaed;
+}
+.move-btn.disabled {
+    opacity: 0;
+    pointer-events: none;
+}
+
 /* Canvas transitions for smooth fading */
 #canvas * {
     transition: opacity 0.3s ease;
