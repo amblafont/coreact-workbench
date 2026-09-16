@@ -181,6 +181,7 @@ export function applyPickedPosition(x: number, y: number): void {
     }
     if (isDraft) {
         setDraftDataField(picker.attrName, [x, y]);
+        finalizeDraftIfComplete();
     } else {
         picker.artefact.data[picker.attrName] = [x, y];
         refresh();
@@ -315,21 +316,32 @@ export function cancelDraft(): void {
     refresh();
 }
 
-export function createDraftArtefact(): boolean {
+export function createDraftArtefact(): Artefact | null {
     const draft = get(draftArtefact);
-    if (!draft) return false;
+    if (!draft) return null;
     try {
         const finalDeps: Record<string, Artefact> = { ...draft.dependencies };
-        drawing.newArtefact(draft.sortName, finalDeps, draft.data, draft.layerId);
+        const created = drawing.newArtefact(draft.sortName, finalDeps, draft.data, draft.layerId);
         draftArtefact.set(null);
         dependencyPickingFor.set(null);
         stopPositionPicker();
         refresh();
-        return true;
+        return created;
     } catch (err) {
         pushToast('error', (err as Error).message);
-        return false;
+        return null;
     }
+}
+
+export function finalizeDraftIfComplete(): Artefact | null {
+    const draft = get(draftArtefact);
+    if (!draft) return null;
+    if (!isDraftComplete(draft)) return null;
+    const created = createDraftArtefact();
+    if (created) {
+        selectArtefactToInspect(created);
+    }
+    return created;
 }
 
 export function isDraftComplete(draft: DraftArtefact): boolean {
@@ -617,6 +629,7 @@ export function pickDraftDependency(artefact: Artefact): void {
             return { ...d, dependencies: { ...d.dependencies, [`${nextIdx}`]: artefact } };
         });
         refresh();
+        finalizeDraftIfComplete();
         return;
     }
 
@@ -645,6 +658,7 @@ export function pickDraftDependency(artefact: Artefact): void {
                 break;
             }
         }
+        finalizeDraftIfComplete();
     } else {
         pushToast('error', `Expected sort '${expectedSort}', but selected '${artefact.sortName}'.`);
     }
