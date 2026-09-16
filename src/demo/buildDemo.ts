@@ -14,6 +14,9 @@ export interface DemoContext {
 }
 
 export function registerDefaultSorts(sortStore: SortStore): void {
+    if (sortStore.getSort('Vertex')) {
+        return;
+    }
     new Function('sortStore', 'd3', defaultSortsCode)(sortStore, d3);
 }
 
