@@ -10,6 +10,7 @@
     } from './store';
     import {
         saveActiveDrawing,
+        duplicateCurrentDrawing,
         newDrawing,
         importDrawingsFile,
         downloadDrawingsJson,
@@ -97,6 +98,7 @@
                 {$rocqRecordingActive ? 'Stop recording' : 'Rocq recording'}
             </button>
             <button class="layer-btn save-btn" title="Save current drawing" onclick={saveActiveDrawing}>Save</button>
+            <button class="layer-btn dup-btn" title="Duplicate the current drawing under a new name" onclick={duplicateCurrentDrawing}>Dup.</button>
             <button
                 class="layer-btn delete-btn"
                 title="Delete the checked drawings"

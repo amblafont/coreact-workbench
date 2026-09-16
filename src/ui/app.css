@@ -725,6 +725,12 @@ body {
     border: none;
     font-weight: bold;
 }
+.dup-btn {
+    background-color: #5d6d7e;
+    color: white;
+    border: none;
+    font-weight: bold;
+}
 .delete-btn {
     background-color: #e74c3c;
     color: white;
@@ -749,6 +755,9 @@ body {
 }
 .layer-btn.save-btn:hover {
     background-color: #27ae60;
+}
+.layer-btn.dup-btn:hover {
+    background-color: #4a5a69;
 }
 .layer-btn.delete-btn:hover {
     background-color: #c0392b;

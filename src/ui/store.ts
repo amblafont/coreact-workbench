@@ -730,6 +730,26 @@ export function saveActiveDrawing(): void {
     }
 }
 
+export function duplicateCurrentDrawing(): void {
+    const activeName = get(activeDrawingName);
+    const suggested = activeName ? `${activeName} copy` : 'Drawing copy';
+    const input = prompt('Enter a name for the duplicate drawing:', suggested);
+    if (!input || !input.trim()) return;
+    const name = input.trim();
+    if (drawingStore.getDrawing(name)) {
+        pushToast('error', `A drawing named '${name}' already exists.`);
+        return;
+    }
+    try {
+        drawingStore.saveDrawing(name, drawing);
+        activeDrawingName.set(name);
+        refresh();
+        pushToast('info', `Duplicated drawing as '${name}'.`);
+    } catch (err) {
+        pushToast('error', (err as Error).message);
+    }
+}
+
 export function newDrawing(): void {
     const hasContent = drawing.getArtefacts().length > 0 || drawing.getAllLayers().length > 1;
     if (hasContent && !confirm('Start a new drawing? Current canvas content will be discarded.')) {
