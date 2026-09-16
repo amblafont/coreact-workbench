@@ -48,6 +48,40 @@ describe('consistency checks', () => {
     });
 });
 
+describe('Drawing.getBestLayerForDependencies', () => {
+    it('returns null for no dependencies', () => {
+        const drawing = makeDrawing();
+        expect(drawing.getBestLayerForDependencies([])).toBeNull();
+    });
+
+    it('returns the dependency layer when there is a single dependency', () => {
+        const drawing = makeDrawing();
+        drawing.addLayer('child', 'Child', 'root');
+        const v0 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v0' }, 'child');
+        expect(drawing.getBestLayerForDependencies([v0.layerId])).toBe('child');
+    });
+
+    it('returns the deepest layer when all deps live there or in an ancestor', () => {
+        const drawing = makeDrawing();
+        drawing.addLayer('mid', 'Mid', 'root');
+        drawing.addLayer('deep', 'Deep', 'mid');
+        const vRoot = makeVertex(drawing, 'vRoot');
+        const vMid = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'vMid' }, 'mid');
+        const vDeep = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'vDeep' }, 'deep');
+        expect(drawing.getBestLayerForDependencies([vRoot.layerId, vMid.layerId, vDeep.layerId])).toBe('deep');
+    });
+
+    it('returns null when a dep is not in the deepest layer or its ancestors', () => {
+        const drawing = makeDrawing();
+        drawing.addLayer('root2', 'Root 2', null, '#e74c3c');
+        drawing.addLayer('a', 'A', 'root');
+        drawing.addLayer('b', 'B', 'root2');
+        const va = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'va' }, 'a');
+        const vb = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'vb' }, 'b');
+        expect(drawing.getBestLayerForDependencies([va.layerId, vb.layerId])).toBeNull();
+    });
+});
+
 describe('equality artefacts', () => {
     it('creates an equality artefact and merges overlapping children on the same layer', () => {
         const drawing = makeDrawing();

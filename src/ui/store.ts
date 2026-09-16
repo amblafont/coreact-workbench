@@ -612,6 +612,17 @@ export function setArtefactLayer(art: Artefact, targetLayerId: string): void {
     refresh();
 }
 
+function autoSelectLayerFromDependencies(): void {
+    const draft = get(draftArtefact);
+    if (!draft) return;
+    const depLayerIds = Object.values(draft.dependencies).map(d => d.layerId);
+    if (depLayerIds.length === 0) return;
+    const best = drawing.getBestLayerForDependencies(depLayerIds);
+    if (best && best !== draft.layerId) {
+        setDraftLayer(best);
+    }
+}
+
 export function pickDraftDependency(artefact: Artefact): void {
     const draft = get(draftArtefact);
     const picking = get(dependencyPickingFor);
@@ -629,6 +640,7 @@ export function pickDraftDependency(artefact: Artefact): void {
             return { ...d, dependencies: { ...d.dependencies, [`${nextIdx}`]: artefact } };
         });
         refresh();
+        autoSelectLayerFromDependencies();
         finalizeDraftIfComplete();
         return;
     }
@@ -658,6 +670,7 @@ export function pickDraftDependency(artefact: Artefact): void {
                 break;
             }
         }
+        autoSelectLayerFromDependencies();
         finalizeDraftIfComplete();
     } else {
         pushToast('error', `Expected sort '${expectedSort}', but selected '${artefact.sortName}'.`);

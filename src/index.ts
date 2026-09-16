@@ -537,6 +537,24 @@ export class Drawing {
         return depth;
     }
 
+    public getBestLayerForDependencies(depLayerIds: string[]): string | null {
+        if (depLayerIds.length === 0) return null;
+        let bestId = depLayerIds[0];
+        let bestDepth = this.getLayerDepth(bestId);
+        for (let i = 1; i < depLayerIds.length; i++) {
+            const depth = this.getLayerDepth(depLayerIds[i]);
+            if (depth > bestDepth) {
+                bestDepth = depth;
+                bestId = depLayerIds[i];
+            }
+        }
+        const allowed = this.getAncestors(bestId);
+        for (const id of depLayerIds) {
+            if (!allowed.has(id)) return null;
+        }
+        return bestId;
+    }
+
     public getDescendants(layerId: string): Set<string> {
         const descendants = new Set<string>();
         descendants.add(layerId);
