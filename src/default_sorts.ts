@@ -164,17 +164,28 @@ function edgeMidpoint(srcPos: number[], tgtPos: number[], bend: number, width: n
 
                 const lineGroup = context.insert("g", ":first-child");
 
-                lineGroup.append("path")
-                    .attr("d", `M ${startX},${startY} Q ${cx},${cy} ${baseX},${baseY}`)
-                    .attr("fill", "none")
-                    .attr("stroke", "#999")
-                    .attr("stroke-width", data.width);
+                if (data.isId) {
+                    const doubleOffset = 3;
+                    for (const side of [-1, 1]) {
+                        lineGroup.append("path")
+                            .attr("d", `M ${startX + nx * doubleOffset * side},${startY + ny * doubleOffset * side} Q ${cx + nx * doubleOffset * side},${cy + ny * doubleOffset * side} ${tipX + nx * doubleOffset * side},${tipY + ny * doubleOffset * side}`)
+                            .attr("fill", "none")
+                            .attr("stroke", "#999")
+                            .attr("stroke-width", data.width);
+                    }
+                } else {
+                    lineGroup.append("path")
+                        .attr("d", `M ${startX},${startY} Q ${cx},${cy} ${baseX},${baseY}`)
+                        .attr("fill", "none")
+                        .attr("stroke", "#999")
+                        .attr("stroke-width", data.width);
 
-                // Manual arrowhead polygon
-                lineGroup.append("path")
-                    .attr("d", `M ${baseX - px * halfW},${baseY - py * halfW} L ${tipX},${tipY} L ${baseX + px * halfW},${baseY + py * halfW} Z`)
-                    .attr("fill", "#999")
-                    .attr("stroke", "none");
+                    // Manual arrowhead polygon
+                    lineGroup.append("path")
+                        .attr("d", `M ${baseX - px * halfW},${baseY - py * halfW} L ${tipX},${tipY} L ${baseX + px * halfW},${baseY + py * halfW} Z`)
+                        .attr("fill", "#999")
+                        .attr("stroke", "none");
+                }
 
 
                 if (data.label) {
@@ -454,6 +465,14 @@ function edgeMidpoint(srcPos: number[], tgtPos: number[], bend: number, width: n
                     .attr("stroke-linecap", "round");
 
                 return group;
+            }
+        )
+        .newSort(
+            "isId",
+            { arrow: "Edge" },
+            {},
+            (_data: any, context: import('./types').D3Context) => {
+                return context.append("g");
             }
         );
 }
