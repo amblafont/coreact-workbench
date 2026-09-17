@@ -78,6 +78,7 @@ interface RecordedStatement {
     conclusionLayerId: string | null;
     ruleInfo: RuleTypeInfo | null;
     dependsOn: Set<string>;
+    proofClosedAt: number | null;
 }
 
 export class RocqRecorder {
@@ -121,7 +122,8 @@ export class RocqRecorder {
             isMain: true,
             conclusionLayerId: info.conclusionLayerId,
             ruleInfo: info,
-            dependsOn: new Set()
+            dependsOn: new Set(),
+            proofClosedAt: null
         });
 
         this.active = true;
@@ -143,6 +145,21 @@ export class RocqRecorder {
         return this.statements.get(hostActiveName) ?? null;
     }
 
+    // A recorded proof is tied to the drawing state at the moment it closed.
+    // Recording any further step supersedes that closed proof: drop the stale
+    // closing `exact ...` line and revert to pending so the exported script
+    // degrades to `Admitted.` unless the drawing is re-proven afterwards.
+    private revertProof(stmt: RecordedStatement): void {
+        if (!stmt.proved) {
+            return;
+        }
+        if (stmt.proofClosedAt !== null) {
+            stmt.bodyLines.splice(stmt.proofClosedAt, 1);
+        }
+        stmt.proved = false;
+        stmt.proofClosedAt = null;
+    }
+
     private registerSubgoal(drawingName: string, lemmaName: string, lemmaType: string): void {
         if ([...this.statements.values()].some(s => s.lemmaName === lemmaName)) {
             return;
@@ -156,7 +173,8 @@ export class RocqRecorder {
             isMain: false,
             conclusionLayerId: null,
             ruleInfo: null,
-            dependsOn: new Set()
+            dependsOn: new Set(),
+            proofClosedAt: null
         });
     }
 
@@ -173,6 +191,7 @@ export class RocqRecorder {
         if (!stmt) {
             return;
         }
+        this.revertProof(stmt);
 
         const savedRule = DrawingStore.drawingToSavedDrawing(savedRuleName, ruleDrawing);
         const ruleNames = drawingExportNames(savedRule, sortStore);
@@ -321,6 +340,7 @@ export class RocqRecorder {
         if (!stmt) {
             return;
         }
+        this.revertProof(stmt);
         if (oldFieldName !== newFieldName) {
             stmt.bodyLines.push(`rename ${oldFieldName} into ${newFieldName}.`);
         }
@@ -337,6 +357,7 @@ export class RocqRecorder {
         if (!stmt) {
             return;
         }
+        this.revertProof(stmt);
 
         const savedHost = DrawingStore.drawingToSavedDrawing(hostActiveName, hostDrawing);
         const hostNames = drawingExportNames(savedHost, sortStore);
@@ -404,6 +425,7 @@ export class RocqRecorder {
         if (stmt.conclusionLayerId === null) {
             stmt.bodyLines.push("exact I.");
             stmt.proved = true;
+            stmt.proofClosedAt = stmt.bodyLines.length - 1;
             return;
         }
 
@@ -452,6 +474,7 @@ export class RocqRecorder {
 
         stmt.bodyLines.push(`exact ${renderExactTerm(info.conclusionElements, witnessFor)}.`);
         stmt.proved = true;
+        stmt.proofClosedAt = stmt.bodyLines.length - 1;
     }
 
     public stop(): string {
@@ -482,7 +505,16 @@ export class RocqRecorder {
         const script: string[] = [];
         for (const s of ordered) {
             script.push(`Lemma ${s.lemmaName} : ${s.lemmaType}.`);
-            if (s.isMain || s.proved) {
+            const lastLine = s.bodyLines[s.bodyLines.length - 1] ?? "";
+            // A statement is only emitted as a finished proof when its closing
+            // `exact` is the final recorded step. An unproved main whose drawing
+            // has no conclusion layer is trivially finished by `exact I.`.
+            const autoCloseMain = !s.proved && s.isMain && s.conclusionLayerId === null && !lastLine.startsWith("exact ");
+            const emitProof = (s.proved && lastLine.startsWith("exact ")) || autoCloseMain;
+            if (emitProof) {
+                if (autoCloseMain) {
+                    script.push("exact I.");
+                }
                 script.push(...s.bodyLines);
                 script.push("Qed.");
             } else {

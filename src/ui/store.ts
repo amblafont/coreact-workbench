@@ -992,8 +992,10 @@ export function toggleRocqRecording(): void {
                 .writeText(script)
                 .then(() => {
                     const proved = stmts.filter(s => s.proved).length;
-                    const admitted = stmts.length - proved;
-                    pushToast('info', `Rocq recording script copied to clipboard (${stmts.length} lemma${stmts.length === 1 ? '' : 's'}: ${proved} proved, ${admitted} admitted).`);
+                    const admittedStmts = stmts.filter(s => !s.proved);
+                    const admitted = admittedStmts.length;
+                    const admittedNames = admitted > 0 ? ` (admitted: ${admittedStmts.map(s => `'${s.drawingName}'`).join(', ')})` : '';
+                    pushToast('info', `Rocq recording script copied to clipboard (${stmts.length} lemma${stmts.length === 1 ? '' : 's'}: ${proved} proved, ${admitted} admitted${admittedNames}).`);
                 })
                 .catch(() => {
                     pushToast('error', 'Error copying recording:\nClipboard access failed.');

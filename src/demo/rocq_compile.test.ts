@@ -366,4 +366,76 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
 
         compile('duplicate_move', exportDrawingsToRocq(store.getAllDrawings(), sortStore) + '\n' + script);
     });
+
+    it('compiles an unfinished main with a goal conclusion exported as Admitted', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+        const host = buildProvableChild(sortStore);
+        store.saveDrawing('Main', host);
+
+        const recorder = new RocqRecorder();
+        recorder.start(host, 'Main', sortStore);
+        const script = recorder.stop();
+
+        expect(script).toContain('Admitted.');
+        expect(script).not.toContain('Qed.');
+        compile('admitted_unfinished_main', exportDrawingsToRocq(store.getAllDrawings(), sortStore) + '\n' + script);
+    });
+
+    it('compiles a subgoal proof reverted to pending after a later recorded step', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+
+        const host = new Drawing(sortStore);
+        makeVertex(host, 'a');
+        makeVertex(host, 'b');
+        store.saveDrawing('Main', host);
+
+        const rule = new Drawing(sortStore);
+        const rx = makeVertex(rule, 'x');
+        const ry = makeVertex(rule, 'y');
+        rule.addLayer('premise-1', 'Premise', 'root');
+        makeEdge(rule, 'pe', rx, ry, 'premise-1');
+        rule.addLayer('premise-1-child', 'Premise Child', 'premise-1');
+        makeEdge(rule, 'pce', rx, ry, 'premise-1-child');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        makeEdge(rule, 'ce', rx, ry, 'conclusion');
+        rule.setIsRule(true);
+        store.saveDrawing('SecondOrderRule', rule);
+
+        const recorder = new RocqRecorder();
+        recorder.start(host, 'Main', sortStore);
+
+        const apps = findSecondOrderRuleApplications(rule, host);
+        if (apps.length === 0) {
+            throw new Error('SecondOrderRule produced no applications');
+        }
+        const result = applySecondOrderRule(rule, host, apps[0], { hostName: 'Main', ruleName: 'SecondOrderRule' });
+        const sub = result.derivedRules[0];
+        const childLayer = getFirstOrderStatementChildLayer(sub.drawing);
+        if (!childLayer) {
+            throw new Error('derived drawing has no first-order statement child layer');
+        }
+        const prove = sub.drawing.checkLayerProvable(childLayer.id);
+        if (!prove.provable) {
+            throw new Error('derived Goal layer not provable: ' + (prove.reason ?? 'unknown'));
+        }
+        recorder.recordRuleApply(
+            rule,
+            'SecondOrderRule',
+            apps[0],
+            host,
+            { artefacts: result.hostArtefacts, created: result.hostCreated, derivedNames: result.derivedRules.map(d => d.name) },
+            'Main',
+            sortStore
+        );
+        recorder.recordProveSuccess(sub.drawing, childLayer.id, prove.match ?? null, sub.name);
+        // A later edit on the sub supersedes the recorded proof: it reverts to pending.
+        recorder.recordRename('pe', 'pf', sub.name);
+        recorder.recordProveSuccess(host, null, null, 'Main');
+        const script = recorder.stop();
+
+        expect(script).toContain('Admitted.');
+        compile('superseded_subgoal', exportDrawingsToRocq(store.getAllDrawings(), sortStore) + '\n' + script);
+    });
 });

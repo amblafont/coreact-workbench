@@ -290,11 +290,14 @@ describe('rocq export', () => {
         recorder.recordRuleApply(rule, 'FlagOnlyRule', apps[0], host, created, 'MainDrawing', sortStore);
         const script = recorder.stop();
 
-        expect(script).toContain('@FlagOnlyRule_rule hv0 hv1 hv2 he1 he2');
-        // The host already has an isMono artefact (in mono-layer, named isMono_2),
-        // so the created conclusion binds as isMono_3.
-        expect(script).toContain('as isMono_3');
-        expect(script).not.toContain('as ()');
+        // The output isMono is a genuine goal layer (mono-layer) that was never
+        // proved, so the unfinished main is exported as Admitted rather than a
+        // bogus Qed.
+        expect(script).toContain('Lemma MainDrawing_rule :');
+        expect(script).toContain('forall (hv0 hv1 hv2 : Vertex)(he1 : Edge hv0 hv1)(he2 : Edge hv1 hv2), isMono he2');
+        expect(script).toContain('Admitted.');
+        expect(script).not.toContain('Qed.');
+        expect(script).not.toContain('as isMono_3');
     });
 
     it('places a root equality binder before the conclusion sorts in the rule type', () => {
@@ -585,5 +588,77 @@ describe('rocq export', () => {
         expect(subLemmaIndex).toBeGreaterThan(-1);
         expect(subsubLemmaIndex).toBeLessThan(subLemmaIndex);
         expect(subLemmaIndex).toBeLessThan(mainLemmaIndex);
+    });
+
+    it('reverts a recorded proof to pending when a rule is applied after the proof was recorded', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+
+        const host = new Drawing(sortStore);
+        const ma = makeVertex(host, 'a');
+        const mb = makeVertex(host, 'b');
+        makeEdge(host, 'g', ma, mb);
+        host.addLayer('child', 'Child Layer', 'root');
+        makeEdge(host, 'c', ma, mb, 'child');
+        store.saveDrawing('MainDrawing', host);
+
+        const result = host.checkLayerProvable('child');
+        expect(result.provable).toBe(true);
+
+        const recorder = new RocqRecorder();
+        recorder.start(host, 'MainDrawing', sortStore);
+        recorder.recordProveSuccess(host, 'child', result.match ?? null, 'MainDrawing');
+        expect(recorder.getRecordedStatements().find(s => s.drawingName === 'MainDrawing')!.proved).toBe(true);
+
+        const rule = new Drawing(sortStore);
+        const rx = makeVertex(rule, 'x');
+        const ry = makeVertex(rule, 'y');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        rule.newArtefact('Edge', { source: rx, target: ry }, { width: 2, bend: 0, label: 'f' }, 'conclusion');
+        rule.setIsRule(true);
+        store.saveDrawing('Foo', rule);
+        const apps = findFirstOrderRuleApplications(rule, host);
+        expect(apps.length).toBeGreaterThan(0);
+        const created = applyFirstOrderRule(rule, host, apps[0]);
+        recorder.recordRuleApply(rule, 'Foo', apps[0], host, created, 'MainDrawing', sortStore);
+
+        expect(recorder.getRecordedStatements().find(s => s.drawingName === 'MainDrawing')!.proved).toBe(false);
+        const script = recorder.stop();
+        expect(script).toContain('Admitted.');
+        expect(script).not.toContain('Qed.');
+    });
+
+    it('exports an unfinished main with a conclusion goal as Admitted instead of Qed', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+
+        const host = buildIsMonoInChildLayerRule();
+        store.saveDrawing('UnfinishedMonoHost', host);
+
+        const recorder = new RocqRecorder();
+        recorder.start(host, 'UnfinishedMonoHost', sortStore);
+        const script = recorder.stop();
+
+        expect(script).toContain('Lemma UnfinishedMonoHost_rule :');
+        expect(script).toContain('Admitted.');
+        expect(script).not.toContain('Qed.');
+        expect(script).not.toContain('exact');
+    });
+
+    it('closes a child-less main with exact I when no proof was recorded', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+
+        const host = buildComposableHost().host;
+        store.saveDrawing('MainDrawing', host);
+
+        const recorder = new RocqRecorder();
+        recorder.start(host, 'MainDrawing', sortStore);
+        const script = recorder.stop();
+
+        expect(script).toContain('Lemma MainDrawing_rule :');
+        expect(script).toContain('exact I.');
+        expect(script).toContain('Qed.');
+        expect(script).not.toContain('Admitted.');
     });
 });
