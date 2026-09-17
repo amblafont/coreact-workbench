@@ -13,6 +13,7 @@ import {
     filterRedundantRuleApplications,
     filterNoProgressRuleApplications,
     filterSolvesGoalRuleApplications,
+    getFirstOrderStatementChildLayer,
     type SortDefinition,
     type SavedDrawing,
     type RuleApplication,
@@ -1115,6 +1116,26 @@ export function checkLayerProvable(layerId: string): void {
     }
 }
 
+export function syncProvedStatus(): void {
+    try {
+        const child = getFirstOrderStatementChildLayer(drawing);
+        let proved = false;
+        if (child) {
+            const result = drawing.checkLayerProvable(child.id);
+            proved = result.provable;
+            if (proved) {
+                rocqRecorder.recordProveSuccess(drawing, child.id, result.match ?? null, get(activeDrawingName) ?? 'Unsaved Drawing');
+            }
+        }
+        const name = get(activeDrawingName);
+        if (name) {
+            drawingStore.setDrawingProved(name, proved);
+        }
+    } catch (err) {
+        pushToast('error', `Proved status check failed:\n${(err as Error).message}`);
+    }
+}
+
 export const filterRedundantMatches = writable(false);
 
 export function toggleFilterRedundantMatches(): void {
@@ -1140,13 +1161,7 @@ export function toggleFilterSolvesGoalMatches(): void {
 }
 
 export const solvesGoalFilterApplicable = derived(version, () => {
-    const layers = drawing.getAllLayers();
-    const rootLayers = layers.filter(l => l.parentId === null);
-    if (rootLayers.length !== 1) return false;
-    const root = rootLayers[0];
-    const childLayers = layers.filter(l => l.parentId === root.id);
-    if (childLayers.length !== 1) return false;
-    return layers.length === 2;
+    return getFirstOrderStatementChildLayer(drawing) !== null;
 });
 
 // ---------------------------------------------------------------------------
@@ -1241,6 +1256,7 @@ export function applyRuleAt(savedRuleName: string, appIndex: number): void {
         if (applicationResult) {
             rocqRecorder.recordRuleApply(ruleDrawing, savedRule.name, app, drawing, applicationResult, activeName, sortStore);
         }
+        syncProvedStatus();
         refresh();
     } catch (err) {
         pushToast('error', `Error applying rule '${savedRule.name}':\n${(err as Error).message}`);

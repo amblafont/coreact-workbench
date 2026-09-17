@@ -1304,6 +1304,7 @@ export interface SavedDrawing {
     isRule: boolean;
     isFirstOrder: boolean;
     parentName?: string;
+    proved?: boolean;
 }
 
 export class DrawingStore {
@@ -1346,6 +1347,15 @@ export class DrawingStore {
         }
         saved.isRule = isRule;
         saved.isFirstOrder = isRule && DrawingStore.firstOrderFromLayers(saved.layers);
+        return saved;
+    }
+
+    public setDrawingProved(name: string, proved: boolean): SavedDrawing {
+        const saved = this.drawings.get(name);
+        if (!saved) {
+            throw new Error(`Consistency Check Failed: Drawing '${name}' does not exist.`);
+        }
+        saved.proved = proved;
         return saved;
     }
 
@@ -1410,6 +1420,7 @@ export class DrawingStore {
         }
 
         const savedDrawing = DrawingStore.drawingToSavedDrawing(trimmedName, drawing);
+        savedDrawing.proved = computeProved(drawing);
         this.drawings.set(trimmedName, savedDrawing);
         return savedDrawing;
     }
@@ -1570,7 +1581,8 @@ export class DrawingStore {
             artefacts: p.artefacts,
             isRule: markedAsRule,
             isFirstOrder: markedAsRule && DrawingStore.firstOrderFromLayers(p.layers),
-            parentName: typeof p.parentName === 'string' ? p.parentName : undefined
+            parentName: typeof p.parentName === 'string' ? p.parentName : undefined,
+            proved: p.proved === true
         };
     }
 
@@ -2177,21 +2189,42 @@ function cloneDrawing(host: Drawing): { clone: Drawing; origToClone: Map<Artefac
     return { clone, origToClone };
 }
 
-export function filterSolvesGoalRuleApplications(rule: Drawing, host: Drawing, applications: RuleApplication[]): RuleApplication[] {
-    // The filter only applies to a drawing consisting of a root layer with a single
-    // child layer and no other layers.
-    const layers = host.getAllLayers();
+export function getFirstOrderStatementChildLayer(drawing: Drawing): Layer | null {
+    // A first-order statement has exactly two layers: a root layer and one
+    // child layer of that root, with no other layers.
+    const layers = drawing.getAllLayers();
+    if (layers.length !== 2) {
+        return null;
+    }
     const rootLayers = layers.filter(l => l.parentId === null);
     if (rootLayers.length !== 1) {
-        return applications;
+        return null;
     }
     const root = rootLayers[0];
     const childLayers = layers.filter(l => l.parentId === root.id);
     if (childLayers.length !== 1) {
-        return applications;
+        return null;
     }
-    const child = childLayers[0];
-    if (layers.length !== 2) {
+    return childLayers[0];
+}
+
+export function computeProved(drawing: Drawing): boolean {
+    const child = getFirstOrderStatementChildLayer(drawing);
+    if (!child) {
+        return false;
+    }
+    try {
+        return drawing.checkLayerProvable(child.id).provable;
+    } catch {
+        return false;
+    }
+}
+
+export function filterSolvesGoalRuleApplications(rule: Drawing, host: Drawing, applications: RuleApplication[]): RuleApplication[] {
+    // The filter only applies to a drawing consisting of a root layer with a single
+    // child layer and no other layers.
+    const child = getFirstOrderStatementChildLayer(host);
+    if (!child) {
         return applications;
     }
 

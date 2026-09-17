@@ -145,6 +145,7 @@
             <div
                 class:active={isActive}
                 class:first-order={savedDrawing.isFirstOrder}
+                class:proved={savedDrawing.proved}
                 class="drawing-row"
             >
                 <div class="drawing-row-header">
@@ -157,10 +158,13 @@
                     />
                     <span
                         class="drawing-title"
-                        title="Drawing: {savedDrawing.name} ({savedDrawing.layers.length} layers, {savedDrawing.artefacts.length} artefacts){savedDrawing.isRule ? (savedDrawing.isFirstOrder ? ' [First-Order Rule]' : ' [Rule]') : ''}"
+                        title="Drawing: {savedDrawing.name} ({savedDrawing.layers.length} layers, {savedDrawing.artefacts.length} artefacts){savedDrawing.isRule ? (savedDrawing.isFirstOrder ? ' [First-Order Rule]' : ' [Rule]') : ''}{savedDrawing.proved ? ' [Proved]' : ''}"
                     >{savedDrawing.name}</span>
                     {#if isActive}
                         <span class="active-badge" title="Currently active on canvas">Editing</span>
+                    {/if}
+                    {#if savedDrawing.proved}
+                        <span class="proved-badge" title="First-order statement whose child layer has been proved in the root layer">Proved</span>
                     {/if}
                     {#if savedDrawing.isRule}
                         {#if savedDrawing.isFirstOrder}
@@ -185,14 +189,17 @@
                     <div class="drawing-children">
                         {#each children as child (child.name)}
                             {@const childActive = child.name === $activeDrawingName}
-                            <div class:active={childActive} class="drawing-row drawing-child-row">
+                            <div class:active={childActive} class:proved={child.proved} class="drawing-row drawing-child-row">
                                 <div class="drawing-row-header">
                                     <span
                                         class="drawing-title"
-                                        title="Drawing: {child.name} ({child.layers.length} layers, {child.artefacts.length} artefacts){child.isRule ? ' [Rule]' : ''}"
+                                        title="Drawing: {child.name} ({child.layers.length} layers, {child.artefacts.length} artefacts){child.isRule ? ' [Rule]' : ''}{child.proved ? ' [Proved]' : ''}"
                                     >{child.name}</span>
                                     {#if childActive}
                                         <span class="active-badge" title="Currently active on canvas">Editing</span>
+                                    {/if}
+                                    {#if child.proved}
+                                        <span class="proved-badge" title="First-order statement whose child layer has been proved in the root layer">Proved</span>
                                     {/if}
                                     {#if child.isFirstOrder}
                                         <span class="first-order-badge" title="First-order rule: root layer has only one child">First-Order</span>

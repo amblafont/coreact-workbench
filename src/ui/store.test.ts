@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { get } from 'svelte/store';
-import { drawing, drawingStore, exportSelection, getSelectedDrawingNames, deleteSelectedDrawings, renameDrawingName, toasts, pushToast, dismissToast } from './store';
+import { drawing, drawingStore, activeDrawingName, sortStore, rocqRecorder, syncProvedStatus, exportSelection, getSelectedDrawingNames, deleteSelectedDrawings, renameDrawingName, toasts, pushToast, dismissToast } from './store';
+import { registerDefaultSorts } from '../demo/buildDemo';
 
 describe('export selection bookkeeping', () => {
     beforeEach(() => {
@@ -70,5 +71,63 @@ describe('toasts', () => {
         expect(get(toasts)).toHaveLength(1);
         vi.advanceTimersByTime(1);
         expect(get(toasts)).toEqual([]);
+    });
+});
+
+describe('first-order statement proved status', () => {
+    beforeEach(() => {
+        registerDefaultSorts(sortStore);
+        drawing.clear(true);
+        drawingStore.clear();
+        activeDrawingName.set(null);
+        vi.stubGlobal('confirm', () => true);
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        activeDrawingName.set(null);
+    });
+
+    function buildStatement(provable: boolean): void {
+        const a = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'a' }, 'root');
+        const b = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'b' }, 'root');
+        if (provable) {
+            drawing.newArtefact('Edge', { source: a, target: b }, { width: 2, bend: 0, label: 'g' }, 'root');
+        }
+        drawing.addLayer('goal', 'Goal', 'root');
+        drawing.newArtefact('Edge', { source: a, target: b }, { width: 2, bend: 0, label: 'c' }, 'goal');
+    }
+
+    it('marks a provable first-order statement as proved', () => {
+        buildStatement(true);
+        drawingStore.saveDrawing('Statement', drawing);
+        activeDrawingName.set('Statement');
+        syncProvedStatus();
+        expect(drawingStore.getDrawing('Statement')?.proved).toBe(true);
+    });
+
+    it('clears a previously set proved flag when the statement is no longer provable', () => {
+        buildStatement(false);
+        drawingStore.saveDrawing('Statement', drawing);
+        drawingStore.setDrawingProved('Statement', true);
+        activeDrawingName.set('Statement');
+        syncProvedStatus();
+        expect(drawingStore.getDrawing('Statement')?.proved).toBe(false);
+    });
+
+    it('handles an unsaved active drawing without crashing', () => {
+        buildStatement(true);
+        syncProvedStatus();
+        expect(true).toBe(true);
+    });
+
+    it('records an exact proof to the rocq recorder when proved', () => {
+        buildStatement(true);
+        drawingStore.saveDrawing('Statement', drawing);
+        activeDrawingName.set('Statement');
+        rocqRecorder.start(drawing, 'Statement', sortStore);
+        syncProvedStatus();
+        const script = rocqRecorder.stop();
+        expect(script).toContain('exact ');
     });
 });
