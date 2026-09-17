@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { exportDrawingsToRocq } from '../rocq_export';
 import { RocqRecorder } from '../rocq_recording';
-import { Drawing, DrawingStore, findFirstOrderRuleApplications, applyFirstOrderRule, findSecondOrderRuleApplications, applySecondOrderRule } from '../index';
+import { Drawing, DrawingStore, findFirstOrderRuleApplications, applyFirstOrderRule, findSecondOrderRuleApplications, applySecondOrderRule, getFirstOrderStatementChildLayer } from '../index';
 import { newSortStore, makeVertex, makeEdge, makeDrawing, buildComposableHost, buildIsMonoInChildLayerRule, buildIsMonoOnlyConclusionRule, buildSecondOrderRule } from './helpers';
 
 describe('rocq export', () => {
@@ -463,5 +463,127 @@ describe('rocq export', () => {
         recorder.recordDuplicate(host, a, a2, 'MainDrawing', sortStore);
 
         expect(recorder.isActive()).toBe(false);
+    });
+
+    it('records a real proof for a subgoal proven in the derived drawing and emits it before the main lemma', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+
+        const host = new Drawing(sortStore);
+        makeVertex(host, 'a');
+        makeVertex(host, 'b');
+        store.saveDrawing('MainDrawing', host);
+
+        const rule = new Drawing(sortStore);
+        const rx = makeVertex(rule, 'x');
+        const ry = makeVertex(rule, 'y');
+        rule.addLayer('premise-1', 'Premise', 'root');
+        makeEdge(rule, 'pe', rx, ry, 'premise-1');
+        rule.addLayer('premise-1-child', 'Premise Child', 'premise-1');
+        makeEdge(rule, 'pce', rx, ry, 'premise-1-child');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        makeEdge(rule, 'ce', rx, ry, 'conclusion');
+        rule.setIsRule(true);
+        store.saveDrawing('SecondOrderRule', rule);
+
+        const recorder = new RocqRecorder();
+        recorder.start(host, 'MainDrawing', sortStore);
+
+        const apps = findSecondOrderRuleApplications(rule, host);
+        expect(apps.length).toBeGreaterThan(0);
+        const result = applySecondOrderRule(rule, host, apps[0], { hostName: 'MainDrawing', ruleName: 'SecondOrderRule' });
+        const derived = result.derivedRules[0];
+        store.saveDrawing(derived.name, derived.drawing);
+
+        const childLayer = getFirstOrderStatementChildLayer(derived.drawing);
+        expect(childLayer).not.toBeNull();
+        const prove = derived.drawing.checkLayerProvable(childLayer!.id);
+        expect(prove.provable).toBe(true);
+
+        recorder.recordRuleApply(
+            rule,
+            'SecondOrderRule',
+            apps[0],
+            host,
+            { artefacts: result.hostArtefacts, created: result.hostCreated, derivedNames: result.derivedRules.map(d => d.name) },
+            'MainDrawing',
+            sortStore
+        );
+        recorder.recordProveSuccess(derived.drawing, childLayer!.id, prove.match ?? null, derived.name);
+        const script = recorder.stop();
+
+        const subLemmaIndex = script.indexOf('Lemma MainDrawing___SecondOrderRule___Premise_rule :');
+        const mainLemmaIndex = script.indexOf('Lemma MainDrawing_rule :');
+        expect(subLemmaIndex).toBeGreaterThan(-1);
+        expect(mainLemmaIndex).toBeGreaterThan(-1);
+        expect(subLemmaIndex).toBeLessThan(mainLemmaIndex);
+        expect(script).not.toContain('Admitted.');
+        expect(script.slice(subLemmaIndex, mainLemmaIndex)).toContain('exact');
+        expect(script.slice(subLemmaIndex, mainLemmaIndex)).toContain('Qed.');
+    });
+
+    it('orders nested subgoal lemmas before their parent subgoal and the main lemma', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+
+        const host = new Drawing(sortStore);
+        makeVertex(host, 'a');
+        makeVertex(host, 'b');
+        store.saveDrawing('MainDrawing', host);
+
+        const rule = new Drawing(sortStore);
+        const rx = makeVertex(rule, 'x');
+        const ry = makeVertex(rule, 'y');
+        rule.addLayer('premise-1', 'Premise', 'root');
+        makeEdge(rule, 'pe', rx, ry, 'premise-1');
+        rule.addLayer('premise-1-child', 'Premise Child', 'premise-1');
+        makeEdge(rule, 'pce', rx, ry, 'premise-1-child');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        makeEdge(rule, 'ce', rx, ry, 'conclusion');
+        rule.setIsRule(true);
+        store.saveDrawing('SecondOrderRule', rule);
+
+        const recorder = new RocqRecorder();
+        recorder.start(host, 'MainDrawing', sortStore);
+
+        const apps1 = findSecondOrderRuleApplications(rule, host);
+        expect(apps1.length).toBeGreaterThan(0);
+        const result1 = applySecondOrderRule(rule, host, apps1[0], { hostName: 'MainDrawing', ruleName: 'SecondOrderRule' });
+        const s1 = result1.derivedRules[0];
+        store.saveDrawing(s1.name, s1.drawing);
+        recorder.recordRuleApply(
+            rule,
+            'SecondOrderRule',
+            apps1[0],
+            host,
+            { artefacts: result1.hostArtefacts, created: result1.hostCreated, derivedNames: result1.derivedRules.map(d => d.name) },
+            'MainDrawing',
+            sortStore
+        );
+
+        const apps2 = findSecondOrderRuleApplications(rule, s1.drawing);
+        expect(apps2.length).toBeGreaterThan(0);
+        const result2 = applySecondOrderRule(rule, s1.drawing, apps2[0], { hostName: s1.name, ruleName: 'SecondOrderRule' });
+        const s1sub = result2.derivedRules[0];
+        store.saveDrawing(s1sub.name, s1sub.drawing);
+        recorder.recordRuleApply(
+            rule,
+            'SecondOrderRule',
+            apps2[0],
+            s1.drawing,
+            { artefacts: result2.hostArtefacts, created: result2.hostCreated, derivedNames: result2.derivedRules.map(d => d.name) },
+            s1.name,
+            sortStore
+        );
+
+        const script = recorder.stop();
+
+        const subsubLemmaIndex = script.indexOf('Lemma MainDrawing___SecondOrderRule___Premise___SecondOrderRule___Premise_rule :');
+        const subLemmaIndex = script.indexOf('Lemma MainDrawing___SecondOrderRule___Premise_rule :');
+        const mainLemmaIndex = script.indexOf('Lemma MainDrawing_rule :');
+        expect(subsubLemmaIndex).toBeGreaterThan(-1);
+        expect(subLemmaIndex).toBeGreaterThan(-1);
+        expect(subsubLemmaIndex).toBeLessThan(subLemmaIndex);
+        expect(subLemmaIndex).toBeLessThan(mainLemmaIndex);
     });
 });

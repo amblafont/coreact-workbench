@@ -61,30 +61,43 @@ function renderPremiseLemmaType(
     return renderForallChain(mapElementsToHost(rootElements, rootNameToHost), premiseType);
 }
 
+export interface RecordedStatementInfo {
+    drawingName: string;
+    lemmaName: string;
+    proved: boolean;
+    isMain: boolean;
+}
+
+interface RecordedStatement {
+    drawingName: string;
+    lemmaName: string;
+    lemmaType: string;
+    bodyLines: string[];
+    proved: boolean;
+    isMain: boolean;
+    conclusionLayerId: string | null;
+    ruleInfo: RuleTypeInfo | null;
+    dependsOn: Set<string>;
+}
+
 export class RocqRecorder {
     private active: boolean = false;
-    private drawingName: string | null = null;
-    private conclusionLayerId: string | null = null;
-    private ruleInfo: RuleTypeInfo | null = null;
+    private mainName: string | null = null;
     private sortStore: SortStore | null = null;
-    private lines: string[] = [];
-    private prelude: string[] = [];
-    private preludeLemmas: Set<string> = new Set();
+    private statements: Map<string, RecordedStatement> = new Map();
 
     public isActive(): boolean {
         return this.active;
     }
 
     public getRecordedDrawingName(): string | null {
-        return this.drawingName;
+        return this.mainName;
     }
 
     public start(drawing: Drawing, activeDrawingName: string, sortStore: SortStore): void {
-        this.drawingName = activeDrawingName;
+        this.mainName = activeDrawingName;
         this.sortStore = sortStore;
-        this.lines = [];
-        this.prelude = [];
-        this.preludeLemmas = new Set();
+        this.statements = new Map();
 
         const savedDrawing = DrawingStore.drawingToSavedDrawing(activeDrawingName, drawing);
         const exportNames = drawingExportNames(savedDrawing, sortStore);
@@ -98,13 +111,53 @@ export class RocqRecorder {
         const registry = newExportRegistry(sortStore);
         const info = ruleTypeInfo(savedDrawing, sortStore, registry, { reserveParam: false, includePremises: false });
         const lemmaName = `${moduleName}_rule`;
-        this.conclusionLayerId = info.conclusionLayerId;
-        this.ruleInfo = info;
 
-        this.lines.push(`Lemma ${lemmaName} : ${info.type}.`);
-        this.lines.push("intros_sigma ().");
+        this.statements.set(activeDrawingName, {
+            drawingName: activeDrawingName,
+            lemmaName,
+            lemmaType: info.type,
+            bodyLines: ["intros_sigma ()."],
+            proved: false,
+            isMain: true,
+            conclusionLayerId: info.conclusionLayerId,
+            ruleInfo: info,
+            dependsOn: new Set()
+        });
 
         this.active = true;
+    }
+
+    public getRecordedStatements(): RecordedStatementInfo[] {
+        return Array.from(this.statements.values()).map(s => ({
+            drawingName: s.drawingName,
+            lemmaName: s.lemmaName,
+            proved: s.proved,
+            isMain: s.isMain
+        }));
+    }
+
+    private statementFor(hostActiveName: string): RecordedStatement | null {
+        if (!this.active) {
+            return null;
+        }
+        return this.statements.get(hostActiveName) ?? null;
+    }
+
+    private registerSubgoal(drawingName: string, lemmaName: string, lemmaType: string): void {
+        if ([...this.statements.values()].some(s => s.lemmaName === lemmaName)) {
+            return;
+        }
+        this.statements.set(drawingName, {
+            drawingName,
+            lemmaName,
+            lemmaType,
+            bodyLines: ["intros_sigma ()."],
+            proved: false,
+            isMain: false,
+            conclusionLayerId: null,
+            ruleInfo: null,
+            dependsOn: new Set()
+        });
     }
 
     public recordRuleApply(
@@ -112,11 +165,12 @@ export class RocqRecorder {
         savedRuleName: string,
         application: { matchedArtefacts: Map<Artefact, Artefact> },
         hostDrawing: Drawing,
-        applicationResult: { artefacts: Artefact[]; created: Map<Artefact, Artefact> },
+        applicationResult: { artefacts: Artefact[]; created: Map<Artefact, Artefact>; derivedNames?: string[] },
         hostActiveName: string,
         sortStore: SortStore
     ): void {
-        if (!this.active || hostActiveName !== this.drawingName) {
+        const stmt = this.statementFor(hostActiveName);
+        if (!stmt) {
             return;
         }
 
@@ -213,8 +267,9 @@ export class RocqRecorder {
         const conclusionArity = ruleInfo.conclusionElements.length;
 
         // Second-order rules: assert each premise via `eauto using` the derived
-        // drawing's rule. That rule is emitted as a preliminary Lemma (whose proof
-        // is admitted) whose type is the premise re-rendered with the host's names.
+        // drawing's rule. Each derived drawing is registered as its own recorded
+        // statement (a subgoal) whose real proof can be supplied later by loading
+        // and proving that drawing; unproved subgoals degrade to `Admitted.`.
         const rootNameToHost = new Map<string, string>();
         ruleInfo.rootElements.forEach((el, i) => rootNameToHost.set(el.name, tupleValues[i]));
 
@@ -234,41 +289,40 @@ export class RocqRecorder {
             const premiseType = renderPremiseType(premise.premiseElements, premise.childElements, rootNameToHost);
             const proofName = `Hpremise${k + 1}`;
             const derivedName = `${hostActiveName} > ${savedRuleName} > ${premiseLayerDefs[k].name}`;
-            const lemmaName = `${sanitizeIdent(derivedName)}_rule`;
-            if (!this.preludeLemmas.has(lemmaName)) {
-                this.preludeLemmas.add(lemmaName);
-                this.prelude.push(`Lemma ${lemmaName} : ${renderPremiseLemmaType(ruleInfo.rootElements, premise.premiseElements, premise.childElements, rootNameToHost)}.`);
-                this.prelude.push("Admitted.");
-            }
-            this.lines.push(`assert (${proofName} : ${premiseType}) by eauto using ${lemmaName}.`);
+            const derivedDrawingName = (applicationResult.derivedNames && applicationResult.derivedNames[k]) || derivedName;
+            const lemmaName = `${sanitizeIdent(derivedDrawingName)}_rule`;
+            this.registerSubgoal(derivedDrawingName, lemmaName, renderPremiseLemmaType(ruleInfo.rootElements, premise.premiseElements, premise.childElements, rootNameToHost));
+            stmt.dependsOn.add(derivedDrawingName);
+            stmt.bodyLines.push(`assert (${proofName} : ${premiseType}) by eauto using ${lemmaName}.`);
             premiseProofNames.push(proofName);
         }
 
         if (premiseProofNames.length > 0) {
             const fullArgsStr = [...tupleValues, ...premiseProofNames].join(" ");
             if (conclusionArity === 0) {
-                this.lines.push(`assert (${assertName} := @${ruleParam} ${fullArgsStr}).`);
+                stmt.bodyLines.push(`assert (${assertName} := @${ruleParam} ${fullArgsStr}).`);
             } else if (conclusionArity === 1) {
-                this.lines.push(`destruct_sigma (@${ruleParam} ${fullArgsStr}) as ${conclusionHostNames.join(" ")}.`);
+                stmt.bodyLines.push(`destruct_sigma (@${ruleParam} ${fullArgsStr}) as ${conclusionHostNames.join(" ")}.`);
             } else {
-                this.lines.push(`assert (${assertName} := @${ruleParam} ${fullArgsStr}); destruct_sigma ${assertName} as ${conclusionHostNames.join(" ")}.`);
+                stmt.bodyLines.push(`assert (${assertName} := @${ruleParam} ${fullArgsStr}); destruct_sigma ${assertName} as ${conclusionHostNames.join(" ")}.`);
             }
             return;
         }
 
         if (conclusionArity === 0) {
-            this.lines.push(`assert (${assertName} := @${ruleParam} ${argsStr}).`);
+            stmt.bodyLines.push(`assert (${assertName} := @${ruleParam} ${argsStr}).`);
         } else {
-            this.lines.push(`destruct_sigma (@${ruleParam} ${argsStr}) as ${conclusionHostNames.join(" ")}.`);
+            stmt.bodyLines.push(`destruct_sigma (@${ruleParam} ${argsStr}) as ${conclusionHostNames.join(" ")}.`);
         }
     }
 
     public recordRename(oldFieldName: string, newFieldName: string, hostActiveName: string): void {
-        if (!this.active || hostActiveName !== this.drawingName) {
+        const stmt = this.statementFor(hostActiveName);
+        if (!stmt) {
             return;
         }
         if (oldFieldName !== newFieldName) {
-            this.lines.push(`rename ${oldFieldName} into ${newFieldName}.`);
+            stmt.bodyLines.push(`rename ${oldFieldName} into ${newFieldName}.`);
         }
     }
 
@@ -279,7 +333,8 @@ export class RocqRecorder {
         hostActiveName: string,
         sortStore: SortStore
     ): void {
-        if (!this.active || hostActiveName !== this.drawingName) {
+        const stmt = this.statementFor(hostActiveName);
+        if (!stmt) {
             return;
         }
 
@@ -318,33 +373,49 @@ export class RocqRecorder {
         }
 
         const typeStr = depFieldNames.length === 0 ? created.sortName : `${created.sortName} ${depFieldNames.join(" ")}`;
-        this.lines.push(`set (${createdField} := ${originalField} : ${typeStr}).`);
+        stmt.bodyLines.push(`set (${createdField} := ${originalField} : ${typeStr}).`);
     }
 
     public recordProveSuccess(hostDrawing: Drawing, layerId: string | null, match: Map<Artefact, Artefact> | null, hostActiveName: string): void {
-        if (!this.active || hostActiveName !== this.drawingName) {
+        const stmt = this.statementFor(hostActiveName);
+        if (!stmt) {
+            return;
+        }
+        if (stmt.proved) {
             return;
         }
 
-        if (this.conclusionLayerId === null) {
-            this.lines.push("exact I.");
+        // Subgoal statements are registered before their goal layer is known;
+        // resolve it lazily from the live drawing before deciding whether the
+        // statement has a provable conclusion layer at all.
+        if (!stmt.ruleInfo) {
+            if (!this.sortStore) {
+                throw new Error("Consistency Check Failed: No sort store available; start a recording before proving a layer.");
+            }
+            const savedHost = DrawingStore.drawingToSavedDrawing(hostActiveName, hostDrawing);
+            const info = ruleTypeInfo(savedHost, this.sortStore, newExportRegistry(this.sortStore), {
+                reserveParam: false,
+                includePremises: false
+            });
+            stmt.ruleInfo = info;
+            stmt.conclusionLayerId = info.conclusionLayerId;
+        }
+
+        if (stmt.conclusionLayerId === null) {
+            stmt.bodyLines.push("exact I.");
+            stmt.proved = true;
             return;
         }
 
-        if (layerId !== this.conclusionLayerId) {
-            throw new Error(`Consistency Check Failed: Recording rule for drawing '${this.drawingName}' has conclusion layer '${this.conclusionLayerId}', cannot prove layer '${layerId}'.`);
+        if (layerId !== stmt.conclusionLayerId) {
+            throw new Error(`Consistency Check Failed: Recording rule for drawing '${hostActiveName}' has conclusion layer '${stmt.conclusionLayerId}', cannot prove layer '${layerId}'.`);
         }
         if (!match) {
-            throw new Error(`Consistency Check Failed: Recording rule for drawing '${this.drawingName}' has conclusion layer '${this.conclusionLayerId}' and requires a successful match to produce an exact proof term.`);
+            throw new Error(`Consistency Check Failed: Recording rule for drawing '${hostActiveName}' has conclusion layer '${stmt.conclusionLayerId}' and requires a successful match to produce an exact proof term.`);
         }
 
-        const ruleInfo = this.ruleInfo;
-        if (!ruleInfo) {
-            throw new Error("Consistency Check Failed: No export info available; start a recording before proving a layer.");
-        }
-
-        const savedHost = DrawingStore.drawingToSavedDrawing(hostActiveName, hostDrawing);
-        const hostNames = drawingExportNames(savedHost, this.sortStore!);
+        const info = stmt.ruleInfo;
+        const hostNames = drawingExportNames(DrawingStore.drawingToSavedDrawing(hostActiveName, hostDrawing), this.sortStore!);
 
         const idToLiveArt = new Map<string, Artefact>();
         for (const art of hostDrawing.getArtefacts()) {
@@ -357,17 +428,17 @@ export class RocqRecorder {
                     const live = el.artefactId ? idToLiveArt.get(el.artefactId) : undefined;
                     const parent = live ? match.get(live) : undefined;
                     if (!parent) {
-                        throw new Error(`Consistency Check Failed: No host parent matched for artefact '${el.artefactId}' in conclusion layer '${this.conclusionLayerId}'.`);
+                        throw new Error(`Consistency Check Failed: No host parent matched for artefact '${el.artefactId}' in conclusion layer '${stmt.conclusionLayerId}'.`);
                     }
                     const parentDataId = artefactToDataId(hostDrawing, parent);
                     const hostFieldName = hostNames.fieldNames.get(parentDataId);
                     if (!hostFieldName) {
-                        throw new Error(`Consistency Check Failed: Matched parent for '${el.artefactId}' has no assigned field name in '${this.drawingName}'.`);
+                        throw new Error(`Consistency Check Failed: Matched parent for '${el.artefactId}' has no assigned field name in '${hostActiveName}'.`);
                     }
                     return hostFieldName;
                 }
                 case "equation": {
-                    const artData = el.artefactId ? ruleInfo.model.artefactById.get(el.artefactId) : undefined;
+                    const artData = el.artefactId ? info.model.artefactById.get(el.artefactId) : undefined;
                     const childCount = artData ? Object.values(artData.dependencies).filter(v => typeof v === "string").length : 2;
                     const eqCount = Math.max(1, childCount - 1);
                     let w = "eq_refl";
@@ -379,7 +450,8 @@ export class RocqRecorder {
             }
         };
 
-        this.lines.push(`exact ${renderExactTerm(ruleInfo.conclusionElements, witnessFor)}.`);
+        stmt.bodyLines.push(`exact ${renderExactTerm(info.conclusionElements, witnessFor)}.`);
+        stmt.proved = true;
     }
 
     public stop(): string {
@@ -387,13 +459,39 @@ export class RocqRecorder {
             throw new Error("Consistency Check Failed: Rocq recording is not active.");
         }
         this.active = false;
-        const script = [...this.prelude, ...this.lines, "Qed."].join("\n") + "\n";
-        this.lines = [];
-        this.prelude = [];
-        this.preludeLemmas = new Set();
-        this.drawingName = null;
-        this.conclusionLayerId = null;
-        this.ruleInfo = null;
-        return script;
+
+        const ordered: RecordedStatement[] = [];
+        const visited = new Set<string>();
+        const visit = (s: RecordedStatement): void => {
+            if (visited.has(s.drawingName)) {
+                return;
+            }
+            visited.add(s.drawingName);
+            for (const dep of s.dependsOn) {
+                const depStmt = this.statements.get(dep);
+                if (depStmt) {
+                    visit(depStmt);
+                }
+            }
+            ordered.push(s);
+        };
+        for (const s of this.statements.values()) {
+            visit(s);
+        }
+
+        const script: string[] = [];
+        for (const s of ordered) {
+            script.push(`Lemma ${s.lemmaName} : ${s.lemmaType}.`);
+            if (s.isMain || s.proved) {
+                script.push(...s.bodyLines);
+                script.push("Qed.");
+            } else {
+                script.push("Admitted.");
+            }
+        }
+        this.statements = new Map();
+        this.mainName = null;
+        this.sortStore = null;
+        return script.join("\n") + "\n";
     }
 }

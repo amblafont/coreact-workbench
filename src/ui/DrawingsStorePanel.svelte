@@ -1,11 +1,12 @@
 <script lang="ts">
-    import type { SavedDrawing } from '../index';
+    import DrawingNode from './DrawingNode.svelte';
     import {
         activeDrawingName,
         allDrawings,
         exportSelection,
         isCurrentDrawingRule,
         rocqRecordingActive,
+        pendingProofCount,
         ruleTag
     } from './store';
     import {
@@ -15,20 +16,18 @@
         importDrawingsFile,
         downloadDrawingsJson,
         copyRocqExport,
-        loadDrawingByName,
         deleteSelectedDrawings,
-        renameDrawingName,
-        markDrawingAsRule,
         setCurrentDrawingRule,
         toggleRocqRecording,
-        toggleExportSelection,
         setExportSelectionAll,
         getSelectedDrawingNames,
-        pushToast,
-        generateReverseRulesFor
+        pushToast
     } from './store';
 
     let importInput: HTMLInputElement;
+
+    $: names = new Set($allDrawings.map(d => d.name));
+    $: roots = $allDrawings.filter(d => !d.parentName || !names.has(d.parentName));
 
     function onImportFile(event: Event): void {
         const target = event.currentTarget as HTMLInputElement;
@@ -56,24 +55,6 @@
         }
         copyRocqExport(names);
     }
-
-    function onRename(saved: SavedDrawing): void {
-        const newName = prompt(`Enter new name for drawing '${saved.name}':`, saved.name);
-        if (!newName || !newName.trim() || newName.trim() === saved.name) return;
-        renameDrawingName(saved.name, newName.trim());
-    }
-
-    function onToggleRule(saved: SavedDrawing): void {
-        markDrawingAsRule(saved.name, !saved.isRule);
-    }
-
-    function onDelete(saved: SavedDrawing): void {
-        deleteSelectedDrawings([saved.name]);
-    }
-
-    function onGenerateReverseRules(saved: SavedDrawing): void {
-        generateReverseRulesFor(saved.name);
-    }
 </script>
 
 <div class="drawings-container">
@@ -95,7 +76,7 @@
                 title="Start or stop Rocq recording for the active drawing"
                 onclick={toggleRocqRecording}
             >
-                {$rocqRecordingActive ? 'Stop recording' : 'Rocq recording'}
+                {$rocqRecordingActive ? ($pendingProofCount > 0 ? `Stop recording (${$pendingProofCount} pending)` : 'Stop recording') : 'Rocq recording'}
             </button>
             <button class="layer-btn save-btn" title="Save current drawing" onclick={saveActiveDrawing}>Save</button>
             <button class="layer-btn dup-btn" title="Duplicate the current drawing under a new name" onclick={duplicateCurrentDrawing}>Dup.</button>
@@ -139,85 +120,8 @@
     {#if $allDrawings.length === 0}
         <div class="empty-msg">No drawings saved yet.</div>
     {:else}
-        {#each $allDrawings.filter(d => !d.parentName) as savedDrawing (savedDrawing.name)}
-            {@const isActive = savedDrawing.name === $activeDrawingName}
-            {@const children = $allDrawings.filter(d => d.parentName === savedDrawing.name)}
-            <div
-                class:active={isActive}
-                class:first-order={savedDrawing.isFirstOrder}
-                class:proved={savedDrawing.proved}
-                class="drawing-row"
-            >
-                <div class="drawing-row-header">
-                    <input
-                        type="checkbox"
-                        class="export-checkbox"
-                        title="Include '{savedDrawing.name}' in the next export"
-                        checked={$exportSelection.has(savedDrawing.name)}
-                        onchange={() => toggleExportSelection(savedDrawing.name)}
-                    />
-                    <span
-                        class="drawing-title"
-                        title="Drawing: {savedDrawing.name} ({savedDrawing.layers.length} layers, {savedDrawing.artefacts.length} artefacts){savedDrawing.isRule ? (savedDrawing.isFirstOrder ? ' [First-Order Rule]' : ' [Rule]') : ''}{savedDrawing.proved ? ' [Proved]' : ''}"
-                    >{savedDrawing.name}</span>
-                    {#if isActive}
-                        <span class="active-badge" title="Currently active on canvas">Editing</span>
-                    {/if}
-                    {#if savedDrawing.proved}
-                        <span class="proved-badge" title="First-order statement whose child layer has been proved in the root layer">Proved</span>
-                    {/if}
-                    {#if savedDrawing.isRule}
-                        {#if savedDrawing.isFirstOrder}
-                            <span class="first-order-badge" title="First-order rule: root layer has only one child">First-Order</span>
-                        {:else}
-                            <span class="second-order-badge" title="Second-order rule: root layer has several child layers">Second-Order</span>
-                        {/if}
-                    {/if}
-                </div>
-                <div class="drawing-row-actions">
-                    <button class="layer-btn" title="Load drawing '{savedDrawing.name}' to edit further" onclick={() => loadDrawingByName(savedDrawing.name)}>Load</button>
-                    <button class="layer-btn" title="Rename drawing '{savedDrawing.name}'" onclick={() => onRename(savedDrawing)}>Rename</button>
-                    {#if savedDrawing.isRule && !savedDrawing.isFirstOrder}
-                        <button class="layer-btn gen-reverse-btn" title="Generate a first-order reverse rule for each premise layer of this second-order rule" onclick={() => onGenerateReverseRules(savedDrawing)}>Gen Reverse</button>
-                    {/if}
-                    <button class="layer-btn" title={savedDrawing.isRule ? 'Remove the explicit rule marking from this drawing' : 'Explicitly mark this drawing as a rule (must satisfy rule conditions)'} onclick={() => onToggleRule(savedDrawing)}>
-                        {savedDrawing.isRule ? 'Unmark Rule' : 'Mark Rule'}
-                    </button>
-                    <button class="layer-btn row-delete-btn" title="Delete drawing '{savedDrawing.name}' and any generated reverse rules" onclick={() => onDelete(savedDrawing)}>×</button>
-                </div>
-                {#if children.length > 0}
-                    <div class="drawing-children">
-                        {#each children as child (child.name)}
-                            {@const childActive = child.name === $activeDrawingName}
-                            <div class:active={childActive} class:proved={child.proved} class="drawing-row drawing-child-row">
-                                <div class="drawing-row-header">
-                                    <span
-                                        class="drawing-title"
-                                        title="Drawing: {child.name} ({child.layers.length} layers, {child.artefacts.length} artefacts){child.isRule ? ' [Rule]' : ''}{child.proved ? ' [Proved]' : ''}"
-                                    >{child.name}</span>
-                                    {#if childActive}
-                                        <span class="active-badge" title="Currently active on canvas">Editing</span>
-                                    {/if}
-                                    {#if child.proved}
-                                        <span class="proved-badge" title="First-order statement whose child layer has been proved in the root layer">Proved</span>
-                                    {/if}
-                                    {#if child.isFirstOrder}
-                                        <span class="first-order-badge" title="First-order rule: root layer has only one child">First-Order</span>
-                                    {/if}
-                                </div>
-                                <div class="drawing-row-actions">
-                                    <button class="layer-btn" title="Load drawing '{child.name}' to edit further" onclick={() => loadDrawingByName(child.name)}>Load</button>
-                                    <button class="layer-btn" title="Rename drawing '{child.name}'" onclick={() => onRename(child)}>Rename</button>
-                                    <button class="layer-btn" title={child.isRule ? 'Remove the explicit rule marking from this drawing' : 'Explicitly mark this drawing as a rule (must satisfy rule conditions)'} onclick={() => onToggleRule(child)}>
-                                        {child.isRule ? 'Unmark Rule' : 'Mark Rule'}
-                                    </button>
-                                    <button class="layer-btn row-delete-btn" title="Delete drawing '{child.name}'" onclick={() => onDelete(child)}>×</button>
-                                </div>
-                            </div>
-                        {/each}
-                    </div>
-                {/if}
-            </div>
+        {#each roots as savedDrawing (savedDrawing.name)}
+            <DrawingNode drawing={savedDrawing} />
         {/each}
     {/if}
 </div>

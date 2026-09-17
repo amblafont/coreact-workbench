@@ -561,6 +561,7 @@ export function loadDrawingByName(name: string): boolean {
         drawingStore.loadDrawing(name, drawing);
         activeDrawingName.set(name);
         resetInteractionState();
+        syncProvedStatus();
         refresh();
         return true;
     } catch (err) {
@@ -819,6 +820,27 @@ export function onArtefactNodeClick(art: Artefact): void {
 export const rocqRecordingActive = writable(false);
 export const isCurrentDrawingRule = derived(version, () => drawing.isRule);
 
+export interface RecordedStatementInfo {
+    drawingName: string;
+    lemmaName: string;
+    proved: boolean;
+    isMain: boolean;
+}
+
+export const recordedStatements = derived(version, () => rocqRecorder.getRecordedStatements());
+
+export const recordedStatementByDrawing = derived(recordedStatements, stmts => {
+    const map = new Map<string, RecordedStatementInfo>();
+    for (const s of stmts) {
+        map.set(s.drawingName, s);
+    }
+    return map;
+});
+
+export const pendingProofCount = derived(recordedStatements, stmts =>
+    stmts.filter(s => !s.isMain && !s.proved).length
+);
+
 export function setCurrentDrawingRule(checked: boolean): void {
     try {
         drawing.setIsRule(checked);
@@ -963,12 +985,15 @@ export function markDrawingAsRule(name: string, isRule: boolean): void {
 export function toggleRocqRecording(): void {
     try {
         if (rocqRecorder.isActive()) {
+            const stmts = rocqRecorder.getRecordedStatements();
             const script = rocqRecorder.stop();
             rocqRecordingActive.set(false);
             navigator.clipboard
                 .writeText(script)
                 .then(() => {
-                    pushToast('info', 'Rocq recording script copied to clipboard.');
+                    const proved = stmts.filter(s => s.proved).length;
+                    const admitted = stmts.length - proved;
+                    pushToast('info', `Rocq recording script copied to clipboard (${stmts.length} lemma${stmts.length === 1 ? '' : 's'}: ${proved} proved, ${admitted} admitted).`);
                 })
                 .catch(() => {
                     pushToast('error', 'Error copying recording:\nClipboard access failed.');
@@ -1229,7 +1254,7 @@ export function applyRuleAt(savedRuleName: string, appIndex: number): void {
     const { savedRule, ruleDrawing, applications } = entry;
     const app = applications[appIndex];
     const activeName = get(activeDrawingName) ?? 'Unsaved Drawing';
-    let applicationResult: { artefacts: Artefact[]; created: Map<Artefact, Artefact> } | null = null;
+    let applicationResult: { artefacts: Artefact[]; created: Map<Artefact, Artefact>; derivedNames?: string[] } | null = null;
     try {
         if (savedRule.isFirstOrder) {
             const result = applyFirstOrderRule(ruleDrawing, drawing, app);
@@ -1248,9 +1273,11 @@ export function applyRuleAt(savedRuleName: string, appIndex: number): void {
                     suffix++;
                 }
                 drawingStore.saveDrawing(name, derived.drawing);
+                drawingStore.setDrawingParent(name, activeName);
                 createdNames.push(name);
                 console.log(`Saved derived drawing '${name}': isRule=${derived.drawing.isRule}, artefacts=${derived.drawing.getArtefacts().length}.`);
             }
+            applicationResult.derivedNames = createdNames;
             pushToast('info', `Applied rule '${savedRule.name}': added ${result.hostArtefacts.length} artefact(s) and created ${createdNames.length} derived drawing(s):\n- ${createdNames.join('\n- ')}`);
         }
         if (applicationResult) {

@@ -483,6 +483,25 @@ body {
 .rule-badge-invalid {
     background-color: #e74c3c;
 }
+.rec-badge {
+    font-size: 0.7em;
+    font-weight: bold;
+    color: white;
+    padding: 2px 5px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-left: 4px;
+}
+.rec-badge.rec-proved {
+    background-color: #28a745;
+}
+.rec-badge.rec-pending {
+    background-color: #e67e22;
+}
+.rec-badge.rec-main {
+    background-color: #3498db;
+}
 .drawing-children {
     margin-left: 14px;
     padding-left: 8px;
