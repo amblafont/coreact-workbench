@@ -530,6 +530,7 @@ export class RocqRecorder {
                 script.push(...s.bodyLines);
                 script.push("Qed.");
             } else {
+                script.push(...s.bodyLines);
                 script.push("Admitted.");
             }
         }

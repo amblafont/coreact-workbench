@@ -178,6 +178,60 @@ describe('rocq export', () => {
         expect(script).toContain('@SecondOrderRule_rule a b Hpremise1');
         expect(script).toContain('as ce');
         expect(script).not.toContain('by admit');
+
+        // The unfinished subgoal's partial proof still precedes its Admitted.
+        const subLemmaStart = script.indexOf('Lemma MainDrawing___SecondOrderRule___Premise_rule :');
+        const subLemmaEnd = script.indexOf('Admitted.', subLemmaStart);
+        expect(script.slice(subLemmaStart, subLemmaEnd)).toContain('intros_sigma ().');
+        expect(script.slice(subLemmaStart, subLemmaEnd)).toContain('Lemma MainDrawing___SecondOrderRule___Premise_rule : forall (a b : Vertex)(pe : Edge a b), Edge a b.');
+    });
+
+    it('keeps recorded steps of an unfinished subgoal proof before Admitted', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+
+        const host = new Drawing(sortStore);
+        makeVertex(host, 'a');
+        makeVertex(host, 'b');
+        store.saveDrawing('MainDrawing', host);
+
+        const rule = new Drawing(sortStore);
+        const rx = makeVertex(rule, 'x');
+        const ry = makeVertex(rule, 'y');
+        rule.addLayer('premise-1', 'Premise', 'root');
+        makeEdge(rule, 'pe', rx, ry, 'premise-1');
+        rule.addLayer('premise-1-child', 'Premise Child', 'premise-1');
+        makeEdge(rule, 'pce', rx, ry, 'premise-1-child');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        makeEdge(rule, 'ce', rx, ry, 'conclusion');
+        rule.setIsRule(true);
+        store.saveDrawing('SecondOrderRule', rule);
+
+        const recorder = new RocqRecorder();
+        recorder.start(host, 'MainDrawing', sortStore);
+        const apps = findSecondOrderRuleApplications(rule, host);
+        expect(apps.length).toBeGreaterThan(0);
+        const result = applySecondOrderRule(rule, host, apps[0], { hostName: 'MainDrawing', ruleName: 'SecondOrderRule' });
+        const sub = result.derivedRules[0];
+        recorder.recordRuleApply(
+            rule,
+            'SecondOrderRule',
+            apps[0],
+            host,
+            { artefacts: result.hostArtefacts, created: result.hostCreated, derived: result.derivedRules },
+            'MainDrawing',
+            sortStore
+        );
+
+        // The subgoal is partly worked (a rename) but never proved.
+        recorder.recordRename('pe', 'pf', sub.name);
+        const script = recorder.stop();
+
+        const subLemmaStart = script.indexOf('Lemma MainDrawing___SecondOrderRule___Premise_rule :');
+        const subLemmaEnd = script.indexOf('Admitted.', subLemmaStart);
+        expect(subLemmaStart).toBeGreaterThan(-1);
+        expect(script.slice(subLemmaStart, subLemmaEnd)).toContain('rename pe into pf.');
+        expect(script.slice(subLemmaStart, subLemmaEnd).trim().startsWith('Lemma')).toBe(true);
     });
 
     it('exports the derived drawing statement as the subgoal lemma type', () => {
@@ -339,12 +393,14 @@ describe('rocq export', () => {
 
         // The output isMono is a genuine goal layer (mono-layer) that was never
         // proved, so the unfinished main is exported as Admitted rather than a
-        // bogus Qed.
+        // bogus Qed, keeping the recorded partial proof.
         expect(script).toContain('Lemma MainDrawing_rule :');
         expect(script).toContain('forall (hv0 hv1 hv2 : Vertex)(he1 : Edge hv0 hv1)(he2 : Edge hv1 hv2), isMono he2');
         expect(script).toContain('Admitted.');
         expect(script).not.toContain('Qed.');
-        expect(script).not.toContain('as isMono_3');
+        const mainStart = script.indexOf('Lemma MainDrawing_rule :');
+        const mainEnd = script.indexOf('Admitted.', mainStart);
+        expect(script.slice(mainStart, mainEnd)).toContain('destruct_sigma (@FlagOnlyRule_rule hv0 hv1 hv2 he1 he2) as isMono_3.');
     });
 
     it('places a root equality binder before the conclusion sorts in the rule type', () => {
