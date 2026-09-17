@@ -233,7 +233,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         compile('proven_subgoal', exportDrawingsToRocq(store.getAllDrawings(), sortStore) + '\n' + script);
     });
 
-    it('compiles a subgoal lemma whose type is the derived drawing statement including extra host context', () => {
+    it('compiles an inlined subgoal proof with extra host context', () => {
         const sortStore = newSortStore();
         const store = new DrawingStore();
 
@@ -287,7 +287,9 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         recorder.recordProveSuccess(host, null, null, 'Main');
         const script = recorder.stop();
 
-        expect(script).toContain('Lemma Main___SecondOrderRule___Premise_rule : forall (a b c : Vertex)(pe : Edge a b), Edge a b.');
+        expect(script).not.toContain('Lemma Main___SecondOrderRule___Premise_rule :');
+        expect(script).toContain('assert (Hpremise1 : forall (pe : Edge a b), Edge a b). {');
+        expect(script).toContain('exact pe.');
         expect(script).not.toContain('Admitted.');
         compile('subgoal_extra_context', exportDrawingsToRocq(store.getAllDrawings(), sortStore) + '\n' + script);
     });
@@ -496,5 +498,152 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
 
         expect(script).toContain('Admitted.');
         compile('superseded_subgoal', exportDrawingsToRocq(store.getAllDrawings(), sortStore) + '\n' + script);
+    });
+
+    it('compiles nested inline subgoal proofs referencing the enclosing context', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+
+        const host = new Drawing(sortStore);
+        makeVertex(host, 'a');
+        makeVertex(host, 'b');
+        store.saveDrawing('Main', host);
+
+        const rule = new Drawing(sortStore);
+        const rx = makeVertex(rule, 'x');
+        const ry = makeVertex(rule, 'y');
+        rule.addLayer('premise-1', 'Premise', 'root');
+        makeEdge(rule, 'pe', rx, ry, 'premise-1');
+        rule.addLayer('premise-1-child', 'Premise Child', 'premise-1');
+        makeEdge(rule, 'pce', rx, ry, 'premise-1-child');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        makeEdge(rule, 'ce', rx, ry, 'conclusion');
+        rule.setIsRule(true);
+        store.saveDrawing('SecondOrderRule', rule);
+
+        const recorder = new RocqRecorder();
+        recorder.start(host, 'Main', sortStore);
+
+        const apps1 = findSecondOrderRuleApplications(rule, host);
+        if (apps1.length === 0) {
+            throw new Error('SecondOrderRule produced no applications on Main');
+        }
+        const result1 = applySecondOrderRule(rule, host, apps1[0], { hostName: 'Main', ruleName: 'SecondOrderRule' });
+        const s1 = result1.derivedRules[0];
+        store.saveDrawing(s1.name, s1.drawing);
+        recorder.recordRuleApply(
+            rule,
+            'SecondOrderRule',
+            apps1[0],
+            host,
+            { artefacts: result1.hostArtefacts, created: result1.hostCreated, derivedNames: result1.derivedRules.map(d => d.name) },
+            'Main',
+            sortStore
+        );
+
+        const apps2 = findSecondOrderRuleApplications(rule, s1.drawing);
+        if (apps2.length === 0) {
+            throw new Error('SecondOrderRule produced no applications on the subgoal drawing');
+        }
+        const result2 = applySecondOrderRule(rule, s1.drawing, apps2[0], { hostName: s1.name, ruleName: 'SecondOrderRule' });
+        const s1sub = result2.derivedRules[0];
+        store.saveDrawing(s1sub.name, s1sub.drawing);
+        recorder.recordRuleApply(
+            rule,
+            'SecondOrderRule',
+            apps2[0],
+            s1.drawing,
+            { artefacts: result2.hostArtefacts, created: result2.hostCreated, derivedNames: result2.derivedRules.map(d => d.name) },
+            s1.name,
+            sortStore
+        );
+
+        recorder.recordProveSuccess(host, null, null, 'Main');
+        const script = recorder.stop();
+
+        expect(script).not.toContain('Lemma Main___SecondOrderRule___Premise_rule :');
+        expect(script).toContain('Admitted.');
+        compile('nested_inline_subgoals', exportDrawingsToRocq(store.getAllDrawings(), sortStore) + '\n' + script);
+    });
+
+    it('compiles a multi-premise second-order rule whose premises share artefact names', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+
+        const host = new Drawing(sortStore);
+        makeVertex(host, 'a');
+        makeVertex(host, 'b');
+        store.saveDrawing('Main', host);
+
+        const rule = new Drawing(sortStore);
+        const rx = makeVertex(rule, 'x');
+        const ry = makeVertex(rule, 'y');
+        rule.addLayer('premise-1', 'Premise 1', 'root');
+        makeEdge(rule, 'pe', rx, ry, 'premise-1');
+        rule.addLayer('premise-1-child', 'Premise 1 Child', 'premise-1');
+        makeEdge(rule, 'pce', rx, ry, 'premise-1-child');
+        rule.addLayer('premise-2', 'Premise 2', 'root');
+        makeEdge(rule, 'pe', rx, ry, 'premise-2');
+        rule.addLayer('premise-2-child', 'Premise 2 Child', 'premise-2');
+        makeEdge(rule, 'pce', rx, ry, 'premise-2-child');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        makeEdge(rule, 'ce', rx, ry, 'conclusion');
+        rule.setIsRule(true);
+        store.saveDrawing('MultiPremiseRule', rule);
+
+        const recorder = new RocqRecorder();
+        recorder.start(host, 'Main', sortStore);
+
+        const apps = findSecondOrderRuleApplications(rule, host);
+        if (apps.length === 0) {
+            throw new Error('MultiPremiseRule produced no applications');
+        }
+        const result = applySecondOrderRule(rule, host, apps[0], { hostName: 'Main', ruleName: 'MultiPremiseRule' });
+        expect(result.derivedRules.length).toBe(2);
+
+        const sub1 = result.derivedRules[0];
+        const sub2 = result.derivedRules[1];
+        store.saveDrawing(sub1.name, sub1.drawing);
+        store.saveDrawing(sub2.name, sub2.drawing);
+
+        const childLayer1 = getFirstOrderStatementChildLayer(sub1.drawing);
+        if (!childLayer1) {
+            throw new Error('sub1 has no child layer');
+        }
+        const prove1 = sub1.drawing.checkLayerProvable(childLayer1.id);
+        if (!prove1.provable) {
+            throw new Error('sub1 not provable: ' + (prove1.reason ?? 'unknown'));
+        }
+
+        const childLayer2 = getFirstOrderStatementChildLayer(sub2.drawing);
+        if (!childLayer2) {
+            throw new Error('sub2 has no child layer');
+        }
+        const prove2 = sub2.drawing.checkLayerProvable(childLayer2.id);
+        if (!prove2.provable) {
+            throw new Error('sub2 not provable: ' + (prove2.reason ?? 'unknown'));
+        }
+
+        recorder.recordRuleApply(
+            rule,
+            'MultiPremiseRule',
+            apps[0],
+            host,
+            { artefacts: result.hostArtefacts, created: result.hostCreated, derivedNames: result.derivedRules.map(d => d.name), derived: result.derivedRules },
+            'Main',
+            sortStore
+        );
+
+        recorder.recordProveSuccess(sub1.drawing, childLayer1.id, prove1.match ?? null, sub1.name);
+        recorder.recordProveSuccess(sub2.drawing, childLayer2.id, prove2.match ?? null, sub2.name);
+        recorder.recordProveSuccess(host, null, null, 'Main');
+        const script = recorder.stop();
+
+        expect(script).not.toContain('Admitted.');
+        expect(script).toContain('assert (Hpremise1 : forall (pe : Edge a b), Edge a b). {');
+        expect(script).toContain('assert (Hpremise2 : forall (pe : Edge a b), Edge a b). {');
+        expect(script).toContain('exact pe.');
+
+        compile('multi_premise_subgoals', exportDrawingsToRocq(store.getAllDrawings(), sortStore) + '\n' + script);
     });
 });

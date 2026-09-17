@@ -2511,6 +2511,7 @@ export function applyFirstOrderRule(rule: Drawing, host: Drawing, application: R
 export interface DerivedRule {
     name: string;
     drawing: Drawing;
+    created?: Map<Artefact, Artefact>;
 }
 
 export interface SecondOrderRuleNames {
@@ -2687,7 +2688,8 @@ export function applySecondOrderRule(rule: Drawing, host: Drawing, application: 
             }
             const uniqueChildren = Array.from(new Set(resolvedChildren));
             if (uniqueChildren.length >= 2) {
-                derived.addEqualityArtefactUnchecked(uniqueChildren, derivedRootId, JSON.parse(JSON.stringify(eq.data)));
+                const newEq = derived.addEqualityArtefactUnchecked(uniqueChildren, derivedRootId, JSON.parse(JSON.stringify(eq.data)));
+                aCreated.set(eq, newEq);
             }
         }
 
@@ -2782,14 +2784,16 @@ export function applySecondOrderRule(rule: Drawing, host: Drawing, application: 
             }
             const uniqueChildren = Array.from(new Set(resolvedChildren));
             if (uniqueChildren.length >= 2) {
-                derived.addEqualityArtefactUnchecked(uniqueChildren, childOfPremise.id, JSON.parse(JSON.stringify(eq.data)));
+                const newEq = derived.addEqualityArtefactUnchecked(uniqueChildren, childOfPremise.id, JSON.parse(JSON.stringify(eq.data)));
+                bCreated.set(eq, newEq);
             }
         }
 
         const derivedName = names
             ? `${names.hostName} > ${names.ruleName} > ${premise.name}`
             : premise.name;
-        derivedRules.push({ name: derivedName, drawing: derived });
+        const derivedCreated = new Map<Artefact, Artefact>([...aCreated, ...bCreated]);
+        derivedRules.push({ name: derivedName, drawing: derived, created: derivedCreated });
     }
 
     return { hostArtefacts, hostCreated: created, derivedRules };

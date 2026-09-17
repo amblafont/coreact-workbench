@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { exportDrawingsToRocq } from '../rocq_export';
+import { exportDrawingsToRocq, ruleParamBaseName } from '../rocq_export';
 import { RocqRecorder } from '../rocq_recording';
 import { Drawing, DrawingStore, findFirstOrderRuleApplications, applyFirstOrderRule, findSecondOrderRuleApplications, applySecondOrderRule, getFirstOrderStatementChildLayer } from '../index';
 import { newSortStore, makeVertex, makeEdge, makeDrawing, buildComposableHost, buildIsMonoInChildLayerRule, buildIsMonoOnlyConclusionRule, buildSecondOrderRule } from './helpers';
@@ -172,21 +172,22 @@ describe('rocq export', () => {
         recorder.recordRuleApply(rule, 'SecondOrderRule', apps[0], host, { artefacts: result.hostArtefacts, created: result.hostCreated, derived: result.derivedRules }, 'MainDrawing', sortStore);
         const script = recorder.stop();
 
-        expect(script).toContain('Lemma MainDrawing___SecondOrderRule___Premise_rule :');
+        expect(script).not.toContain('Lemma MainDrawing___SecondOrderRule___Premise_rule :');
         expect(script).toContain('Admitted.');
-        expect(script).toContain('by eauto using MainDrawing___SecondOrderRule___Premise_rule');
+        expect(script).toContain('assert (Hpremise1 : forall (pe : Edge a b), Edge a b). {');
         expect(script).toContain('@SecondOrderRule_rule a b Hpremise1');
         expect(script).toContain('as ce');
-        expect(script).not.toContain('by admit');
+        expect(script).toContain('admit.');
 
-        // The unfinished subgoal's partial proof still precedes its Admitted.
-        const subLemmaStart = script.indexOf('Lemma MainDrawing___SecondOrderRule___Premise_rule :');
-        const subLemmaEnd = script.indexOf('Admitted.', subLemmaStart);
-        expect(script.slice(subLemmaStart, subLemmaEnd)).toContain('intros_sigma ().');
-        expect(script.slice(subLemmaStart, subLemmaEnd)).toContain('Lemma MainDrawing___SecondOrderRule___Premise_rule : forall (a b : Vertex)(pe : Edge a b), Edge a b.');
+        // The unfinished subgoal's partial proof is inlined between the braces.
+        const inlineStart = script.indexOf('assert (Hpremise1 : forall (pe : Edge a b), Edge a b). {');
+        const inlineEnd = script.indexOf('}', inlineStart);
+        expect(inlineStart).toBeGreaterThan(-1);
+        expect(inlineEnd).toBeGreaterThan(-1);
+        expect(script.slice(inlineStart, inlineEnd)).toContain('intros_sigma ().');
     });
 
-    it('keeps recorded steps of an unfinished subgoal proof before Admitted', () => {
+    it('keeps recorded steps of an unfinished subgoal proof inlined before the enclosing admit', () => {
         const sortStore = newSortStore();
         const store = new DrawingStore();
 
@@ -227,14 +228,16 @@ describe('rocq export', () => {
         recorder.recordRename('pe', 'pf', sub.name);
         const script = recorder.stop();
 
-        const subLemmaStart = script.indexOf('Lemma MainDrawing___SecondOrderRule___Premise_rule :');
-        const subLemmaEnd = script.indexOf('Admitted.', subLemmaStart);
-        expect(subLemmaStart).toBeGreaterThan(-1);
-        expect(script.slice(subLemmaStart, subLemmaEnd)).toContain('rename pe into pf.');
-        expect(script.slice(subLemmaStart, subLemmaEnd).trim().startsWith('Lemma')).toBe(true);
+        expect(script).not.toContain('Lemma MainDrawing___SecondOrderRule___Premise_rule :');
+        const inlineStart = script.indexOf('assert (Hpremise1 : forall (pe : Edge a b), Edge a b). {');
+        const inlineEnd = script.indexOf('}', inlineStart);
+        expect(inlineStart).toBeGreaterThan(-1);
+        expect(inlineEnd).toBeGreaterThan(-1);
+        expect(script.slice(inlineStart, inlineEnd)).toContain('rename pe into pf.');
+        expect(script.slice(inlineStart, inlineEnd)).toContain('admit.');
     });
 
-    it('exports the derived drawing statement as the subgoal lemma type', () => {
+    it('inlines the subgoal proof against the mapped premise type, leaving host context enclosing', () => {
         const sortStore = newSortStore();
         const store = new DrawingStore();
 
@@ -275,10 +278,12 @@ describe('rocq export', () => {
         );
         const script = recorder.stop();
 
-        // The subgoal statement must be the derived drawing's own statement: its
-        // full root (including the extra host vertex `c`) plus the "Goal" layer.
-        expect(script).toContain('Lemma MainDrawing___SecondOrderRule___Premise_rule : forall (a b c : Vertex)(pe : Edge a b), Edge a b.');
-        expect(script).toContain('by eauto using MainDrawing___SecondOrderRule___Premise_rule');
+        // The subgoal is asserted inline with the mapped premise type; the extra
+        // host vertex `c` stays in the enclosing lemma's context. No standalone
+        // subgoal lemma is emitted.
+        expect(script).not.toContain('Lemma MainDrawing___SecondOrderRule___Premise_rule : forall (a b c : Vertex)(pe : Edge a b), Edge a b.');
+        expect(script).toContain('assert (Hpremise1 : forall (pe : Edge a b), Edge a b). {');
+        expect(script).toContain('admit.');
     });
 
     it('orders rule arguments topologically, interleaving root equalities at their dependency position', () => {
@@ -360,7 +365,9 @@ describe('rocq export', () => {
         recorder.recordRuleApply(rule, 'SecondOrderRule', apps[0], host, { artefacts: result.hostArtefacts, created: result.hostCreated, derived: result.derivedRules }, 'MainDrawing', sortStore);
         const script = recorder.stop();
 
-        expect(script).toContain('Lemma MainDrawing___SecondOrderRule___Premise_A_rule :');
+        expect(script).not.toContain('Lemma MainDrawing___SecondOrderRule___Premise_A_rule :');
+        expect(script).toContain('assert (Hpremise1 : ');
+        expect(script).toContain('admit.');
         expect(script).toContain('@SecondOrderRule_rule hv0 hv1 hv2 he1 he2 Hpremise1');
         expect(script).toContain('as sh isMono_2');
         expect(script).not.toContain('as ()');
@@ -571,7 +578,7 @@ describe('rocq export', () => {
         expect(recorder.isActive()).toBe(false);
     });
 
-    it('records a real proof for a subgoal proven in the derived drawing and emits it before the main lemma', () => {
+    it('inlines the real proof of a subgoal proven in the derived drawing', () => {
         const sortStore = newSortStore();
         const store = new DrawingStore();
 
@@ -618,17 +625,19 @@ describe('rocq export', () => {
         recorder.recordProveSuccess(derived.drawing, childLayer!.id, prove.match ?? null, derived.name);
         const script = recorder.stop();
 
-        const subLemmaIndex = script.indexOf('Lemma MainDrawing___SecondOrderRule___Premise_rule :');
+        const subInlineIndex = script.indexOf('assert (Hpremise1 : forall (pe : Edge a b), Edge a b). {');
         const mainLemmaIndex = script.indexOf('Lemma MainDrawing_rule :');
-        expect(subLemmaIndex).toBeGreaterThan(-1);
+        expect(subInlineIndex).toBeGreaterThan(-1);
         expect(mainLemmaIndex).toBeGreaterThan(-1);
-        expect(subLemmaIndex).toBeLessThan(mainLemmaIndex);
+        expect(subInlineIndex).toBeGreaterThan(mainLemmaIndex);
+        expect(script).not.toContain('Lemma MainDrawing___SecondOrderRule___Premise_rule :');
         expect(script).not.toContain('Admitted.');
-        expect(script.slice(subLemmaIndex, mainLemmaIndex)).toContain('exact');
-        expect(script.slice(subLemmaIndex, mainLemmaIndex)).toContain('Qed.');
+        expect(script.slice(subInlineIndex)).toContain('exact pe.');
+        expect(script.slice(subInlineIndex)).toContain('\n}');
+        expect(script.slice(mainLemmaIndex)).toContain('Qed.');
     });
 
-    it('orders nested subgoal lemmas before their parent subgoal and the main lemma', () => {
+    it('inlines nested subgoal proofs inside the main lemma', () => {
         const sortStore = newSortStore();
         const store = new DrawingStore();
 
@@ -684,13 +693,24 @@ describe('rocq export', () => {
 
         const script = recorder.stop();
 
-        const subsubLemmaIndex = script.indexOf('Lemma MainDrawing___SecondOrderRule___Premise___SecondOrderRule___Premise_rule :');
-        const subLemmaIndex = script.indexOf('Lemma MainDrawing___SecondOrderRule___Premise_rule :');
-        const mainLemmaIndex = script.indexOf('Lemma MainDrawing_rule :');
-        expect(subsubLemmaIndex).toBeGreaterThan(-1);
-        expect(subLemmaIndex).toBeGreaterThan(-1);
-        expect(subsubLemmaIndex).toBeLessThan(subLemmaIndex);
-        expect(subLemmaIndex).toBeLessThan(mainLemmaIndex);
+        // No standalone subgoal lemmas are emitted; both levels of subgoals are
+        // inlined as nested `assert ... . { ... }` blocks inside the main lemma.
+        expect(script).not.toContain('Lemma MainDrawing___SecondOrderRule___Premise___SecondOrderRule___Premise_rule :');
+        expect(script).not.toContain('Lemma MainDrawing___SecondOrderRule___Premise_rule :');
+        expect(script).toContain('Lemma MainDrawing_rule :');
+
+        // The same rule applied twice produces two inlined premise asserts (the
+        // inner one inside the outer one's braces).
+        const inlineAssertes = script.match(/assert \(Hpremise1 : forall \(pe : Edge a b\), Edge a b\)\. \{/g);
+        expect(inlineAssertes).not.toBeNull();
+        expect(inlineAssertes!.length).toBe(2);
+
+        // The first inline assert opens before the second one does, so the
+        // structure nests rather than flattening.
+        const first = script.indexOf('assert (Hpremise1 : forall (pe : Edge a b), Edge a b). {');
+        const second = script.indexOf('assert (Hpremise1 : forall (pe : Edge a b), Edge a b). {', first + 1);
+        expect(first).toBeGreaterThan(-1);
+        expect(second).toBeGreaterThan(first);
     });
 
     it('reverts a recorded proof to pending when a rule is applied after the proof was recorded', () => {
@@ -763,5 +783,133 @@ describe('rocq export', () => {
         expect(script).toContain('exact I.');
         expect(script).toContain('Qed.');
         expect(script).not.toContain('Admitted.');
+    });
+
+    it('names premise binders consistently when a second-order rule has multiple premises with shared labels', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+
+        const host = new Drawing(sortStore);
+        makeVertex(host, 'a');
+        makeVertex(host, 'b');
+        store.saveDrawing('MainDrawing', host);
+
+        const rule = new Drawing(sortStore);
+        const rx = makeVertex(rule, 'x');
+        const ry = makeVertex(rule, 'y');
+        rule.addLayer('premise-1', 'Premise 1', 'root');
+        makeEdge(rule, 'pe', rx, ry, 'premise-1');
+        rule.addLayer('premise-1-child', 'Premise 1 Child', 'premise-1');
+        makeEdge(rule, 'pce', rx, ry, 'premise-1-child');
+        rule.addLayer('premise-2', 'Premise 2', 'root');
+        makeEdge(rule, 'pe', rx, ry, 'premise-2');
+        rule.addLayer('premise-2-child', 'Premise 2 Child', 'premise-2');
+        makeEdge(rule, 'pce', rx, ry, 'premise-2-child');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        makeEdge(rule, 'ce', rx, ry, 'conclusion');
+        rule.setIsRule(true);
+        store.saveDrawing('MultiPremiseRule', rule);
+
+        const recorder = new RocqRecorder();
+        recorder.start(host, 'MainDrawing', sortStore);
+
+        const apps = findSecondOrderRuleApplications(rule, host);
+        expect(apps.length).toBeGreaterThan(0);
+        const result = applySecondOrderRule(rule, host, apps[0], { hostName: 'MainDrawing', ruleName: 'MultiPremiseRule' });
+        expect(result.derivedRules.length).toBe(2);
+
+        const sub1 = result.derivedRules[0];
+        const sub2 = result.derivedRules[1];
+        store.saveDrawing(sub1.name, sub1.drawing);
+        store.saveDrawing(sub2.name, sub2.drawing);
+
+        const childLayer1 = getFirstOrderStatementChildLayer(sub1.drawing);
+        expect(childLayer1).not.toBeNull();
+        const prove1 = sub1.drawing.checkLayerProvable(childLayer1!.id);
+        expect(prove1.provable).toBe(true);
+
+        const childLayer2 = getFirstOrderStatementChildLayer(sub2.drawing);
+        expect(childLayer2).not.toBeNull();
+        const prove2 = sub2.drawing.checkLayerProvable(childLayer2!.id);
+        expect(prove2.provable).toBe(true);
+
+        recorder.recordRuleApply(
+            rule,
+            'MultiPremiseRule',
+            apps[0],
+            host,
+            { artefacts: result.hostArtefacts, created: result.hostCreated, derivedNames: result.derivedRules.map(d => d.name), derived: result.derivedRules },
+            'MainDrawing',
+            sortStore
+        );
+
+        recorder.recordProveSuccess(sub1.drawing, childLayer1!.id, prove1.match ?? null, sub1.name);
+        recorder.recordProveSuccess(sub2.drawing, childLayer2!.id, prove2.match ?? null, sub2.name);
+        recorder.recordProveSuccess(host, null, null, 'MainDrawing');
+
+        const script = recorder.stop();
+
+        // Both inlined premise asserts should use the derived drawing's local binder name 'pe',
+        // matching the inner 'exact pe.', rather than the rule-global 'pe_2'.
+        expect(script).toContain('assert (Hpremise1 : forall (pe : Edge a b), Edge a b). {');
+        expect(script).toContain('assert (Hpremise2 : forall (pe : Edge a b), Edge a b). {');
+        expect(script).not.toContain('Hpremise2 : forall (pe_2');
+
+        const firstAssert = script.indexOf('assert (Hpremise1 : forall (pe : Edge a b), Edge a b). {');
+        const firstExact = script.indexOf('exact pe.', firstAssert);
+        const secondAssert = script.indexOf('assert (Hpremise2 : forall (pe : Edge a b), Edge a b). {', firstExact);
+        const secondExact = script.indexOf('exact pe.', secondAssert);
+
+        expect(firstAssert).toBeGreaterThan(-1);
+        expect(firstExact).toBeGreaterThan(firstAssert);
+        expect(secondAssert).toBeGreaterThan(firstExact);
+        expect(secondExact).toBeGreaterThan(secondAssert);
+
+        expect(script).toContain('Qed.');
+        expect(script).not.toContain('Admitted.');
+    });
+
+    it('computes rule parameter base names consistently', () => {
+        expect(ruleParamBaseName('Triangle')).toBe('Triangle_rule');
+        expect(ruleParamBaseName('rule')).toBe('rule_rule');
+        expect(ruleParamBaseName('')).toBe('Drawing_rule');
+    });
+
+    it('invokes a second-order rule named after a reserved sort with matching rule parameter in destruct_sigma', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+
+        const host = new Drawing(sortStore);
+        makeVertex(host, 'a');
+        makeVertex(host, 'b');
+        store.saveDrawing('MainDrawing', host);
+
+        const rule = new Drawing(sortStore);
+        const rx = makeVertex(rule, 'x');
+        const ry = makeVertex(rule, 'y');
+        rule.addLayer('premise-1', 'Premise', 'root');
+        makeEdge(rule, 'pe', rx, ry, 'premise-1');
+        rule.addLayer('premise-1-child', 'Premise Child', 'premise-1');
+        makeEdge(rule, 'pce', rx, ry, 'premise-1-child');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        makeEdge(rule, 'ce', rx, ry, 'conclusion');
+        rule.setIsRule(true);
+        // "Triangle" is a defined sort, so previously drawingExportNames produced Triangle_2_rule
+        // whereas exportDrawingsToRocq produced Parameter Triangle_rule : ...
+        store.saveDrawing('Triangle', rule);
+
+        const recorder = new RocqRecorder();
+        recorder.start(host, 'MainDrawing', sortStore);
+        const apps = findSecondOrderRuleApplications(rule, host);
+        expect(apps.length).toBeGreaterThan(0);
+        const result = applySecondOrderRule(rule, host, apps[0], { hostName: 'MainDrawing', ruleName: 'Triangle' });
+        recorder.recordRuleApply(rule, 'Triangle', apps[0], host, { artefacts: result.hostArtefacts, created: result.hostCreated, derived: result.derivedRules }, 'MainDrawing', sortStore);
+        const script = recorder.stop();
+
+        const code = exportDrawingsToRocq(store.getAllDrawings(), sortStore);
+        expect(code).toContain('Parameter Triangle_rule :');
+        expect(script).toContain('@Triangle_rule a b Hpremise1');
+        expect(script).toContain('destruct_sigma (@Triangle_rule a b Hpremise1) as ce.');
+        expect(script).not.toContain('@Triangle_2_rule');
     });
 });

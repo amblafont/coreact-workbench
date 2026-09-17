@@ -26,6 +26,10 @@ export function sanitizeIdent(raw: string): string {
     return s;
 }
 
+export function ruleParamBaseName(drawingName: string): string {
+    return `${sanitizeIdent(drawingName || "Drawing")}_rule`;
+}
+
 export class NameRegistry {
     private readonly used: Set<string>;
 
@@ -529,7 +533,7 @@ export function ruleTypeInfo(
 
     let paramName: string | null = null;
     if (options.reserveParam) {
-        paramName = registry.unique(`${sanitizeIdent(savedDrawing.name || "Drawing")}_rule`);
+        paramName = registry.unique(ruleParamBaseName(savedDrawing.name));
     }
 
     if (!conclusion) {
@@ -694,7 +698,7 @@ export function drawingExportNames(savedDrawing: SavedDrawing, sortStore: SortSt
     const proofNames = computeProofFieldNames(savedDrawing, model, registry);
     let ruleParam: string | null = null;
     if (savedDrawing.isRule) {
-        ruleParam = registry.unique(`${moduleName}_rule`);
+        ruleParam = registry.unique(ruleParamBaseName(savedDrawing.name));
     }
 
     return {

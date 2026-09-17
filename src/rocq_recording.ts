@@ -69,6 +69,13 @@ export interface RecordedStatementInfo {
     isMain: boolean;
 }
 
+interface InlineSubgoal {
+    index: number;
+    lemmaName: string;
+    proofName: string;
+    premiseType: string;
+}
+
 interface RecordedStatement {
     drawingName: string;
     lemmaName: string;
@@ -78,7 +85,7 @@ interface RecordedStatement {
     isMain: boolean;
     conclusionLayerId: string | null;
     ruleInfo: RuleTypeInfo | null;
-    dependsOn: Set<string>;
+    inlineSubgoals: InlineSubgoal[];
     proofClosedAt: number | null;
 }
 
@@ -123,7 +130,7 @@ export class RocqRecorder {
             isMain: true,
             conclusionLayerId: info.conclusionLayerId,
             ruleInfo: info,
-            dependsOn: new Set(),
+            inlineSubgoals: [],
             proofClosedAt: null
         });
 
@@ -174,7 +181,7 @@ export class RocqRecorder {
             isMain: false,
             conclusionLayerId: null,
             ruleInfo: null,
-            dependsOn: new Set(),
+            inlineSubgoals: [],
             proofClosedAt: null
         });
     }
@@ -224,7 +231,7 @@ export class RocqRecorder {
             reserveParam: true,
             includePremises: hasConclusion
         });
-        const ruleParam = ruleNames.ruleParam;
+        const ruleParam = ruleInfo.paramName ?? ruleNames.ruleParam;
         if (!ruleParam) {
             throw new Error(`Consistency Check Failed: Rule '${savedRuleName}' has no exported rule parameter.`);
         }
@@ -286,10 +293,12 @@ export class RocqRecorder {
         const assertName = conclusionHostNames[0] ?? "h";
         const conclusionArity = ruleInfo.conclusionElements.length;
 
-        // Second-order rules: assert each premise via `eauto using` the derived
-        // drawing's rule. Each derived drawing is registered as its own recorded
-        // statement (a subgoal) whose real proof can be supplied later by loading
-        // and proving that drawing; unproved subgoals degrade to `Admitted.`.
+        // Second-order rules: assert each premise as an inline proof whose body
+        // is the recorded proof of the derived drawing. The derived drawing is
+        // registered as its own recorded statement (a subgoal) whose real proof
+        // can be supplied later by loading and proving that drawing; when the
+        // subgoal stays unproved its inline proof degrades to `admit`. and the
+        // enclosing lemma ends with `Admitted.`.
         const rootNameToHost = new Map<string, string>();
         ruleInfo.rootElements.forEach((el, i) => rootNameToHost.set(el.name, tupleValues[i]));
 
@@ -306,12 +315,13 @@ export class RocqRecorder {
         const premiseProofNames: string[] = [];
         for (let k = 0; k < ruleInfo.premiseLayers.length; k++) {
             const premise = ruleInfo.premiseLayers[k];
-            const premiseType = renderPremiseType(premise.premiseElements, premise.childElements, rootNameToHost);
             const proofName = `Hpremise${k + 1}`;
             const derivedName = `${hostActiveName} > ${savedRuleName} > ${premiseLayerDefs[k].name}`;
             const derivedDrawingName = (applicationResult.derivedNames && applicationResult.derivedNames[k]) || derivedName;
             const lemmaName = `${sanitizeIdent(derivedDrawingName)}_rule`;
             const derivedDrawing = applicationResult.derived?.[k];
+
+            let premiseType: string;
             let lemmaType: string;
             if (derivedDrawing) {
                 const derivedSaved = DrawingStore.drawingToSavedDrawing(derivedDrawingName, derivedDrawing.drawing);
@@ -319,12 +329,46 @@ export class RocqRecorder {
                     reserveParam: false,
                     includePremises: false
                 }).type;
+
+                if (derivedDrawing.created) {
+                    const derivedExport = drawingExportNames(derivedSaved, sortStore);
+                    const effectiveNameMap = new Map<string, string>(rootNameToHost);
+
+                    for (const el of [...premise.premiseElements, ...premise.childElements]) {
+                        const ruleArt = el.artefactId ? ruleArtById.get(el.artefactId) : undefined;
+                        const derivedArt = ruleArt ? derivedDrawing.created.get(ruleArt) : undefined;
+                        if (derivedArt) {
+                            const derivedArtId = artefactToDataId(derivedDrawing.drawing, derivedArt);
+                            const derivedFieldName = el.kind === "equation"
+                                ? derivedExport.equalityFieldNames.get(derivedArtId) ?? derivedExport.fieldNames.get(derivedArtId)
+                                : derivedExport.fieldNames.get(derivedArtId);
+                            if (derivedFieldName) {
+                                effectiveNameMap.set(el.name, derivedFieldName);
+                            }
+                        }
+                    }
+
+                    const mappedPremiseElements = premise.premiseElements.map(el => ({
+                        ...el,
+                        name: effectiveNameMap.get(el.name) ?? el.name,
+                        type: substituteRuleNames(el.type, effectiveNameMap)
+                    }));
+                    const mappedChildElements = premise.childElements.map(el => ({
+                        ...el,
+                        name: effectiveNameMap.get(el.name) ?? el.name,
+                        type: substituteRuleNames(el.type, effectiveNameMap)
+                    }));
+                    premiseType = renderForallChain(mappedPremiseElements, renderSigma(mappedChildElements));
+                } else {
+                    premiseType = renderPremiseType(premise.premiseElements, premise.childElements, rootNameToHost);
+                }
             } else {
+                premiseType = renderPremiseType(premise.premiseElements, premise.childElements, rootNameToHost);
                 lemmaType = renderPremiseLemmaType(ruleInfo.rootElements, premise.premiseElements, premise.childElements, rootNameToHost);
             }
             this.registerSubgoal(derivedDrawingName, lemmaName, lemmaType);
-            stmt.dependsOn.add(derivedDrawingName);
-            stmt.bodyLines.push(`assert (${proofName} : ${premiseType}) by eauto using ${lemmaName}.`);
+            stmt.bodyLines.push(`assert (${proofName} : ${premiseType}).`);
+            stmt.inlineSubgoals.push({ index: stmt.bodyLines.length - 1, lemmaName, proofName, premiseType });
             premiseProofNames.push(proofName);
         }
 
@@ -495,48 +539,69 @@ export class RocqRecorder {
         }
         this.active = false;
 
-        const ordered: RecordedStatement[] = [];
-        const visited = new Set<string>();
-        const visit = (s: RecordedStatement): void => {
-            if (visited.has(s.drawingName)) {
-                return;
-            }
-            visited.add(s.drawingName);
-            for (const dep of s.dependsOn) {
-                const depStmt = this.statements.get(dep);
-                if (depStmt) {
-                    visit(depStmt);
-                }
-            }
-            ordered.push(s);
-        };
+        const byLemmaName = new Map<string, RecordedStatement>();
         for (const s of this.statements.values()) {
-            visit(s);
+            byLemmaName.set(s.lemmaName, s);
         }
 
-        const script: string[] = [];
-        for (const s of ordered) {
-            script.push(`Lemma ${s.lemmaName} : ${s.lemmaType}.`);
-            const lastLine = s.bodyLines[s.bodyLines.length - 1] ?? "";
-            // A statement is only emitted as a finished proof when its closing
-            // `exact` is the final recorded step. An unproved main whose drawing
-            // has no conclusion layer is trivially finished by `exact I.`.
-            const autoCloseMain = !s.proved && s.isMain && s.conclusionLayerId === null && !lastLine.startsWith("exact ");
-            const emitProof = (s.proved && lastLine.startsWith("exact ")) || autoCloseMain;
-            if (emitProof) {
-                if (autoCloseMain) {
-                    script.push("exact I.");
+        // A statement's proof is closed when its final `exact` was recorded, or
+        // when an unproved main drawing has no conclusion layer and is trivially
+        // finished by `exact I.`.
+        const isClosed = (stmt: RecordedStatement): boolean => {
+            const lastLine = stmt.bodyLines[stmt.bodyLines.length - 1] ?? "";
+            const autoCloseMain = !stmt.proved && stmt.isMain && stmt.conclusionLayerId === null && !lastLine.startsWith("exact ");
+            return (stmt.proved && lastLine.startsWith("exact ")) || autoCloseMain;
+        };
+
+        // Render a statement's proof, expanding inline subgoals recursively.
+        // `unproved` is true whenever the statement's own goal is left open or
+        // any inlined subgoal proof was admitted, in which case the enclosing
+        // lemma must be closed with `Admitted.` rather than `Qed.`.
+        const renderProof = (stmt: RecordedStatement, indent: string): { lines: string[]; unproved: boolean } => {
+            const lines: string[] = [];
+            let unproved = !isClosed(stmt);
+            stmt.bodyLines.forEach((line, i) => {
+                const inline = stmt.inlineSubgoals.find(g => g.index === i);
+                if (!inline) {
+                    lines.push(indent + line);
+                    return;
                 }
-                script.push(...s.bodyLines);
-                script.push("Qed.");
-            } else {
-                script.push(...s.bodyLines);
-                script.push("Admitted.");
+                const sub = byLemmaName.get(inline.lemmaName);
+                if (!sub) {
+                    throw new Error(`Consistency Check Failed: Inline subgoal '${inline.lemmaName}' has no recorded statement.`);
+                }
+                const subRepr = renderProof(sub, indent + "  ");
+                lines.push(indent + `assert (${inline.proofName} : ${inline.premiseType}). {`);
+                lines.push(...subRepr.lines);
+                if (subRepr.unproved) {
+                    lines.push(indent + "  admit.");
+                    unproved = true;
+                }
+                lines.push(indent + "}");
+            });
+            return { lines, unproved };
+        };
+
+        const main = Array.from(this.statements.values()).find(s => s.isMain);
+        if (!main) {
+            throw new Error("Consistency Check Failed: No main recorded statement found; recording never started.");
+        }
+
+        const mainRepr = renderProof(main, "");
+        const script = mainRepr.lines;
+        if (mainRepr.unproved) {
+            script.push("Admitted.");
+        } else {
+            const lastLine = main.bodyLines[main.bodyLines.length - 1] ?? "";
+            const autoCloseMain = !main.proved && main.conclusionLayerId === null && !lastLine.startsWith("exact ");
+            if (autoCloseMain) {
+                script.push("exact I.");
             }
+            script.push("Qed.");
         }
         this.statements = new Map();
         this.mainName = null;
         this.sortStore = null;
-        return script.join("\n") + "\n";
+        return `Lemma ${main.lemmaName} : ${main.lemmaType}.\n${script.join("\n")}\n`;
     }
 }
