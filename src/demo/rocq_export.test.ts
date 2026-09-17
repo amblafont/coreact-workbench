@@ -169,7 +169,7 @@ describe('rocq export', () => {
         const apps = findSecondOrderRuleApplications(rule, host);
         expect(apps.length).toBeGreaterThan(0);
         const result = applySecondOrderRule(rule, host, apps[0], { hostName: 'MainDrawing', ruleName: 'SecondOrderRule' });
-        recorder.recordRuleApply(rule, 'SecondOrderRule', apps[0], host, { artefacts: result.hostArtefacts, created: result.hostCreated }, 'MainDrawing', sortStore);
+        recorder.recordRuleApply(rule, 'SecondOrderRule', apps[0], host, { artefacts: result.hostArtefacts, created: result.hostCreated, derived: result.derivedRules }, 'MainDrawing', sortStore);
         const script = recorder.stop();
 
         expect(script).toContain('Lemma MainDrawing___SecondOrderRule___Premise_rule :');
@@ -178,6 +178,53 @@ describe('rocq export', () => {
         expect(script).toContain('@SecondOrderRule_rule a b Hpremise1');
         expect(script).toContain('as ce');
         expect(script).not.toContain('by admit');
+    });
+
+    it('exports the derived drawing statement as the subgoal lemma type', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+
+        const host = new Drawing(sortStore);
+        const ha = makeVertex(host, 'a');
+        const hb = makeVertex(host, 'b');
+        makeVertex(host, 'c');
+        store.saveDrawing('MainDrawing', host);
+
+        const rule = new Drawing(sortStore);
+        const rx = makeVertex(rule, 'x');
+        const ry = makeVertex(rule, 'y');
+        rule.addLayer('premise-1', 'Premise', 'root');
+        makeEdge(rule, 'pe', rx, ry, 'premise-1');
+        rule.addLayer('premise-1-child', 'Premise Child', 'premise-1');
+        makeEdge(rule, 'pce', rx, ry, 'premise-1-child');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        makeEdge(rule, 'ce', rx, ry, 'conclusion');
+        rule.setIsRule(true);
+        store.saveDrawing('SecondOrderRule', rule);
+
+        const recorder = new RocqRecorder();
+        recorder.start(host, 'MainDrawing', sortStore);
+        const apps = findSecondOrderRuleApplications(rule, host);
+        expect(apps.length).toBeGreaterThan(0);
+        const app = apps.find(a => a.matchedArtefacts.get(rx) === ha && a.matchedArtefacts.get(ry) === hb) ?? apps[0];
+        const result = applySecondOrderRule(rule, host, app, { hostName: 'MainDrawing', ruleName: 'SecondOrderRule' });
+        const derived = result.derivedRules[0];
+        store.saveDrawing(derived.name, derived.drawing);
+        recorder.recordRuleApply(
+            rule,
+            'SecondOrderRule',
+            app,
+            host,
+            { artefacts: result.hostArtefacts, created: result.hostCreated, derivedNames: result.derivedRules.map(d => d.name), derived: result.derivedRules },
+            'MainDrawing',
+            sortStore
+        );
+        const script = recorder.stop();
+
+        // The subgoal statement must be the derived drawing's own statement: its
+        // full root (including the extra host vertex `c`) plus the "Goal" layer.
+        expect(script).toContain('Lemma MainDrawing___SecondOrderRule___Premise_rule : forall (a b c : Vertex)(pe : Edge a b), Edge a b.');
+        expect(script).toContain('by eauto using MainDrawing___SecondOrderRule___Premise_rule');
     });
 
     it('orders rule arguments topologically, interleaving root equalities at their dependency position', () => {
@@ -256,7 +303,7 @@ describe('rocq export', () => {
         const apps = findSecondOrderRuleApplications(rule, host);
         expect(apps.length).toBeGreaterThan(0);
         const result = applySecondOrderRule(rule, host, apps[0], { hostName: 'MainDrawing', ruleName: 'SecondOrderRule' });
-        recorder.recordRuleApply(rule, 'SecondOrderRule', apps[0], host, { artefacts: result.hostArtefacts, created: result.hostCreated }, 'MainDrawing', sortStore);
+        recorder.recordRuleApply(rule, 'SecondOrderRule', apps[0], host, { artefacts: result.hostArtefacts, created: result.hostCreated, derived: result.derivedRules }, 'MainDrawing', sortStore);
         const script = recorder.stop();
 
         expect(script).toContain('Lemma MainDrawing___SecondOrderRule___Premise_A_rule :');
@@ -508,7 +555,7 @@ describe('rocq export', () => {
             'SecondOrderRule',
             apps[0],
             host,
-            { artefacts: result.hostArtefacts, created: result.hostCreated, derivedNames: result.derivedRules.map(d => d.name) },
+            { artefacts: result.hostArtefacts, created: result.hostCreated, derivedNames: result.derivedRules.map(d => d.name), derived: result.derivedRules },
             'MainDrawing',
             sortStore
         );

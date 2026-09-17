@@ -220,7 +220,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
             'SecondOrderRule',
             apps[0],
             host,
-            { artefacts: result.hostArtefacts, created: result.hostCreated, derivedNames: result.derivedRules.map(d => d.name) },
+            { artefacts: result.hostArtefacts, created: result.hostCreated, derivedNames: result.derivedRules.map(d => d.name), derived: result.derivedRules },
             'Main',
             sortStore
         );
@@ -231,6 +231,65 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         expect(script).not.toContain('Admitted.');
         expect(script).toContain('exact pe.');
         compile('proven_subgoal', exportDrawingsToRocq(store.getAllDrawings(), sortStore) + '\n' + script);
+    });
+
+    it('compiles a subgoal lemma whose type is the derived drawing statement including extra host context', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+
+        const host = new Drawing(sortStore);
+        const ha = makeVertex(host, 'a');
+        const hb = makeVertex(host, 'b');
+        makeVertex(host, 'c');
+        store.saveDrawing('Main', host);
+
+        const rule = new Drawing(sortStore);
+        const rx = makeVertex(rule, 'x');
+        const ry = makeVertex(rule, 'y');
+        rule.addLayer('premise-1', 'Premise', 'root');
+        makeEdge(rule, 'pe', rx, ry, 'premise-1');
+        rule.addLayer('premise-1-child', 'Premise Child', 'premise-1');
+        makeEdge(rule, 'pce', rx, ry, 'premise-1-child');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        makeEdge(rule, 'ce', rx, ry, 'conclusion');
+        rule.setIsRule(true);
+        store.saveDrawing('SecondOrderRule', rule);
+
+        const recorder = new RocqRecorder();
+        recorder.start(host, 'Main', sortStore);
+
+        const apps = findSecondOrderRuleApplications(rule, host);
+        if (apps.length === 0) {
+            throw new Error('SecondOrderRule produced no applications');
+        }
+        const app = apps.find(a => a.matchedArtefacts.get(rx) === ha && a.matchedArtefacts.get(ry) === hb) ?? apps[0];
+        const result = applySecondOrderRule(rule, host, app, { hostName: 'Main', ruleName: 'SecondOrderRule' });
+        const sub = result.derivedRules[0];
+        const childLayer = getFirstOrderStatementChildLayer(sub.drawing);
+        if (!childLayer) {
+            throw new Error('derived drawing has no first-order statement child layer');
+        }
+        const prove = sub.drawing.checkLayerProvable(childLayer.id);
+        if (!prove.provable) {
+            throw new Error('derived Goal layer not provable: ' + (prove.reason ?? 'unknown'));
+        }
+
+        recorder.recordRuleApply(
+            rule,
+            'SecondOrderRule',
+            app,
+            host,
+            { artefacts: result.hostArtefacts, created: result.hostCreated, derivedNames: result.derivedRules.map(d => d.name), derived: result.derivedRules },
+            'Main',
+            sortStore
+        );
+        recorder.recordProveSuccess(sub.drawing, childLayer.id, prove.match ?? null, sub.name);
+        recorder.recordProveSuccess(host, null, null, 'Main');
+        const script = recorder.stop();
+
+        expect(script).toContain('Lemma Main___SecondOrderRule___Premise_rule : forall (a b c : Vertex)(pe : Edge a b), Edge a b.');
+        expect(script).not.toContain('Admitted.');
+        compile('subgoal_extra_context', exportDrawingsToRocq(store.getAllDrawings(), sortStore) + '\n' + script);
     });
 
     it('compiles a provable child layer with a tuple and equality conclusion', () => {
@@ -320,7 +379,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
             'SecondOrderRule',
             soApps[0],
             host,
-            { artefacts: soResult.hostArtefacts, created: soResult.hostCreated },
+            { artefacts: soResult.hostArtefacts, created: soResult.hostCreated, derived: soResult.derivedRules },
             'Main',
             sortStore
         );
@@ -425,7 +484,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
             'SecondOrderRule',
             apps[0],
             host,
-            { artefacts: result.hostArtefacts, created: result.hostCreated, derivedNames: result.derivedRules.map(d => d.name) },
+            { artefacts: result.hostArtefacts, created: result.hostCreated, derivedNames: result.derivedRules.map(d => d.name), derived: result.derivedRules },
             'Main',
             sortStore
         );

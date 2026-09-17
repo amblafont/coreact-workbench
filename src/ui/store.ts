@@ -18,6 +18,7 @@ import {
     type SavedDrawing,
     type RuleApplication,
     type DataAttributeValue,
+    type DerivedRule,
     getAttributeType,
     getSliderMeta,
     getRelativePositionMeta
@@ -1256,7 +1257,7 @@ export function applyRuleAt(savedRuleName: string, appIndex: number): void {
     const { savedRule, ruleDrawing, applications } = entry;
     const app = applications[appIndex];
     const activeName = get(activeDrawingName) ?? 'Unsaved Drawing';
-    let applicationResult: { artefacts: Artefact[]; created: Map<Artefact, Artefact>; derivedNames?: string[] } | null = null;
+    let applicationResult: { artefacts: Artefact[]; created: Map<Artefact, Artefact>; derivedNames?: string[]; derived?: DerivedRule[] } | null = null;
     try {
         if (savedRule.isFirstOrder) {
             const result = applyFirstOrderRule(ruleDrawing, drawing, app);
@@ -1264,7 +1265,7 @@ export function applyRuleAt(savedRuleName: string, appIndex: number): void {
             console.log(`Applied '${savedRule.name}': added ${result.artefacts.length} artefact(s).`);
         } else {
             const result = applySecondOrderRule(ruleDrawing, drawing, app, { hostName: activeName, ruleName: savedRule.name });
-            applicationResult = { artefacts: result.hostArtefacts, created: result.hostCreated };
+            applicationResult = { artefacts: result.hostArtefacts, created: result.hostCreated, derived: result.derivedRules };
             console.log(`Applied '${savedRule.name}': added ${result.hostArtefacts.length} artefact(s), derived ${result.derivedRules.length} drawing(s).`);
             const createdNames: string[] = [];
             for (const derived of result.derivedRules) {

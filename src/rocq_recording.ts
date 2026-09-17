@@ -1,4 +1,5 @@
 import { Artefact, Drawing, DrawingStore, SortStore } from "./index";
+import type { DerivedRule } from "./index";
 import { drawingExportNames, ruleTypeInfo, newExportRegistry, renderExactTerm, renderForallChain, renderSigma, sanitizeIdent } from "./rocq_export";
 import type { LayerElement, RuleTypeInfo } from "./rocq_export";
 
@@ -183,7 +184,7 @@ export class RocqRecorder {
         savedRuleName: string,
         application: { matchedArtefacts: Map<Artefact, Artefact> },
         hostDrawing: Drawing,
-        applicationResult: { artefacts: Artefact[]; created: Map<Artefact, Artefact>; derivedNames?: string[] },
+        applicationResult: { artefacts: Artefact[]; created: Map<Artefact, Artefact>; derivedNames?: string[]; derived?: DerivedRule[] },
         hostActiveName: string,
         sortStore: SortStore
     ): void {
@@ -310,7 +311,18 @@ export class RocqRecorder {
             const derivedName = `${hostActiveName} > ${savedRuleName} > ${premiseLayerDefs[k].name}`;
             const derivedDrawingName = (applicationResult.derivedNames && applicationResult.derivedNames[k]) || derivedName;
             const lemmaName = `${sanitizeIdent(derivedDrawingName)}_rule`;
-            this.registerSubgoal(derivedDrawingName, lemmaName, renderPremiseLemmaType(ruleInfo.rootElements, premise.premiseElements, premise.childElements, rootNameToHost));
+            const derivedDrawing = applicationResult.derived?.[k];
+            let lemmaType: string;
+            if (derivedDrawing) {
+                const derivedSaved = DrawingStore.drawingToSavedDrawing(derivedDrawingName, derivedDrawing.drawing);
+                lemmaType = ruleTypeInfo(derivedSaved, sortStore, newExportRegistry(sortStore), {
+                    reserveParam: false,
+                    includePremises: false
+                }).type;
+            } else {
+                lemmaType = renderPremiseLemmaType(ruleInfo.rootElements, premise.premiseElements, premise.childElements, rootNameToHost);
+            }
+            this.registerSubgoal(derivedDrawingName, lemmaName, lemmaType);
             stmt.dependsOn.add(derivedDrawingName);
             stmt.bodyLines.push(`assert (${proofName} : ${premiseType}) by eauto using ${lemmaName}.`);
             premiseProofNames.push(proofName);
