@@ -16,12 +16,11 @@
     } from './store';
     import DrawingNode from './DrawingNode.svelte';
 
-    export let drawing: SavedDrawing;
-    export let isChild = false;
+    let { drawing, isChild = false }: { drawing: SavedDrawing; isChild?: boolean } = $props();
 
-    $: isActive = drawing.name === $activeDrawingName;
-    $: children = $allDrawings.filter(d => d.parentName === drawing.name && d.name !== drawing.name);
-    $: recStatus = $recordedStatementByDrawing.get(drawing.name);
+    let isActive = $derived(drawing.name === $activeDrawingName);
+    let children = $derived($allDrawings.filter(d => d.parentName === drawing.name && d.name !== drawing.name));
+    let recStatus = $derived($recordedStatementByDrawing.get(drawing.name));
 
     function onRename(saved: SavedDrawing): void {
         const newName = prompt(`Enter new name for drawing '${saved.name}':`, saved.name);

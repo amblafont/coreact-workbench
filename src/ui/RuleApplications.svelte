@@ -1,10 +1,9 @@
 <script lang="ts">
     import type { Artefact } from '../index.svelte.ts';
     import { get } from 'svelte/store';
-    import { computeRuleApplications, applyRuleAt, mergeMode, ruleHoverArtefacts, version, filterRedundantMatches, toggleFilterRedundantMatches, filterNoProgressMatches, toggleFilterNoProgressMatches, filterStrictMatches, toggleFilterStrictMatches, filterSolvesGoalMatches, toggleFilterSolvesGoalMatches, solvesGoalFilterApplicable } from './store';
+    import { computeRuleApplications, applyRuleAt, mergeMode, ruleHoverArtefacts, filterRedundantMatches, toggleFilterRedundantMatches, filterNoProgressMatches, toggleFilterNoProgressMatches, filterStrictMatches, toggleFilterStrictMatches, filterSolvesGoalMatches, toggleFilterSolvesGoalMatches, solvesGoalFilterApplicable } from './store';
 
-    let entries: ReturnType<typeof computeRuleApplications> = [];
-    $: $version, $filterRedundantMatches, $filterNoProgressMatches, $filterStrictMatches, $filterSolvesGoalMatches, entries = computeRuleApplications();
+    let entries = $derived(computeRuleApplications());
 
     function matchLabels(entry: (typeof entries)[number], app: (typeof entry.applications)[number]): string[] {
         const ruleDrawing = entry.ruleDrawing;

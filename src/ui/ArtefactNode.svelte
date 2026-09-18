@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { Artefact, Layer } from '../index.svelte.ts';
+    import type { Artefact } from '../index.svelte.ts';
     import { drawing } from './store';
     import {
         mergeMode,
@@ -8,8 +8,7 @@
         mergeHoverArtefact,
         inspectedArtefact,
         menuHoverArtefact,
-        dependencyPickingFor,
-        version
+        dependencyPickingFor
     } from './store';
     import {
         getArtefactLabel,
@@ -26,63 +25,56 @@
     } from './store';
     import ArtefactNode from './ArtefactNode.svelte';
 
-    export let artefact: Artefact;
-    export let dependencyKey: string | null = null;
-    export let parentArtefact: Artefact | null = null;
-    export let rootNode = false;
+    let {
+        artefact,
+        dependencyKey = null,
+        parentArtefact = null,
+        rootNode = false
+    }: {
+        artefact: Artefact;
+        dependencyKey?: string | null;
+        parentArtefact?: Artefact | null;
+        rootNode?: boolean;
+    } = $props();
 
-    let expanded = false;
+    let expanded = $state(false);
 
-    let children: Artefact[] = [];
-    let baseLabel = '';
-    let equalitySuffix = '';
-    let prefix = '';
-    let layerObj: Layer | null | undefined;
-    let isLayerVis = true;
-    let layerBadgeText = '';
-    let provablyEqualCandidate = false;
-    let inspectedNode = false;
-    let nodeOpacity = 1;
-    let depEntries: [string, Artefact][] = [];
-    let canUp = false;
-    let canDown = false;
-
-    $: $version, children = equalityChildren(artefact);
-    $: $version, baseLabel = getArtefactLabel(artefact);
-    $: $version, equalitySuffix = artefact.sortName === 'Equality' && children.length > 0 ? ` [${children[0].sortName}]` : '';
-    $: $version, prefix = dependencyKey ? `${dependencyKey}: ` : '';
-    $: $version, layerObj = drawing.getLayer(artefact.layerId);
-    $: $version, isLayerVis = layerObj ? drawing.isLayerVisible(layerObj.id) : true;
-    $: $version, layerBadgeText = layerObj ? layerObj.name + (isLayerVis ? '' : ' (hidden)') : artefact.layerId;
-    $: $version, $dependencyPickingFor, provablyEqualCandidate = isProvablyEqualCandidate(artefact);
-    $: $version, inspectedNode =
+    let children = $derived(equalityChildren(artefact));
+    let baseLabel = $derived(getArtefactLabel(artefact));
+    let equalitySuffix = $derived(artefact.sortName === 'Equality' && children.length > 0 ? ` [${children[0].sortName}]` : '');
+    let prefix = $derived(dependencyKey ? `${dependencyKey}: ` : '');
+    let layerObj = $derived(drawing.getLayer(artefact.layerId));
+    let isLayerVis = $derived(layerObj ? drawing.isLayerVisible(layerObj.id) : true);
+    let layerBadgeText = $derived(layerObj ? layerObj.name + (isLayerVis ? '' : ' (hidden)') : artefact.layerId);
+    let provablyEqualCandidate = $derived(isProvablyEqualCandidate(artefact));
+    let inspectedNode = $derived(
         $inspectedArtefact === artefact
-        || ($mergeMode && ($mergeFirstArtefact === artefact || $mergeSecondArtefact === artefact));
+        || ($mergeMode && ($mergeFirstArtefact === artefact || $mergeSecondArtefact === artefact))
+    );
 
-    $: $version, depEntries = Object.entries(artefact.dependencies) as [string, Artefact][];
-    $: $version, $dependencyPickingFor, canUp = rootNode && !$dependencyPickingFor && canMoveArtefactUp(artefact);
-    $: $version, $dependencyPickingFor, canDown = rootNode && !$dependencyPickingFor && canMoveArtefactDown(artefact);
+    let depEntries = $derived(Object.entries(artefact.dependencies) as [string, Artefact][]);
+    let canUp = $derived(rootNode && !$dependencyPickingFor && canMoveArtefactUp(artefact));
+    let canDown = $derived(rootNode && !$dependencyPickingFor && canMoveArtefactDown(artefact));
 
-    $: {
-        $version;
+    let nodeOpacity = $derived.by(() => {
         if ($mergeMode) {
             const hoveredSet = $mergeHoverArtefact ? $mergeHoverArtefact.getSelfAndDependencies() : null;
             if (hoveredSet && hoveredSet.has(artefact)) {
-                nodeOpacity = 1;
+                return 1;
             } else if (hoveredSet) {
-                nodeOpacity = 0.5;
+                return 0.5;
             } else {
-                nodeOpacity = mergeBaseOpacityFor(artefact);
+                return mergeBaseOpacityFor(artefact);
             }
         } else {
             const target = $menuHoverArtefact ?? $inspectedArtefact;
             if (target) {
-                nodeOpacity = target.getSelfAndDependencies().has(artefact) ? 1 : 0.5;
+                return target.getSelfAndDependencies().has(artefact) ? 1 : 0.5;
             } else {
-                nodeOpacity = 1;
+                return 1;
             }
         }
-    }
+    });
 
     function onHeaderMouseEnter(): void {
         if ($mergeMode) {

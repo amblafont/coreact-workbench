@@ -1,12 +1,23 @@
 <script lang="ts">
-    export let prefix: string;
-    export let model: { data: Record<string, any> };
-    export let attributes: Record<string, string | { type: string; min: number; max: number; default: number } | { type: string; target: string }>;
-    export let onValueChange: (attrName: string, value: string | number | boolean) => void;
-    export let onSetPosition: (attrName: string, axis: 0 | 1, newVal: number) => void;
-    export let isPickerActive: (attrName: string) => boolean;
-    export let onPickPosition: (attrName: string) => void;
-    export let isDepReady: (attrName: string) => boolean = () => true;
+    let {
+        prefix,
+        model,
+        attributes,
+        onValueChange,
+        onSetPosition,
+        isPickerActive,
+        onPickPosition,
+        isDepReady = () => true
+    }: {
+        prefix: string;
+        model: { data: Record<string, any> };
+        attributes: Record<string, string | { type: string; min: number; max: number; default: number } | { type: string; target: string }>;
+        onValueChange: (attrName: string, value: string | number | boolean) => void;
+        onSetPosition: (attrName: string, axis: 0 | 1, newVal: number) => void;
+        isPickerActive: (attrName: string) => boolean;
+        onPickPosition: (attrName: string) => void;
+        isDepReady?: (attrName: string) => boolean;
+    } = $props();
 
     function getTypeName(at: string | { type: string; min: number; max: number; default: number } | { type: string; target: string }): string {
         return typeof at === 'string' ? at : at.type;

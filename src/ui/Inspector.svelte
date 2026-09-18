@@ -11,7 +11,6 @@
         draftArtefact,
         dependencyPickingFor,
         inspectedArtefact,
-        version,
         ruleTag
     } from './store';
     import {
@@ -36,61 +35,46 @@
     } from './store';
 
     // --- Merge view helpers ---
-    let orderedCandidates: Artefact[] = [];
-    let provablyEqualCandidates: Artefact[] = [];
-    let otherCandidates: Artefact[] = [];
-    let mergePreviewLabel = '';
-
-    // The inspected Artefact is a plain mutable object; mutations signal via
-    // `version`. Rebuild `inspectModel` as a fresh reference on every bump so
-    // the DataAttributeFields child re-renders its in-place-mutated data.
-    let inspectModel: Artefact | null = null;
-    let inspectLabel = '';
-    let inspectLayerId = 'root';
-    $: {
-        const a = $inspectedArtefact;
-        $version;
-        inspectModel = a ? { data: a.data, dependencies: a.dependencies, sortName: a.sortName } as Artefact : null;
-        inspectLabel = a ? (typeof a.data.label === 'string' ? a.data.label : '') : '';
-        inspectLayerId = a ? (typeof a.layerId === 'string' ? a.layerId : 'root') : 'root';
-    }
-
-    $: {
-        $version;
+    let provablyEqualCandidates = $derived.by(() => {
         const first = $mergeFirstArtefact;
-        if (first) {
-            const candidates = drawing.getArtefacts().filter(art =>
-                art !== first && drawing.areDependenciesEqual(first, art)
-            );
-            provablyEqualCandidates = candidates.filter(c => drawing.areProvablyEqual(first, c));
-            otherCandidates = candidates.filter(c => !drawing.areProvablyEqual(first, c));
-            orderedCandidates = [...provablyEqualCandidates, ...otherCandidates];
-        } else {
-            provablyEqualCandidates = [];
-            otherCandidates = [];
-            orderedCandidates = [];
-        }
-    }
-
-    $: {
+        if (!first) return [];
+        return drawing.getArtefacts().filter(art =>
+            art !== first && drawing.areDependenciesEqual(first, art) && drawing.areProvablyEqual(first, art)
+        );
+    });
+    let otherCandidates = $derived.by(() => {
+        const first = $mergeFirstArtefact;
+        if (!first) return [];
+        return drawing.getArtefacts().filter(art =>
+            art !== first && drawing.areDependenciesEqual(first, art) && !drawing.areProvablyEqual(first, art)
+        );
+    });
+    let orderedCandidates = $derived([...provablyEqualCandidates, ...otherCandidates]);
+    let mergePreviewLabel = $derived.by(() => {
         const label1 = $mergeFirstArtefact && typeof $mergeFirstArtefact.data.label === 'string'
             ? ($mergeFirstArtefact.data.label as string).trim()
             : '';
         const label2 = $mergeSecondArtefact && typeof $mergeSecondArtefact.data.label === 'string'
             ? ($mergeSecondArtefact.data.label as string).trim()
             : '';
-        if (label1 && label2) mergePreviewLabel = `${label1}, ${label2}`;
-        else if (label1) mergePreviewLabel = label1;
-        else if (label2) mergePreviewLabel = label2;
-        else mergePreviewLabel = '';
-    }
+        if (label1 && label2) return `${label1}, ${label2}`;
+        if (label1) return label1;
+        if (label2) return label2;
+        return '';
+    });
 
-    let secondSelectIndex: number;
-    $: secondSelectIndex = $mergeSecondArtefact ? orderedCandidates.indexOf($mergeSecondArtefact) : -1;
+    let inspectModel = $derived.by(() => {
+        const a = $inspectedArtefact;
+        return a ? { data: a.data, dependencies: a.dependencies, sortName: a.sortName } as Artefact : null;
+    });
+    let inspectLabel = $derived($inspectedArtefact && typeof $inspectedArtefact.data.label === 'string' ? $inspectedArtefact.data.label : '');
+    let inspectLayerId = $derived($inspectedArtefact && typeof $inspectedArtefact.layerId === 'string' ? $inspectedArtefact.layerId : 'root');
 
-    $: canMerge = !!($mergeFirstArtefact && $mergeSecondArtefact
+    let secondSelectIndex = $derived($mergeSecondArtefact ? orderedCandidates.indexOf($mergeSecondArtefact) : -1);
+
+    let canMerge = $derived(!!($mergeFirstArtefact && $mergeSecondArtefact
         && $mergeFirstArtefact !== $mergeSecondArtefact
-        && drawing.areDependenciesEqual($mergeFirstArtefact, $mergeSecondArtefact));
+        && drawing.areDependenciesEqual($mergeFirstArtefact, $mergeSecondArtefact)));
 
     function toggleMergeFirst(): void {
         mergePickingFor.set($mergePickingFor === 'first' ? null : 'first');

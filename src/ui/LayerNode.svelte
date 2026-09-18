@@ -13,15 +13,11 @@
     } from './store';
     import LayerNode from './LayerNode.svelte';
 
-    export let layer: Layer;
+    let { layer }: { layer: Layer } = $props();
 
-    let childLayers: Layer[] = [];
-    let isEffectivelyVisible = true;
-    let provableResult: { provable: boolean; reason: string } | undefined;
-
-    $: childLayers = $allLayers.filter(l => l.parentId === layer.id);
-    $: isEffectivelyVisible = drawing.isLayerVisible(layer.id);
-    $: provableResult = $layerProvability.get(layer.id);
+    let childLayers = $derived($allLayers.filter(l => l.parentId === layer.id));
+    let isEffectivelyVisible = $derived(drawing.isLayerVisible(layer.id));
+    let provableResult = $derived($layerProvability.get(layer.id));
 </script>
 
 <div class="layer-item {layer.parentId === null ? 'root-layer' : ''}">

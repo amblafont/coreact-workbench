@@ -4,29 +4,18 @@
     import { startDraftForSort } from './store';
     import ArtefactNode from './ArtefactNode.svelte';
 
-    let sortDefs: SortDefinition[] = [];
-    let grouped: Record<string, Artefact[]> = {};
-    let focusedId: string | null = null;
-    let expectedSortFilter: string | null = null;
-
-    $: {
-        $allArtefacts;
-        $dependencyPickingFor;
-        $draftArtefact;
-        sortDefs = sortStore.getAllSorts();
-        focusedId = drawing.getFocusedLayerId();
-        grouped = $allArtefacts.reduce((acc, artefact) => {
-            if (!acc[artefact.sortName]) acc[artefact.sortName] = [];
-            acc[artefact.sortName].push(artefact);
-            return acc;
-        }, {} as Record<string, Artefact[]>);
-        if ($dependencyPickingFor && $draftArtefact && $draftArtefact.sortName !== 'Equality') {
-            const sortDef = sortStore.getSort($draftArtefact.sortName);
-            expectedSortFilter = sortDef?.dependencies[$dependencyPickingFor] ?? null;
-        } else {
-            expectedSortFilter = null;
-        }
-    }
+    let sortDefs: SortDefinition[] = $derived(sortStore.getAllSorts());
+    let grouped: Record<string, Artefact[]> = $derived($allArtefacts.reduce((acc, artefact) => {
+        if (!acc[artefact.sortName]) acc[artefact.sortName] = [];
+        acc[artefact.sortName].push(artefact);
+        return acc;
+    }, {} as Record<string, Artefact[]>));
+    let focusedId: string | null = $derived(drawing.getFocusedLayerId());
+    let expectedSortFilter: string | null = $derived(
+        $dependencyPickingFor && $draftArtefact && $draftArtefact.sortName !== 'Equality'
+            ? sortStore.getSort($draftArtefact.sortName)?.dependencies[$dependencyPickingFor] ?? null
+            : null
+    );
 </script>
 
 {#each sortDefs as sortDef (sortDef.name)}

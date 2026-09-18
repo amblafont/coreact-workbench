@@ -26,8 +26,8 @@
 
     let importInput: HTMLInputElement;
 
-    $: names = new Set($allDrawings.map(d => d.name));
-    $: roots = $allDrawings.filter(d => !d.parentName || !names.has(d.parentName));
+    let names = $derived(new Set($allDrawings.map(d => d.name)));
+    let roots = $derived($allDrawings.filter(d => !d.parentName || !names.has(d.parentName)));
 
     function onImportFile(event: Event): void {
         const target = event.currentTarget as HTMLInputElement;
