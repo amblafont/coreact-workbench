@@ -1,4 +1,5 @@
 import type { D3Context } from './types';
+import { SvelteMap } from 'svelte/reactivity';
 
 export interface SliderAttribute {
     type: "slider";
@@ -36,11 +37,11 @@ export interface SortDefinition {
 
 export class Layer {
     public id: string;
-    public name: string;
-    public parentId: string | null;
-    public color: string;
-    public colorEnabled: boolean;
-    public visible: boolean;
+    public name = $state<string>('');
+    public parentId = $state<string | null>(null);
+    public color = $state<string>('#3498db');
+    public colorEnabled = $state(false);
+    public visible = $state(true);
 
     constructor(
         id: string,
@@ -60,7 +61,7 @@ export class Layer {
 }
 
 export class SortStore {
-    private sorts: Map<string, SortDefinition> = new Map();
+    private sorts = new SvelteMap<string, SortDefinition>();
 
     constructor() {
         this.registerBuiltInSorts();
@@ -178,11 +179,11 @@ export interface ReverseDependencyInfo {
 export class Artefact {
     public svgElement: D3Context | null = null; // Store the rendered SVG element
     public readonly id: string;
-    public sortName: string;
-    public dependencies: Record<string, Artefact>;
-    public data: Record<string, any>;
+    public sortName = $state<string>('');
+    public dependencies = $state<Record<string, Artefact>>({});
+    public data = $state<Record<string, any>>({});
     protected drawFunction: (data: any, context: D3Context) => D3Context | null;
-    public layerId: string;
+    public layerId = $state<string>('root');
 
     constructor(
         id: string,
@@ -258,7 +259,7 @@ export class Artefact {
 }
 
 export class EqualityArtefact extends Artefact {
-    public children: Artefact[];
+    public children = $state<Artefact[]>([]);
 
     constructor(
         id: string,
@@ -358,10 +359,10 @@ export function checkRuleStructure(layers: Array<{ id: string; name: string; par
 
 export class Drawing {
     public sortStore: SortStore;
-    private artefacts: Artefact[] = [];
-    private layers: Map<string, Layer> = new Map();
-    private focusedLayerId: string | null = null;
-    private ruleFlag: boolean = false;
+    private artefacts = $state<Artefact[]>([]);
+    private layers = new SvelteMap<string, Layer>();
+    private focusedLayerId = $state<string | null>(null);
+    private ruleFlag = $state(false);
     private nextArtefactId: number = 1;
 
     constructor(sortStore: SortStore) {
@@ -1380,7 +1381,7 @@ export interface SavedDrawing {
 }
 
 export class DrawingStore {
-    private drawings: Map<string, SavedDrawing> = new Map();
+    private drawings = new SvelteMap<string, SavedDrawing>();
 
     public checkIsRule(drawing: Drawing): { isRule: boolean; reason?: string } {
         return drawing.checkRuleConditions();
