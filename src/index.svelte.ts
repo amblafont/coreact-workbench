@@ -1418,9 +1418,9 @@ export class DrawingStore {
                 throw new Error(`Consistency Check Failed: Drawing '${name}' cannot be marked as a rule: ${check.reason}`);
             }
         }
-        saved.isRule = isRule;
-        saved.isFirstOrder = isRule && DrawingStore.firstOrderFromLayers(saved.layers);
-        return saved;
+        const updated = { ...saved, isRule, isFirstOrder: isRule && DrawingStore.firstOrderFromLayers(saved.layers) };
+        this.drawings.set(name, updated);
+        return updated;
     }
 
     public setDrawingProved(name: string, proved: boolean): SavedDrawing {
@@ -1428,8 +1428,9 @@ export class DrawingStore {
         if (!saved) {
             throw new Error(`Consistency Check Failed: Drawing '${name}' does not exist.`);
         }
-        saved.proved = proved;
-        return saved;
+        const updated = { ...saved, proved };
+        this.drawings.set(name, updated);
+        return updated;
     }
 
     public static drawingToSavedDrawing(name: string, drawing: Drawing): SavedDrawing {
@@ -1565,7 +1566,10 @@ export class DrawingStore {
         }
 
         drawing.setIsRule(savedDrawing.isRule);
-        savedDrawing.isFirstOrder = this.checkIsFirstOrder(drawing);
+        const isFirstOrder = this.checkIsFirstOrder(drawing);
+        if (savedDrawing.isFirstOrder !== isFirstOrder) {
+            savedDrawing.isFirstOrder = isFirstOrder;
+        }
     }
 
     public exportDrawingJSON(name: string): string {
@@ -1731,9 +1735,9 @@ export class DrawingStore {
         this.drawings.delete(oldName);
         saved.name = trimmed;
         this.drawings.set(trimmed, saved);
-        for (const [, other] of this.drawings) {
+        for (const other of Array.from(this.drawings.values())) {
             if (other.parentName === oldName) {
-                other.parentName = trimmed;
+                this.drawings.set(other.name, { ...other, parentName: trimmed });
             }
         }
         return saved;
@@ -1757,7 +1761,8 @@ export class DrawingStore {
         if (!saved) {
             throw new Error(`Consistency Check Failed: Drawing '${name}' does not exist.`);
         }
-        saved.parentName = parentName;
+        const updated = { ...saved, parentName };
+        this.drawings.set(name, updated);
     }
 
     public clear(): void {
