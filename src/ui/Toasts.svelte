@@ -1,9 +1,9 @@
 <script lang="ts">
-    import { toasts, dismissToast } from './store.svelte.ts';
+    import { ui, dismissToast } from './store.svelte.ts';
 </script>
 
 <div class="toast-container">
-    {#each $toasts as toast (toast.id)}
+    {#each ui.toasts as toast (toast.id)}
         <div class="toast {toast.kind}" role="alert">
             <span class="toast-message">{toast.message}</span>
             <button

@@ -1,9 +1,8 @@
 <script lang="ts">
     import type { SavedDrawing } from '../index.svelte.ts';
     import {
-        activeDrawingName,
         allDrawings,
-        exportSelection,
+        ui,
         recordedStatementByDrawing
     } from './store.svelte.ts';
     import {
@@ -18,7 +17,7 @@
 
     let { drawing, isChild = false }: { drawing: SavedDrawing; isChild?: boolean } = $props();
 
-    let isActive = $derived(drawing.name === $activeDrawingName);
+    let isActive = $derived(drawing.name === ui.activeDrawingName);
     let children = $derived(allDrawings().filter(d => d.parentName === drawing.name && d.name !== drawing.name));
     let recStatus = $derived(recordedStatementByDrawing().get(drawing.name));
 
@@ -53,7 +52,7 @@
             type="checkbox"
             class="export-checkbox"
             title="Include '{drawing.name}' in the next export"
-            checked={$exportSelection.has(drawing.name)}
+            checked={ui.exportSelection.has(drawing.name)}
             onchange={() => toggleExportSelection(drawing.name)}
         />
         <span

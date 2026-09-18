@@ -1,7 +1,6 @@
 <script lang="ts">
     import type { Artefact } from '../index.svelte.ts';
-    import { get } from 'svelte/store';
-    import { computeRuleApplications, applyRuleAt, mergeMode, ruleHoverArtefacts, filterRedundantMatches, toggleFilterRedundantMatches, filterNoProgressMatches, toggleFilterNoProgressMatches, filterStrictMatches, toggleFilterStrictMatches, filterSolvesGoalMatches, toggleFilterSolvesGoalMatches, solvesGoalFilterApplicable } from './store.svelte.ts';
+    import { computeRuleApplications, applyRuleAt, ui, toggleFilterRedundantMatches, toggleFilterNoProgressMatches, toggleFilterStrictMatches, toggleFilterSolvesGoalMatches, solvesGoalFilterApplicable } from './store.svelte.ts';
 
     let entries = $derived(computeRuleApplications());
 
@@ -36,30 +35,30 @@
     }
 
     function onHover(activeSet: Set<Artefact>): void {
-        if (get(mergeMode)) return;
-        ruleHoverArtefacts.set(activeSet);
+        if (ui.mergeMode) return;
+        ui.ruleHoverArtefacts = activeSet;
     }
 
     function onLeave(): void {
-        ruleHoverArtefacts.set(null);
+        ui.ruleHoverArtefacts = null;
     }
 </script>
 
 <div class="rules-filter">
     <label class="rule-checkbox-label">
-        <input type="checkbox" checked={$filterRedundantMatches} onchange={toggleFilterRedundantMatches} />
+        <input type="checkbox" checked={ui.filterRedundantMatches} onchange={toggleFilterRedundantMatches} />
         Filter redundant matches
     </label>
     <label class="rule-checkbox-label">
-        <input type="checkbox" checked={$filterNoProgressMatches} onchange={toggleFilterNoProgressMatches} />
+        <input type="checkbox" checked={ui.filterNoProgressMatches} onchange={toggleFilterNoProgressMatches} />
         Filter no-progress matches
     </label>
     <label class="rule-checkbox-label">
-        <input type="checkbox" checked={$filterStrictMatches} onchange={toggleFilterStrictMatches} />
+        <input type="checkbox" checked={ui.filterStrictMatches} onchange={toggleFilterStrictMatches} />
         Strict matching
     </label>
     <label class="rule-checkbox-label" class:disabled={!solvesGoalFilterApplicable()} title={solvesGoalFilterApplicable() ? 'Only show matchings whose conclusion would make the child layer provable' : 'Requires a drawing with exactly one root and one child layer'}>
-        <input type="checkbox" checked={$filterSolvesGoalMatches} disabled={!solvesGoalFilterApplicable()} onchange={toggleFilterSolvesGoalMatches} />
+        <input type="checkbox" checked={ui.filterSolvesGoalMatches} disabled={!solvesGoalFilterApplicable()} onchange={toggleFilterSolvesGoalMatches} />
         Solves the goal
     </label>
 </div>

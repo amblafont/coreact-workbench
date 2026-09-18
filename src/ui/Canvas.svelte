@@ -1,22 +1,14 @@
 <script lang="ts">
     import { onMount, untrack } from 'svelte';
-    import { get } from 'svelte/store';
     import * as d3 from 'd3';
     import { Artefact } from '../index.svelte.ts';
     import type { D3Context } from '../types';
     import {
         drawing,
         sortStore,
-        draftArtefact,
-        positionPicker,
+        ui,
         applyPickedPosition,
-        mergeMode,
-        focusedLayerId,
-        mergeBaseOpacityFor,
-        mergeHoverArtefact,
-        inspectedArtefact,
-        menuHoverArtefact,
-        ruleHoverArtefacts
+        mergeBaseOpacityFor
     } from './store.svelte.ts';
 
     let svgElement!: SVGSVGElement;
@@ -32,12 +24,12 @@
 
     $effect(() => {
         if (!svgReady) return;
-        const activeMerge = $mergeMode;
-        const activeFocus = $focusedLayerId;
-        const activeMergeHover = $mergeHoverArtefact;
-        const activeInspected = $inspectedArtefact;
-        const activeMenuHover = $menuHoverArtefact;
-        const activeRuleHover = $ruleHoverArtefacts;
+        const activeMerge = ui.mergeMode;
+        const activeFocus = ui.focusedLayerId;
+        const activeMergeHover = ui.mergeHoverArtefact;
+        const activeInspected = ui.inspectedArtefact;
+        const activeMenuHover = ui.menuHoverArtefact;
+        const activeRuleHover = ui.ruleHoverArtefacts;
         untrack(() => {
             mergeOn = activeMerge;
             focusedId = activeFocus;
@@ -96,19 +88,19 @@
     }
 
     function applyOverlaysFromStores(): void {
-        const a = untrack(() => get(inspectedArtefact));
-        const mh = untrack(() => get(menuHoverArtefact));
-        const mge = untrack(() => get(mergeHoverArtefact));
-        const rh = untrack(() => get(ruleHoverArtefacts));
-        const fi = untrack(() => get(focusedLayerId));
-        const mo = untrack(() => get(mergeMode));
+        const a = untrack(() => ui.inspectedArtefact);
+        const mh = untrack(() => ui.menuHoverArtefact);
+        const mge = untrack(() => ui.mergeHoverArtefact);
+        const rh = untrack(() => ui.ruleHoverArtefacts);
+        const fi = untrack(() => ui.focusedLayerId);
+        const mo = untrack(() => ui.mergeMode);
         const prev = { mergeOn, focusedId, mergeHover, inspected, menuHover, ruleHover };
         mergeOn = mo; focusedId = fi; mergeHover = mge; inspected = a; menuHover = mh; ruleHover = rh;
         try { applyOverlays(); } finally { Object.assign({ mergeOn, focusedId, mergeHover, inspected, menuHover, ruleHover }, prev); }
     }
 
     function drawDraftPreview(): void {
-        const draft = get(draftArtefact);
+        const draft = ui.draftArtefact;
         if (!draft) return;
         const sortDef = sortStore.getSort(draft.sortName);
         if (!sortDef) return;
@@ -154,7 +146,7 @@
     }
 
     function onSvgClick(event: MouseEvent): void {
-        if (get(positionPicker)) {
+        if (ui.positionPicker) {
             event.stopPropagation();
             const coords = d3.pointer(event, svgContext!.node());
             applyPickedPosition(Math.round(coords[0]), Math.round(coords[1]));

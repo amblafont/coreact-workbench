@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { get } from 'svelte/store';
     import Canvas from './Canvas.svelte';
     import LayersTree from './LayersTree.svelte';
     import ArtefactMenu from './ArtefactMenu.svelte';
@@ -7,7 +6,7 @@
     import Inspector from './Inspector.svelte';
     import RuleApplications from './RuleApplications.svelte';
     import Toasts from './Toasts.svelte';
-    import { loadSortScript, clearAll, mergeMode, startMergeMode, cancelMergeMode, inspectedArtefact } from './store.svelte.ts';
+    import { loadSortScript, clearAll, ui, startMergeMode, cancelMergeMode } from './store.svelte.ts';
 
     let scriptUpload: HTMLInputElement;
 
@@ -25,10 +24,10 @@
     }
 
     function onMergeClick(): void {
-        if (get(mergeMode)) {
+        if (ui.mergeMode) {
             cancelMergeMode();
         } else {
-            startMergeMode(get(inspectedArtefact));
+            startMergeMode(ui.inspectedArtefact);
         }
     }
 </script>

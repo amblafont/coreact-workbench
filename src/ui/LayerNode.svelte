@@ -1,6 +1,6 @@
 <script lang="ts">
     import type { Layer } from '../index.svelte.ts';
-    import { drawing, allLayers, layerProvability, focusedLayerId } from './store.svelte.ts';
+    import { drawing, allLayers, ui } from './store.svelte.ts';
     import {
         toggleLayerVisibility,
         toggleLayerFocus,
@@ -17,12 +17,12 @@
 
     let childLayers = $derived(allLayers().filter(l => l.parentId === layer.id));
     let isEffectivelyVisible = $derived(drawing.isLayerVisible(layer.id));
-    let provableResult = $derived($layerProvability.get(layer.id));
+    let provableResult = $derived(ui.layerProvability.get(layer.id));
 </script>
 
 <div class="layer-item {layer.parentId === null ? 'root-layer' : ''}">
     <div
-        class="layer-row {$focusedLayerId === layer.id ? 'focused' : ''} {!isEffectivelyVisible ? 'layer-hidden' : ''}"
+        class="layer-row {ui.focusedLayerId === layer.id ? 'focused' : ''} {!isEffectivelyVisible ? 'layer-hidden' : ''}"
     >
         <div class="layer-row-header">
             <span class="layer-title" title="ID: {layer.id}{!isEffectivelyVisible ? ' (hidden)' : ''}">
@@ -46,10 +46,10 @@
                 onclick={() => toggleLayerVisibility(layer)}
             >{layer.visible ? 'Hide' : 'Show'}</button>
             <button
-                class="layer-btn focus-btn {$focusedLayerId === layer.id ? 'active' : ''}"
+                class="layer-btn focus-btn {ui.focusedLayerId === layer.id ? 'active' : ''}"
                 title="Focus on this layer (dims other layers to 50% opacity)"
                 onclick={() => toggleLayerFocus(layer.id)}
-            >{$focusedLayerId === layer.id ? 'Focusing' : 'Focus'}</button>
+            >{ui.focusedLayerId === layer.id ? 'Focusing' : 'Focus'}</button>
             <button class="layer-btn" title={`Rename layer '${layer.name}'`} onclick={() => renameLayer(layer)}>
                 Rename
             </button>

@@ -1,15 +1,6 @@
 <script lang="ts">
     import type { Artefact } from '../index.svelte.ts';
-    import { drawing } from './store.svelte.ts';
-    import {
-        mergeMode,
-        mergeFirstArtefact,
-        mergeSecondArtefact,
-        mergeHoverArtefact,
-        inspectedArtefact,
-        menuHoverArtefact,
-        dependencyPickingFor
-    } from './store.svelte.ts';
+    import { drawing, ui } from './store.svelte.ts';
     import {
         getArtefactLabel,
         equalityChildren,
@@ -48,17 +39,17 @@
     let layerBadgeText = $derived(layerObj ? layerObj.name + (isLayerVis ? '' : ' (hidden)') : artefact.layerId);
     let provablyEqualCandidate = $derived(isProvablyEqualCandidate(artefact));
     let inspectedNode = $derived(
-        $inspectedArtefact === artefact
-        || ($mergeMode && ($mergeFirstArtefact === artefact || $mergeSecondArtefact === artefact))
+        ui.inspectedArtefact === artefact
+        || (ui.mergeMode && (ui.mergeFirstArtefact === artefact || ui.mergeSecondArtefact === artefact))
     );
 
     let depEntries = $derived(Object.entries(artefact.dependencies) as [string, Artefact][]);
-    let canUp = $derived(rootNode && !$dependencyPickingFor && canMoveArtefactUp(artefact));
-    let canDown = $derived(rootNode && !$dependencyPickingFor && canMoveArtefactDown(artefact));
+    let canUp = $derived(rootNode && !ui.dependencyPickingFor && canMoveArtefactUp(artefact));
+    let canDown = $derived(rootNode && !ui.dependencyPickingFor && canMoveArtefactDown(artefact));
 
     let nodeOpacity = $derived.by(() => {
-        if ($mergeMode) {
-            const hoveredSet = $mergeHoverArtefact ? $mergeHoverArtefact.getSelfAndDependencies() : null;
+        if (ui.mergeMode) {
+            const hoveredSet = ui.mergeHoverArtefact ? ui.mergeHoverArtefact.getSelfAndDependencies() : null;
             if (hoveredSet && hoveredSet.has(artefact)) {
                 return 1;
             } else if (hoveredSet) {
@@ -67,7 +58,7 @@
                 return mergeBaseOpacityFor(artefact);
             }
         } else {
-            const target = $menuHoverArtefact ?? $inspectedArtefact;
+            const target = ui.menuHoverArtefact ?? ui.inspectedArtefact;
             if (target) {
                 return target.getSelfAndDependencies().has(artefact) ? 1 : 0.5;
             } else {
@@ -77,18 +68,18 @@
     });
 
     function onHeaderMouseEnter(): void {
-        if ($mergeMode) {
-            mergeHoverArtefact.set(artefact);
+        if (ui.mergeMode) {
+            ui.mergeHoverArtefact = artefact;
         } else {
-            menuHoverArtefact.set(artefact);
+            ui.menuHoverArtefact = artefact;
         }
     }
 
     function onHeaderMouseLeave(): void {
-        if ($mergeMode) {
-            mergeHoverArtefact.set(null);
+        if (ui.mergeMode) {
+            ui.mergeHoverArtefact = null;
         } else {
-            menuHoverArtefact.set(null);
+            ui.menuHoverArtefact = null;
         }
     }
 
@@ -159,7 +150,7 @@
         {#if provablyEqualCandidate}
             <span class="eq-badge" title="Provably equal (via equality artefacts)">≡</span>
         {/if}
-        {#if rootNode && !$dependencyPickingFor}
+        {#if rootNode && !ui.dependencyPickingFor}
             <span
                 class="move-btn"
                 class:disabled={!canUp}
@@ -199,7 +190,7 @@
                 }}
             >↓</span>
         {/if}
-        {#if rootNode && !$dependencyPickingFor && artefact.sortName !== 'Equality'}
+        {#if rootNode && !ui.dependencyPickingFor && artefact.sortName !== 'Equality'}
             <span
                 class="move-btn"
                 role="button"

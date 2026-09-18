@@ -1,4 +1,4 @@
-import { writable, get } from 'svelte/store';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import * as d3 from 'd3';
 import {
     SortStore,
@@ -38,11 +38,9 @@ export const drawingStore = new DrawingStore();
 export const rocqRecorder = new RocqRecorder();
 
 // ---------------------------------------------------------------------------
-// Interaction state
+// Interaction state (single fine-grained $state object; components read and
+// write ui.* directly and track the exact signals they touch)
 // ---------------------------------------------------------------------------
-
-export const activeDrawingName = writable<string | null>(null);
-export const inspectedArtefact = writable<Artefact | null>(null);
 
 export interface DraftArtefact {
     sortName: string;
@@ -52,31 +50,9 @@ export interface DraftArtefact {
     duplicateOf?: Artefact;
 }
 
-export const draftArtefact = writable<DraftArtefact | null>(null);
-export const dependencyPickingFor = writable<string | null>(null);
-
 export type PositionPicker =
     | { kind: 'draft'; attrName: string }
     | { kind: 'artefact'; id: string; attrName: string };
-
-export const positionPicker = writable<PositionPicker | null>(null);
-
-export const focusedLayerId = writable<string | null>(null);
-export const mergeMode = writable(false);
-export const mergeFirstArtefact = writable<Artefact | null>(null);
-export const mergeSecondArtefact = writable<Artefact | null>(null);
-export const mergePickingFor = writable<'first' | 'second' | null>(null);
-export const mergeHoverArtefact = writable<Artefact | null>(null);
-
-export const menuHoverArtefact = writable<Artefact | null>(null);
-export const ruleHoverArtefacts = writable<Set<Artefact> | null>(null);
-
-export const layerProvability = writable<Map<string, { provable: boolean; reason: string }>>(new Map());
-export const exportSelection = writable<Set<string>>(new Set());
-
-// ---------------------------------------------------------------------------
-// Toasts (non-blocking replacement for alert()/window.alert)
-// ---------------------------------------------------------------------------
 
 export type ToastKind = 'info' | 'error';
 
@@ -86,17 +62,43 @@ export interface Toast {
     message: string;
 }
 
-export const toasts = writable<Toast[]>([]);
+export const ui = $state({
+    activeDrawingName: null as string | null,
+    inspectedArtefact: null as Artefact | null,
+    draftArtefact: null as DraftArtefact | null,
+    dependencyPickingFor: null as string | null,
+    positionPicker: null as PositionPicker | null,
+    focusedLayerId: null as string | null,
+    mergeMode: false,
+    mergeFirstArtefact: null as Artefact | null,
+    mergeSecondArtefact: null as Artefact | null,
+    mergePickingFor: null as 'first' | 'second' | null,
+    mergeHoverArtefact: null as Artefact | null,
+    menuHoverArtefact: null as Artefact | null,
+    ruleHoverArtefacts: null as Set<Artefact> | null,
+    layerProvability: new SvelteMap<string, { provable: boolean; reason: string }>(),
+    exportSelection: new SvelteSet<string>(),
+    toasts: [] as Toast[],
+    rocqRecordingActive: false,
+    filterRedundantMatches: false,
+    filterNoProgressMatches: false,
+    filterStrictMatches: false,
+    filterSolvesGoalMatches: false
+});
+
+// ---------------------------------------------------------------------------
+// Toasts (non-blocking replacement for alert()/window.alert)
+// ---------------------------------------------------------------------------
 
 let nextToastId = 1;
 
 export function dismissToast(id: number): void {
-    toasts.update(list => list.filter(t => t.id !== id));
+    ui.toasts = ui.toasts.filter(t => t.id !== id);
 }
 
 export function pushToast(kind: ToastKind, message: string): void {
     const id = nextToastId++;
-    toasts.update(list => [...list, { id, kind, message }]);
+    ui.toasts = [...ui.toasts, { id, kind, message }];
     setTimeout(() => dismissToast(id), kind === 'error' ? 8000 : 4000);
 }
 
@@ -138,19 +140,19 @@ function setBodyCursor(cursor: string): void {
 }
 
 export function stopPositionPicker(): void {
-    positionPicker.set(null);
+    ui.positionPicker = null;
     setBodyCursor('default');
 }
 
 export function startPositionPicker(target: PositionPicker): void {
-    positionPicker.set(target);
+    ui.positionPicker = target;
     setBodyCursor('crosshair');
 }
 
 function resolvePickerTarget(picker: PositionPicker):
     { sortName: string; data: Record<string, DataAttributeValue>; dependencies: Record<string, Artefact>; isDraft: boolean } | null {
     if (picker.kind === 'draft') {
-        const draft = get(draftArtefact);
+        const draft = ui.draftArtefact;
         if (!draft) return null;
         return { sortName: draft.sortName, data: draft.data, dependencies: draft.dependencies, isDraft: true };
     }
@@ -160,7 +162,7 @@ function resolvePickerTarget(picker: PositionPicker):
 }
 
 export function applyPickedPosition(x: number, y: number): void {
-    const picker = get(positionPicker);
+    const picker = ui.positionPicker;
     if (!picker) return;
     const target = resolvePickerTarget(picker);
     if (!target) {
@@ -213,14 +215,14 @@ export function getSinglePositionAttr(sortDef: SortDefinition): string | null {
 }
 
 export function isPositionPickerActive(artefact: Artefact, attrName: string): boolean {
-    const picker = get(positionPicker);
+    const picker = ui.positionPicker;
     if (!picker) return false;
     if (picker.attrName !== attrName) return false;
     return picker.kind === 'artefact' && picker.id === artefact.id;
 }
 
 export function isDraftPickerActive(attrName: string): boolean {
-    const picker = get(positionPicker);
+    const picker = ui.positionPicker;
     if (!picker) return false;
     return picker.kind === 'draft' && picker.attrName === attrName;
 }
@@ -257,29 +259,25 @@ export function findNextUnfilledDependency(draft: DraftArtefact): string | null 
 }
 
 export function setDraftDataField(name: string, value: DataAttributeValue): void {
-    draftArtefact.update(d => {
-        if (!d) return d;
-        const nextData = { ...d.data };
-        if (name === 'label' && value === '') {
-            delete nextData[name];
-        } else {
-            nextData[name] = value;
-        }
-        return { ...d, data: nextData };
-    });
-
+    const d = ui.draftArtefact;
+    if (!d) return;
+    const nextData = { ...d.data };
+    if (name === 'label' && value === '') {
+        delete nextData[name];
+    } else {
+        nextData[name] = value;
+    }
+    ui.draftArtefact = { ...d, data: nextData };
 }
 
 export function setDraftLayer(layerId: string): void {
-    draftArtefact.update(d => {
-        if (!d) return d;
-        return { ...d, layerId };
-    });
-
+    const d = ui.draftArtefact;
+    if (!d) return;
+    ui.draftArtefact = { ...d, layerId };
 }
 
 export function startDraftForSort(sortDef: SortDefinition): void {
-    inspectedArtefact.set(null);
+    ui.inspectedArtefact = null;
     cancelMergeMode();
 
     const initialData: Record<string, DataAttributeValue> = {};
@@ -311,14 +309,14 @@ export function startDraftForSort(sortDef: SortDefinition): void {
         data: initialData,
         layerId: defaultLayerId
     };
-    draftArtefact.set(draft);
+    ui.draftArtefact = draft;
     stopPositionPicker();
 
     if (sortDef.name === 'Equality') {
-        dependencyPickingFor.set('Equality');
+        ui.dependencyPickingFor = 'Equality';
     } else {
         const firstDep = findNextUnfilledDependency(draft);
-        dependencyPickingFor.set(firstDep);
+        ui.dependencyPickingFor = firstDep;
         if (firstDep) {
             const expectedSort = sortDef.dependencies[firstDep];
             const pickableCount = drawing.getArtefacts()
@@ -350,7 +348,7 @@ export function startDuplicateArtefact(art: Artefact): void {
         return;
     }
 
-    inspectedArtefact.set(null);
+    ui.inspectedArtefact = null;
     cancelMergeMode();
     stopPositionPicker();
 
@@ -363,10 +361,10 @@ export function startDuplicateArtefact(art: Artefact): void {
         layerId: art.layerId,
         duplicateOf: art
     };
-    draftArtefact.set(draft);
+    ui.draftArtefact = draft;
 
     const firstDep = findNextUnfilledDependency(draft);
-    dependencyPickingFor.set(firstDep);
+    ui.dependencyPickingFor = firstDep;
 
 
 }
@@ -376,14 +374,14 @@ export function duplicateArtefactNode(art: Artefact): void {
 }
 
 export function cancelDraft(): void {
-    draftArtefact.set(null);
-    dependencyPickingFor.set(null);
+    ui.draftArtefact = null;
+    ui.dependencyPickingFor = null;
     stopPositionPicker();
 
 }
 
 export function createDraftArtefact(): Artefact | null {
-    const draft = get(draftArtefact);
+    const draft = ui.draftArtefact;
     if (!draft) return null;
     try {
         const finalDeps: Record<string, Artefact> = { ...draft.dependencies };
@@ -392,14 +390,14 @@ export function createDraftArtefact(): Artefact | null {
             const dupResult = drawing.duplicateArtefact(draft.duplicateOf, finalDeps, draft.data, draft.layerId);
             created = dupResult.artefact;
             if (rocqRecorder.isActive()) {
-                const activeName = get(activeDrawingName) ?? 'Unsaved Drawing';
+                const activeName = ui.activeDrawingName ?? 'Unsaved Drawing';
                 rocqRecorder.recordDuplicate(drawing, draft.duplicateOf, created, activeName, sortStore);
             }
         } else {
             created = drawing.newArtefact(draft.sortName, finalDeps, draft.data, draft.layerId);
         }
-        draftArtefact.set(null);
-        dependencyPickingFor.set(null);
+        ui.draftArtefact = null;
+        ui.dependencyPickingFor = null;
         stopPositionPicker();
 
         return created;
@@ -410,7 +408,7 @@ export function createDraftArtefact(): Artefact | null {
 }
 
 export function finalizeDraftIfComplete(): Artefact | null {
-    const draft = get(draftArtefact);
+    const draft = ui.draftArtefact;
     if (!draft) return null;
     if (!isDraftComplete(draft)) return null;
     const created = createDraftArtefact();
@@ -444,68 +442,68 @@ export function isDraftComplete(draft: DraftArtefact): boolean {
 // ---------------------------------------------------------------------------
 
 export function startMergeMode(preselectFirst: Artefact | null = null): void {
-    draftArtefact.set(null);
-    dependencyPickingFor.set(null);
-    mergeHoverArtefact.set(null);
+    ui.draftArtefact = null;
+    ui.dependencyPickingFor = null;
+    ui.mergeHoverArtefact = null;
     stopPositionPicker();
 
-    mergeMode.set(true);
+    ui.mergeMode = true;
     if (preselectFirst && drawing.getArtefacts().includes(preselectFirst)) {
-        mergeFirstArtefact.set(preselectFirst);
-        mergeSecondArtefact.set(null);
-        mergePickingFor.set('second');
+        ui.mergeFirstArtefact = preselectFirst;
+        ui.mergeSecondArtefact = null;
+        ui.mergePickingFor = 'second';
     } else {
-        mergeFirstArtefact.set(null);
-        mergeSecondArtefact.set(null);
-        mergePickingFor.set('first');
+        ui.mergeFirstArtefact = null;
+        ui.mergeSecondArtefact = null;
+        ui.mergePickingFor = 'first';
     }
 
 }
 
 export function cancelMergeMode(): void {
-    mergeMode.set(false);
-    mergeFirstArtefact.set(null);
-    mergeSecondArtefact.set(null);
-    mergePickingFor.set(null);
-    mergeHoverArtefact.set(null);
+    ui.mergeMode = false;
+    ui.mergeFirstArtefact = null;
+    ui.mergeSecondArtefact = null;
+    ui.mergePickingFor = null;
+    ui.mergeHoverArtefact = null;
 
 }
 
 export function selectMergeArtefact(artefact: Artefact): void {
-    mergeHoverArtefact.set(null);
-    const first = get(mergeFirstArtefact);
-    const pickingFor = get(mergePickingFor);
+    ui.mergeHoverArtefact = null;
+    const first = ui.mergeFirstArtefact;
+    const pickingFor = ui.mergePickingFor;
     if (pickingFor === 'first' || !first) {
-        mergeFirstArtefact.set(artefact);
-        if (get(mergeSecondArtefact) === artefact) {
-            mergeSecondArtefact.set(null);
+        ui.mergeFirstArtefact = artefact;
+        if (ui.mergeSecondArtefact === artefact) {
+            ui.mergeSecondArtefact = null;
         }
-        mergePickingFor.set('second');
+        ui.mergePickingFor = 'second';
     } else if (pickingFor === 'second' || first) {
         if (artefact === first) {
             pushToast('error', 'Cannot merge an artefact with itself.');
         } else if (!drawing.areDependenciesEqual(first, artefact)) {
             pushToast('error', `Cannot merge: Artefact '${artefact.data.label || artefact.sortName}' does not have matching dependencies.`);
         } else {
-            mergeSecondArtefact.set(artefact);
-            mergePickingFor.set(null);
+            ui.mergeSecondArtefact = artefact;
+            ui.mergePickingFor = null;
         }
     }
 
 }
 
 export function performMerge(): void {
-    const first = get(mergeFirstArtefact);
-    const second = get(mergeSecondArtefact);
+    const first = ui.mergeFirstArtefact;
+    const second = ui.mergeSecondArtefact;
     if (!first || !second || first === second || !drawing.areDependenciesEqual(first, second)) return;
     try {
         const mergedResult = drawing.mergeArtefacts(first, second);
-        mergeMode.set(false);
-        mergeFirstArtefact.set(null);
-        mergeSecondArtefact.set(null);
-        mergePickingFor.set(null);
-        mergeHoverArtefact.set(null);
-        inspectedArtefact.set(mergedResult);
+        ui.mergeMode = false;
+        ui.mergeFirstArtefact = null;
+        ui.mergeSecondArtefact = null;
+        ui.mergePickingFor = null;
+        ui.mergeHoverArtefact = null;
+        ui.inspectedArtefact = mergedResult;
 
     } catch (err) {
         pushToast('error', (err as Error).message);
@@ -513,8 +511,8 @@ export function performMerge(): void {
 }
 
 export function mergeBaseOpacityFor(art: Artefact): number {
-    const first = get(mergeFirstArtefact);
-    if (art === first || art === get(mergeSecondArtefact)) {
+    const first = ui.mergeFirstArtefact;
+    if (art === first || art === ui.mergeSecondArtefact) {
         return 1.0;
     }
     if (first && drawing.areDependenciesEqual(first, art)) {
@@ -527,8 +525,8 @@ export function mergeBaseOpacityFor(art: Artefact): number {
 }
 
 export function isDuplicateEligible(art: Artefact): boolean {
-    const draft = get(draftArtefact);
-    const picking = get(dependencyPickingFor);
+    const draft = ui.draftArtefact;
+    const picking = ui.dependencyPickingFor;
     if (!draft?.duplicateOf || !picking) return false;
     const sortDef = sortStore.getSort(draft.sortName);
     const expectedSort = sortDef?.dependencies[picking];
@@ -539,8 +537,8 @@ export function isDuplicateEligible(art: Artefact): boolean {
 }
 
 export function isProvablyEqualCandidate(art: Artefact): boolean {
-    const first = get(mergeFirstArtefact);
-    if (get(mergeMode) && !!first && art !== first
+    const first = ui.mergeFirstArtefact;
+    if (ui.mergeMode && !!first && art !== first
         && drawing.areDependenciesEqual(first, art)
         && drawing.areProvablyEqual(first, art)) {
         return true;
@@ -569,24 +567,24 @@ export function equalityChildren(art: { dependencies: Record<string, Artefact> }
 // ---------------------------------------------------------------------------
 
 export function resetInteractionState(): void {
-    inspectedArtefact.set(null);
-    focusedLayerId.set(null);
+    ui.inspectedArtefact = null;
+    ui.focusedLayerId = null;
     drawing.setFocusedLayer(null);
-    draftArtefact.set(null);
-    dependencyPickingFor.set(null);
-    layerProvability.set(new Map());
-    mergeMode.set(false);
-    mergeFirstArtefact.set(null);
-    mergeSecondArtefact.set(null);
-    mergePickingFor.set(null);
-    mergeHoverArtefact.set(null);
+    ui.draftArtefact = null;
+    ui.dependencyPickingFor = null;
+    ui.layerProvability.clear();
+    ui.mergeMode = false;
+    ui.mergeFirstArtefact = null;
+    ui.mergeSecondArtefact = null;
+    ui.mergePickingFor = null;
+    ui.mergeHoverArtefact = null;
     stopPositionPicker();
 }
 
 export function loadDrawingByName(name: string): boolean {
     try {
         drawingStore.loadDrawing(name, drawing);
-        activeDrawingName.set(name);
+        ui.activeDrawingName = name;
         resetInteractionState();
         syncProvedStatus();
 
@@ -599,7 +597,7 @@ export function loadDrawingByName(name: string): boolean {
 
 export function getSelectedDrawingNames(): string[] {
     const existing = new Set(drawingStore.getAllDrawings().map(d => d.name));
-    return Array.from(get(exportSelection)).filter(name => existing.has(name));
+    return Array.from(ui.exportSelection).filter(name => existing.has(name));
 }
 
 export function downloadDrawingsJson(names: string[]): void {
@@ -648,11 +646,11 @@ export function copyRocqExport(names: string[]): void {
 // ---------------------------------------------------------------------------
 
 export function selectArtefactToInspect(art: Artefact): void {
-    const nowInspected = get(inspectedArtefact) !== art;
-    inspectedArtefact.set(nowInspected ? art : null);
+    const nowInspected = ui.inspectedArtefact !== art;
+    ui.inspectedArtefact = nowInspected ? art : null;
     if (nowInspected) {
-        draftArtefact.set(null);
-        dependencyPickingFor.set(null);
+        ui.draftArtefact = null;
+        ui.dependencyPickingFor = null;
         stopPositionPicker();
     }
 
@@ -669,7 +667,7 @@ export function setArtefactDataField(art: Artefact, name: string, value: DataAtt
 
 export function setInspectedLabel(art: Artefact, rawLabel: string): void {
     const target = rawLabel.trim();
-    const activeName = get(activeDrawingName) ?? 'Unsaved Drawing';
+    const activeName = ui.activeDrawingName ?? 'Unsaved Drawing';
     const isRootLayer = art.layerId === 'root' || drawing.getLayer(art.layerId)?.parentId === null;
     let oldFieldName: string | null = null;
     if (rocqRecorder.isActive() && isRootLayer) {
@@ -699,7 +697,7 @@ export function setArtefactLayer(art: Artefact, targetLayerId: string): void {
 }
 
 function autoSelectLayerFromDependencies(): void {
-    const draft = get(draftArtefact);
+    const draft = ui.draftArtefact;
     if (!draft) return;
     const depLayerIds = Object.values(draft.dependencies).map(d => d.layerId);
     if (depLayerIds.length === 0) return;
@@ -710,21 +708,18 @@ function autoSelectLayerFromDependencies(): void {
 }
 
 export function pickDraftDependency(artefact: Artefact): void {
-    const draft = get(draftArtefact);
-    const picking = get(dependencyPickingFor);
+    const draft = ui.draftArtefact;
+    const picking = ui.dependencyPickingFor;
     if (!draft || !picking) return;
 
     if (draft.sortName === 'Equality') {
-        draftArtefact.update(d => {
-            if (!d) return d;
-            const existingItems = equalityChildren(d);
-            if (existingItems.length > 0 && existingItems[0].sortName !== artefact.sortName) {
-                pushToast('error', `Equality artefact requires all elements to be of sort '${existingItems[0].sortName}', but selected '${artefact.sortName}'.`);
-                return d;
-            }
-            const nextIdx = Object.keys(d.dependencies).length;
-            return { ...d, dependencies: { ...d.dependencies, [`${nextIdx}`]: artefact } };
-        });
+        const existingItems = equalityChildren(draft);
+        if (existingItems.length > 0 && existingItems[0].sortName !== artefact.sortName) {
+            pushToast('error', `Equality artefact requires all elements to be of sort '${existingItems[0].sortName}', but selected '${artefact.sortName}'.`);
+            return;
+        }
+        const nextIdx = Object.keys(draft.dependencies).length;
+        ui.draftArtefact = { ...draft, dependencies: { ...draft.dependencies, [`${nextIdx}`]: artefact } };
 
         autoSelectLayerFromDependencies();
         finalizeDraftIfComplete();
@@ -745,11 +740,10 @@ export function pickDraftDependency(artefact: Artefact): void {
                 return;
             }
         }
-        draftArtefact.update(d => {
-            if (d) return { ...d, dependencies: { ...d.dependencies, [picking]: artefact } };
-            return d;
-        });
-        dependencyPickingFor.set(findNextUnfilledDependency(get(draftArtefact) as DraftArtefact));
+        if (draft) {
+            ui.draftArtefact = { ...draft, dependencies: { ...draft.dependencies, [picking]: artefact } };
+        }
+        ui.dependencyPickingFor = findNextUnfilledDependency(ui.draftArtefact as DraftArtefact);
 
         // Auto-activate picker for relativePosition attrs targeting this dep key
         if (sortDef) {
@@ -784,11 +778,11 @@ export function removeArtefactNode(artefact: Artefact, parentArtefact: Artefact 
 // so the inspected/picked artefact can disappear as collateral without being
 // the node the user deleted.
 function pruneStaleArtefactRefs(): void {
-    const inspected = get(inspectedArtefact);
+    const inspected = ui.inspectedArtefact;
     if (inspected && !drawing.getArtefactById(inspected.id)) {
-        inspectedArtefact.set(null);
+        ui.inspectedArtefact = null;
     }
-    const picker = get(positionPicker);
+    const picker = ui.positionPicker;
     if (picker?.kind === 'artefact' && !drawing.getArtefactById(picker.id)) {
         stopPositionPicker();
     }
@@ -834,11 +828,11 @@ export function moveArtefactDown(artefact: Artefact): void {
 }
 
 export function onArtefactNodeClick(art: Artefact): void {
-    if (get(mergeMode)) {
+    if (ui.mergeMode) {
         selectMergeArtefact(art);
         return;
     }
-    if (get(dependencyPickingFor) && get(draftArtefact)) {
+    if (ui.dependencyPickingFor && ui.draftArtefact) {
         pickDraftDependency(art);
         return;
     }
@@ -849,7 +843,6 @@ export function onArtefactNodeClick(art: Artefact): void {
 // Drawing store / rule / recording app actions
 // ---------------------------------------------------------------------------
 
-export const rocqRecordingActive = writable(false);
 export function isCurrentDrawingRule(): boolean {
     return drawing.isRule;
 }
@@ -887,7 +880,7 @@ export function setCurrentDrawingRule(checked: boolean): void {
 }
 
 export function saveActiveDrawing(): void {
-    let name = get(activeDrawingName);
+    let name = ui.activeDrawingName;
     if (!name) {
         const input = prompt('Enter a name for the drawing:');
         if (!input || !input.trim()) return;
@@ -895,7 +888,7 @@ export function saveActiveDrawing(): void {
     }
     try {
         drawingStore.saveDrawing(name, drawing);
-        activeDrawingName.set(name);
+        ui.activeDrawingName = name;
 
     } catch (err) {
         pushToast('error', `Error saving drawing:\n${(err as Error).message}`);
@@ -903,7 +896,7 @@ export function saveActiveDrawing(): void {
 }
 
 export function duplicateCurrentDrawing(): void {
-    const activeName = get(activeDrawingName);
+    const activeName = ui.activeDrawingName;
     const suggested = activeName ? `${activeName} copy` : 'Drawing copy';
     const input = prompt('Enter a name for the duplicate drawing:', suggested);
     if (!input || !input.trim()) return;
@@ -914,7 +907,7 @@ export function duplicateCurrentDrawing(): void {
     }
     try {
         drawingStore.saveDrawing(name, drawing);
-        activeDrawingName.set(name);
+        ui.activeDrawingName = name;
 
         pushToast('info', `Duplicated drawing as '${name}'.`);
     } catch (err) {
@@ -938,7 +931,7 @@ export function newDrawing(): void {
     resetInteractionState();
     try {
         drawingStore.saveDrawing(name, drawing);
-        activeDrawingName.set(name);
+        ui.activeDrawingName = name;
 
     } catch (err) {
         pushToast('error', (err as Error).message);
@@ -970,36 +963,27 @@ export function deleteSelectedDrawings(names: string[]): void {
     }
     const deleted = new Set(names);
     for (const name of names) {
-        if (name === get(activeDrawingName)) {
-            activeDrawingName.set(null);
+        if (name === ui.activeDrawingName) {
+            ui.activeDrawingName = null;
         }
         drawingStore.deleteDrawing(name);
     }
-    exportSelection.update(sel => {
-        const next = new Set(sel);
-        for (const name of deleted) {
-            next.delete(name);
-        }
-        return next;
-    });
+    for (const name of deleted) {
+        ui.exportSelection.delete(name);
+    }
 
 }
 
 export function renameDrawingName(oldName: string, newName: string): void {
     try {
         drawingStore.renameDrawing(oldName, newName);
-        if (oldName === get(activeDrawingName)) {
-            activeDrawingName.set(newName);
+        if (oldName === ui.activeDrawingName) {
+            ui.activeDrawingName = newName;
         }
-        exportSelection.update(sel => {
-            if (!sel.has(oldName)) {
-                return sel;
-            }
-            const next = new Set(sel);
-            next.delete(oldName);
-            next.add(newName);
-            return next;
-        });
+        if (ui.exportSelection.has(oldName)) {
+            ui.exportSelection.delete(oldName);
+            ui.exportSelection.add(newName);
+        }
 
     } catch (err) {
         pushToast('error', (err as Error).message);
@@ -1008,7 +992,7 @@ export function renameDrawingName(oldName: string, newName: string): void {
 
 export function markDrawingAsRule(name: string, isRule: boolean): void {
     try {
-        if (name === get(activeDrawingName)) {
+        if (name === ui.activeDrawingName) {
             drawing.setIsRule(isRule);
         }
         drawingStore.markAsRule(name, isRule);
@@ -1023,7 +1007,7 @@ export function toggleRocqRecording(): void {
         if (rocqRecorder.isActive()) {
             const stmts = rocqRecorder.getRecordedStatements();
             const script = rocqRecorder.stop();
-            rocqRecordingActive.set(false);
+            ui.rocqRecordingActive = false;
             navigator.clipboard
                 .writeText(script)
                 .then(() => {
@@ -1037,9 +1021,9 @@ export function toggleRocqRecording(): void {
                     pushToast('error', 'Error copying recording:\nClipboard access failed.');
                 });
         } else {
-            const name = get(activeDrawingName) ?? 'Unsaved Drawing';
+            const name = ui.activeDrawingName ?? 'Unsaved Drawing';
             rocqRecorder.start(drawing, name, sortStore);
-            rocqRecordingActive.set(true);
+            ui.rocqRecordingActive = true;
         }
 
     } catch (err) {
@@ -1048,19 +1032,15 @@ export function toggleRocqRecording(): void {
 }
 
 export function toggleExportSelection(name: string): void {
-    exportSelection.update(sel => {
-        const next = new Set(sel);
-        if (next.has(name)) {
-            next.delete(name);
-        } else {
-            next.add(name);
-        }
-        return next;
-    });
+    if (ui.exportSelection.has(name)) {
+        ui.exportSelection.delete(name);
+    } else {
+        ui.exportSelection.add(name);
+    }
 }
 
 export function setExportSelectionAll(checked: boolean): void {
-    exportSelection.set(checked ? new Set(drawingStore.getAllDrawings().map(d => d.name)) : new Set());
+    ui.exportSelection = checked ? new SvelteSet(drawingStore.getAllDrawings().map(d => d.name)) : new SvelteSet();
 }
 
 export function clearAll(): void {
@@ -1068,8 +1048,8 @@ export function clearAll(): void {
         return;
     }
     drawing.clear();
-    focusedLayerId.set(null);
-    activeDrawingName.set(null);
+    ui.focusedLayerId = null;
+    ui.activeDrawingName = null;
     resetInteractionState();
 
 }
@@ -1127,8 +1107,8 @@ export function deleteLayer(layer: { id: string; name: string }): void {
         : `Delete layer '${layer.name}'?`;
     if (confirm(msg)) {
         drawing.removeLayer(layer.id);
-        if (get(focusedLayerId) && descendants.has(get(focusedLayerId)!)) {
-            focusedLayerId.set(null);
+        if (ui.focusedLayerId && descendants.has(ui.focusedLayerId!)) {
+            ui.focusedLayerId = null;
         }
 
     }
@@ -1140,12 +1120,12 @@ export function toggleLayerVisibility(layer: { id: string; visible: boolean }): 
 }
 
 export function toggleLayerFocus(layerId: string): void {
-    const current = get(focusedLayerId);
+    const current = ui.focusedLayerId;
     if (current === layerId) {
-        focusedLayerId.set(null);
+        ui.focusedLayerId = null;
         drawing.setFocusedLayer(null);
     } else {
-        focusedLayerId.set(layerId);
+        ui.focusedLayerId = layerId;
         drawing.setFocusedLayer(layerId);
     }
 
@@ -1165,13 +1145,9 @@ export function toggleLayerColorEnabled(layer: { id: string; colorEnabled: boole
 export function checkLayerProvable(layerId: string): void {
     try {
         const result = drawing.checkLayerProvable(layerId);
-        layerProvability.update(m => {
-            const next = new Map(m);
-            next.set(layerId, { provable: result.provable, reason: result.reason ?? '' });
-            return next;
-        });
+        ui.layerProvability.set(layerId, { provable: result.provable, reason: result.reason ?? '' });
         if (result.provable) {
-            rocqRecorder.recordProveSuccess(drawing, layerId, result.match ?? null, get(activeDrawingName) ?? 'Unsaved Drawing');
+            rocqRecorder.recordProveSuccess(drawing, layerId, result.match ?? null, ui.activeDrawingName ?? 'Unsaved Drawing');
         }
 
     } catch (err) {
@@ -1187,10 +1163,10 @@ export function syncProvedStatus(): void {
             const result = drawing.checkLayerProvable(child.id);
             proved = result.provable;
             if (proved) {
-                rocqRecorder.recordProveSuccess(drawing, child.id, result.match ?? null, get(activeDrawingName) ?? 'Unsaved Drawing');
+                rocqRecorder.recordProveSuccess(drawing, child.id, result.match ?? null, ui.activeDrawingName ?? 'Unsaved Drawing');
             }
         }
-        const name = get(activeDrawingName);
+        const name = ui.activeDrawingName;
         if (name) {
             drawingStore.setDrawingProved(name, proved);
         }
@@ -1199,28 +1175,20 @@ export function syncProvedStatus(): void {
     }
 }
 
-export const filterRedundantMatches = writable(false);
-
 export function toggleFilterRedundantMatches(): void {
-    filterRedundantMatches.update(v => !v);
+    ui.filterRedundantMatches = !ui.filterRedundantMatches;
 }
-
-export const filterNoProgressMatches = writable(false);
 
 export function toggleFilterNoProgressMatches(): void {
-    filterNoProgressMatches.update(v => !v);
+    ui.filterNoProgressMatches = !ui.filterNoProgressMatches;
 }
-
-export const filterStrictMatches = writable(false);
 
 export function toggleFilterStrictMatches(): void {
-    filterStrictMatches.update(v => !v);
+    ui.filterStrictMatches = !ui.filterStrictMatches;
 }
 
-export const filterSolvesGoalMatches = writable(false);
-
 export function toggleFilterSolvesGoalMatches(): void {
-    filterSolvesGoalMatches.update(v => !v);
+    ui.filterSolvesGoalMatches = !ui.filterSolvesGoalMatches;
 }
 
 export function solvesGoalFilterApplicable(): boolean {
@@ -1254,28 +1222,28 @@ export function computeRuleApplications(): RuleAppEntry[] {
         let applications: RuleApplication[];
         try {
             applications = savedRule.isFirstOrder
-                ? findFirstOrderRuleApplications(ruleDrawing, drawing, get(filterStrictMatches))
-                : findSecondOrderRuleApplications(ruleDrawing, drawing, get(filterStrictMatches));
+                ? findFirstOrderRuleApplications(ruleDrawing, drawing, ui.filterStrictMatches)
+                : findSecondOrderRuleApplications(ruleDrawing, drawing, ui.filterStrictMatches);
         } catch {
             continue;
         }
 
         let hiddenRedundant = 0;
-        if (get(filterRedundantMatches) && applications.length > 1) {
+        if (ui.filterRedundantMatches && applications.length > 1) {
             const total = applications.length;
             applications = filterRedundantRuleApplications(ruleDrawing, drawing, applications);
             hiddenRedundant = total - applications.length;
         }
 
         let hiddenNoProgress = 0;
-        if (get(filterNoProgressMatches) && applications.length > 0) {
+        if (ui.filterNoProgressMatches && applications.length > 0) {
             const total = applications.length;
             applications = filterNoProgressRuleApplications(ruleDrawing, drawing, applications);
             hiddenNoProgress = total - applications.length;
         }
 
         let hiddenSolvesGoal = 0;
-        if (get(filterSolvesGoalMatches) && applications.length > 0) {
+        if (ui.filterSolvesGoalMatches && applications.length > 0) {
             const total = applications.length;
             applications = filterSolvesGoalRuleApplications(ruleDrawing, drawing, applications);
             hiddenSolvesGoal = total - applications.length;
@@ -1291,7 +1259,7 @@ export function applyRuleAt(savedRuleName: string, appIndex: number): void {
     if (!entry || !entry.applications[appIndex]) return;
     const { savedRule, ruleDrawing, applications } = entry;
     const app = applications[appIndex];
-    const activeName = get(activeDrawingName) ?? 'Unsaved Drawing';
+    const activeName = ui.activeDrawingName ?? 'Unsaved Drawing';
     let applicationResult: { artefacts: Artefact[]; created: Map<Artefact, Artefact>; derivedNames?: string[]; derived?: DerivedRule[] } | null = null;
     try {
         if (savedRule.isFirstOrder) {
@@ -1322,7 +1290,7 @@ export function applyRuleAt(savedRuleName: string, appIndex: number): void {
             rocqRecorder.recordRuleApply(ruleDrawing, savedRule.name, app, drawing, applicationResult, activeName, sortStore);
         }
         syncProvedStatus();
-        const currentActiveName = get(activeDrawingName);
+        const currentActiveName = ui.activeDrawingName;
         if (currentActiveName) {
             const existing = drawingStore.getDrawing(currentActiveName);
             drawingStore.saveDrawing(currentActiveName, drawing);

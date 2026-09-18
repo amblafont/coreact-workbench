@@ -2,15 +2,8 @@
     import type { Artefact } from '../index.svelte.ts';
     import { getAttributeType, getRelativePositionMeta } from '../index.svelte.ts';
     import DataAttributeFields from './DataAttributeFields.svelte';
-    import { drawing, sortStore, allLayers } from './store.svelte.ts';
+    import { drawing, sortStore, allLayers, ui } from './store.svelte.ts';
     import {
-        mergeMode,
-        mergeFirstArtefact,
-        mergeSecondArtefact,
-        mergePickingFor,
-        draftArtefact,
-        dependencyPickingFor,
-        inspectedArtefact,
         ruleTag
     } from './store.svelte.ts';
     import {
@@ -36,14 +29,14 @@
 
     // --- Merge view helpers ---
     let provablyEqualCandidates = $derived.by(() => {
-        const first = $mergeFirstArtefact;
+        const first = ui.mergeFirstArtefact;
         if (!first) return [];
         return drawing.getArtefacts().filter(art =>
             art !== first && drawing.areDependenciesEqual(first, art) && drawing.areProvablyEqual(first, art)
         );
     });
     let otherCandidates = $derived.by(() => {
-        const first = $mergeFirstArtefact;
+        const first = ui.mergeFirstArtefact;
         if (!first) return [];
         return drawing.getArtefacts().filter(art =>
             art !== first && drawing.areDependenciesEqual(first, art) && !drawing.areProvablyEqual(first, art)
@@ -51,11 +44,11 @@
     });
     let orderedCandidates = $derived([...provablyEqualCandidates, ...otherCandidates]);
     let mergePreviewLabel = $derived.by(() => {
-        const label1 = $mergeFirstArtefact && typeof $mergeFirstArtefact.data.label === 'string'
-            ? ($mergeFirstArtefact.data.label as string).trim()
+        const label1 = ui.mergeFirstArtefact && typeof ui.mergeFirstArtefact.data.label === 'string'
+            ? (ui.mergeFirstArtefact.data.label as string).trim()
             : '';
-        const label2 = $mergeSecondArtefact && typeof $mergeSecondArtefact.data.label === 'string'
-            ? ($mergeSecondArtefact.data.label as string).trim()
+        const label2 = ui.mergeSecondArtefact && typeof ui.mergeSecondArtefact.data.label === 'string'
+            ? (ui.mergeSecondArtefact.data.label as string).trim()
             : '';
         if (label1 && label2) return `${label1}, ${label2}`;
         if (label1) return label1;
@@ -64,33 +57,33 @@
     });
 
     let inspectModel = $derived.by(() => {
-        const a = $inspectedArtefact;
+        const a = ui.inspectedArtefact;
         return a ? { data: a.data, dependencies: a.dependencies, sortName: a.sortName } as Artefact : null;
     });
-    let inspectLabel = $derived($inspectedArtefact && typeof $inspectedArtefact.data.label === 'string' ? $inspectedArtefact.data.label : '');
-    let inspectLayerId = $derived($inspectedArtefact && typeof $inspectedArtefact.layerId === 'string' ? $inspectedArtefact.layerId : 'root');
+    let inspectLabel = $derived(ui.inspectedArtefact && typeof ui.inspectedArtefact.data.label === 'string' ? ui.inspectedArtefact.data.label : '');
+    let inspectLayerId = $derived(ui.inspectedArtefact && typeof ui.inspectedArtefact.layerId === 'string' ? ui.inspectedArtefact.layerId : 'root');
 
-    let secondSelectIndex = $derived($mergeSecondArtefact ? orderedCandidates.indexOf($mergeSecondArtefact) : -1);
+    let secondSelectIndex = $derived(ui.mergeSecondArtefact ? orderedCandidates.indexOf(ui.mergeSecondArtefact) : -1);
 
-    let canMerge = $derived(!!($mergeFirstArtefact && $mergeSecondArtefact
-        && $mergeFirstArtefact !== $mergeSecondArtefact
-        && drawing.areDependenciesEqual($mergeFirstArtefact, $mergeSecondArtefact)));
+    let canMerge = $derived(!!(ui.mergeFirstArtefact && ui.mergeSecondArtefact
+        && ui.mergeFirstArtefact !== ui.mergeSecondArtefact
+        && drawing.areDependenciesEqual(ui.mergeFirstArtefact, ui.mergeSecondArtefact)));
 
     function toggleMergeFirst(): void {
-        mergePickingFor.set($mergePickingFor === 'first' ? null : 'first');
+        ui.mergePickingFor = ui.mergePickingFor === 'first' ? null : 'first';
     }
 
     function toggleMergeSecond(): void {
-        mergePickingFor.set($mergePickingFor === 'second' ? null : 'second');
+        ui.mergePickingFor = ui.mergePickingFor === 'second' ? null : 'second';
     }
 
     function onMergeSecondSelect(e: Event): void {
         const val = (e.currentTarget as HTMLSelectElement).value;
         if (val !== '') {
-            mergeSecondArtefact.set(orderedCandidates[parseInt(val, 10)]);
-            mergePickingFor.set(null);
+            ui.mergeSecondArtefact = orderedCandidates[parseInt(val, 10)];
+            ui.mergePickingFor = null;
         } else {
-            mergeSecondArtefact.set(null);
+            ui.mergeSecondArtefact = null;
         }
     }
 
@@ -100,11 +93,11 @@
     }
 
     function toggleDraftPicking(): void {
-        dependencyPickingFor.set($dependencyPickingFor === 'Equality' ? null : 'Equality');
+        ui.dependencyPickingFor = ui.dependencyPickingFor === 'Equality' ? null : 'Equality';
     }
 
     function toggleDepPicking(depKey: string): void {
-        dependencyPickingFor.set($dependencyPickingFor === depKey ? null : depKey);
+        ui.dependencyPickingFor = ui.dependencyPickingFor === depKey ? null : depKey;
     }
 
     function updatePosition(
@@ -136,7 +129,7 @@
 </script>
 
 <!-- ================= Merge Mode View ================= -->
-{#if $mergeMode}
+{#if ui.mergeMode}
     <h3 style="margin-top: 0;">Merge Artefacts</h3>
     <p style="color: #666; font-size: 0.82rem; margin-top: 4px; margin-bottom: 12px;">
         Select two artefacts of the same sort with identical dependencies to merge them.
@@ -148,12 +141,12 @@
             <button
                 id="merge-first-btn"
                 type="button"
-                class="pick-dep-btn {$mergePickingFor === 'first' ? 'active' : ''}"
+                class="pick-dep-btn {ui.mergePickingFor === 'first' ? 'active' : ''}"
                 onclick={toggleMergeFirst}
             >
-                {#if $mergeFirstArtefact}
-                    1st: {$mergeFirstArtefact.data.label || '(unnamed)'} ({$mergeFirstArtefact.sortName})
-                {:else if $mergePickingFor === 'first'}
+                {#if ui.mergeFirstArtefact}
+                    1st: {ui.mergeFirstArtefact.data.label || '(unnamed)'} ({ui.mergeFirstArtefact.sortName})
+                {:else if ui.mergePickingFor === 'first'}
                     Click artefact in tree...
                 {:else}
                     Pick 1st Artefact
@@ -163,7 +156,7 @@
 
         <div class="form-group">
             <label for="merge-second-select">2nd Artefact (datafields kept)</label>
-            {#if $mergeFirstArtefact}
+            {#if ui.mergeFirstArtefact}
                 {#if orderedCandidates.length === 0}
                     <div style="font-size: 0.8rem; color: #e74c3c; font-style: italic; margin-top: 4px;">
                         No other artefacts with matching dependencies found.
@@ -192,13 +185,13 @@
                 {/if}
                 <button
                     type="button"
-                    class="pick-dep-btn {$mergePickingFor === 'second' ? 'active' : ''}"
+                    class="pick-dep-btn {ui.mergePickingFor === 'second' ? 'active' : ''}"
                     style="margin-top: 6px;"
                     onclick={toggleMergeSecond}
                 >
-                    {#if $mergeSecondArtefact}
-                        2nd: {$mergeSecondArtefact.data.label || '(unnamed)'} ({$mergeSecondArtefact.sortName})
-                    {:else if $mergePickingFor === 'second'}
+                    {#if ui.mergeSecondArtefact}
+                        2nd: {ui.mergeSecondArtefact.data.label || '(unnamed)'} ({ui.mergeSecondArtefact.sortName})
+                    {:else if ui.mergePickingFor === 'second'}
                         Click candidate in tree...
                     {:else}
                         Or Pick in Tree/Canvas
@@ -211,10 +204,10 @@
             {/if}
         </div>
 
-        {#if $mergeFirstArtefact && $mergeSecondArtefact}
+        {#if ui.mergeFirstArtefact && ui.mergeSecondArtefact}
             <div class="merge-preview-box">
                 <strong style="color: #8e44ad;">Merge Result Preview:</strong><br/>
-                • Datafields kept from: <strong>{$mergeSecondArtefact.data.label || $mergeSecondArtefact.sortName}</strong><br/>
+                • Datafields kept from: <strong>{ui.mergeSecondArtefact.data.label || ui.mergeSecondArtefact.sortName}</strong><br/>
                 • New Label: <strong>{mergePreviewLabel || '(none)'}</strong>
             </div>
         {/if}
@@ -226,8 +219,8 @@
     </div>
 
 <!-- ================= Draft (Creation) View ================= -->
-{:else if $draftArtefact}
-    {@const draft = $draftArtefact}
+{:else if ui.draftArtefact}
+    {@const draft = ui.draftArtefact}
     {@const draftSortDef = sortStore.getSort(draft.sortName)}
     {#if draftSortDef}
         {@const allDeps = Object.entries(draftSortDef.dependencies)}
@@ -265,10 +258,10 @@
                 {/each}
                 <button
                     type="button"
-                    class="pick-dep-btn {$dependencyPickingFor === 'Equality' ? 'active' : ''}"
+                    class="pick-dep-btn {ui.dependencyPickingFor === 'Equality' ? 'active' : ''}"
                     onclick={toggleDraftPicking}
                 >
-                    {$dependencyPickingFor === 'Equality' ? 'Click artefact in tree...' : '+ Pick Artefact'}
+                    {ui.dependencyPickingFor === 'Equality' ? 'Click artefact in tree...' : '+ Pick Artefact'}
                 </button>
             {:else if allDeps.length > 0}
                 <h4 style="margin: 10px 0 5px 0; font-size: 0.95rem; color: #444;">Dependencies</h4>
@@ -279,12 +272,12 @@
                         <button
                             id="draft-dep-{depKey}"
                             type="button"
-                            class="pick-dep-btn {$dependencyPickingFor === depKey ? 'active' : ''}"
+                            class="pick-dep-btn {ui.dependencyPickingFor === depKey ? 'active' : ''}"
                             onclick={() => toggleDepPicking(depKey)}
                         >
                             {#if picked}
                                 ✓ {picked.data.label || '(unnamed)'}
-                            {:else if $dependencyPickingFor === depKey}
+                            {:else if ui.dependencyPickingFor === depKey}
                                 Select in tree...
                             {:else}
                                 Pick {depKey}
@@ -316,7 +309,7 @@
                 attributes={draftSortDef.attributes}
                 onValueChange={(attrName, value) => setDraftDataField(attrName, value)}
                 onSetPosition={(attrName, axis, newVal) => {
-                    const currentDraft = $draftArtefact;
+                    const currentDraft = ui.draftArtefact;
                     if (!currentDraft) return;
                     updatePosition(currentDraft, attrName, newVal, axis, (v) => setDraftDataField(attrName, v));
                 }}
@@ -338,8 +331,8 @@
     {/if}
 
 <!-- ================= Normal Inspection View ================= -->
-{:else if $inspectedArtefact}
-    {@const art = $inspectedArtefact}
+{:else if ui.inspectedArtefact}
+    {@const art = ui.inspectedArtefact}
     {@const artSortDef = sortStore.getSort(art.sortName)}
     {#if artSortDef}
         <h3 style="margin-top: 0;">

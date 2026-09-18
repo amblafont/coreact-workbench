@@ -1,6 +1,6 @@
 <script lang="ts">
     import type { Artefact, SortDefinition } from '../index.svelte.ts';
-    import { sortStore, drawing, allArtefacts, dependencyPickingFor, draftArtefact } from './store.svelte.ts';
+    import { sortStore, drawing, allArtefacts, ui } from './store.svelte.ts';
     import { startDraftForSort } from './store.svelte.ts';
     import ArtefactNode from './ArtefactNode.svelte';
 
@@ -12,8 +12,8 @@
     }, {} as Record<string, Artefact[]>));
     let focusedId: string | null = $derived(drawing.getFocusedLayerId());
     let expectedSortFilter: string | null = $derived(
-        $dependencyPickingFor && $draftArtefact && $draftArtefact.sortName !== 'Equality'
-            ? sortStore.getSort($draftArtefact.sortName)?.dependencies[$dependencyPickingFor] ?? null
+        ui.dependencyPickingFor && ui.draftArtefact && ui.draftArtefact.sortName !== 'Equality'
+            ? sortStore.getSort(ui.draftArtefact.sortName)?.dependencies[ui.dependencyPickingFor] ?? null
             : null
     );
 </script>

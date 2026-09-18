@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { get } from 'svelte/store';
-import { drawing, drawingStore, activeDrawingName, sortStore, rocqRecorder, syncProvedStatus, exportSelection, getSelectedDrawingNames, deleteSelectedDrawings, renameDrawingName, toasts, pushToast, dismissToast, applyRuleAt,
-    inspectedArtefact, positionPicker, draftArtefact,
+import { SvelteSet } from 'svelte/reactivity';
+import { drawing, drawingStore, ui, sortStore, rocqRecorder, syncProvedStatus, getSelectedDrawingNames, deleteSelectedDrawings, renameDrawingName, pushToast, dismissToast, applyRuleAt,
     resetInteractionState, togglePositionPicker, isPositionPickerActive, isDraftPickerActive,
     applyPickedPosition, startPositionPicker, selectArtefactToInspect, removeArtefactNode
 } from './store.svelte.ts';
@@ -14,18 +13,18 @@ describe('export selection bookkeeping', () => {
         drawingStore.clear();
         drawingStore.saveDrawing('Initial Drawing', drawing);
         drawingStore.saveDrawing('Rule Drawing Demo', drawing);
-        exportSelection.set(new Set(['Initial Drawing', 'Rule Drawing Demo']));
+        ui.exportSelection = new SvelteSet(['Initial Drawing', 'Rule Drawing Demo']);
         vi.stubGlobal('confirm', () => true);
     });
 
     afterEach(() => {
         vi.unstubAllGlobals();
-        exportSelection.set(new Set());
+        ui.exportSelection = new SvelteSet();
     });
 
     it('removes deleted drawing names from the export selection', () => {
         deleteSelectedDrawings(['Initial Drawing']);
-        expect(get(exportSelection)).toEqual(new Set(['Rule Drawing Demo']));
+        expect(ui.exportSelection).toEqual(new Set(['Rule Drawing Demo']));
         const names = getSelectedDrawingNames();
         expect(names).toEqual(['Rule Drawing Demo']);
         expect(() => drawingStore.exportDrawingsJSON(names)).not.toThrow();
@@ -33,12 +32,12 @@ describe('export selection bookkeeping', () => {
 
     it('migrates the export selection across a rename', () => {
         renameDrawingName('Initial Drawing', 'Renamed Drawing');
-        expect(get(exportSelection)).toEqual(new Set(['Renamed Drawing', 'Rule Drawing Demo']));
+        expect(ui.exportSelection).toEqual(new Set(['Renamed Drawing', 'Rule Drawing Demo']));
         expect(getSelectedDrawingNames()).toEqual(expect.arrayContaining(['Renamed Drawing', 'Rule Drawing Demo']));
     });
 
     it('filters stale names out of the export selection', () => {
-        exportSelection.set(new Set(['Initial Drawing', 'Ghost Drawing']));
+        ui.exportSelection = new SvelteSet(['Initial Drawing', 'Ghost Drawing']);
         expect(getSelectedDrawingNames()).toEqual(['Initial Drawing']);
     });
 });
@@ -50,32 +49,32 @@ describe('toasts', () => {
 
     afterEach(() => {
         vi.useRealTimers();
-        toasts.set([]);
+        ui.toasts = [];
     });
 
     it('pushes a toast with unique ids', () => {
         pushToast('error', 'boom');
-        expect(get(toasts)).toHaveLength(1);
-        expect(get(toasts)[0].kind).toBe('error');
-        expect(get(toasts)[0].message).toBe('boom');
+        expect(ui.toasts).toHaveLength(1);
+        expect(ui.toasts[0].kind).toBe('error');
+        expect(ui.toasts[0].message).toBe('boom');
         pushToast('error', 'again');
-        expect(get(toasts)).toHaveLength(2);
-        expect(get(toasts)[0].id).not.toBe(get(toasts)[1].id);
+        expect(ui.toasts).toHaveLength(2);
+        expect(ui.toasts[0].id).not.toBe(ui.toasts[1].id);
     });
 
     it('dismisses a toast by id', () => {
         pushToast('info', 'hi');
-        const id = get(toasts)[0].id;
+        const id = ui.toasts[0].id;
         dismissToast(id);
-        expect(get(toasts)).toEqual([]);
+        expect(ui.toasts).toEqual([]);
     });
 
     it('auto-dismisses after the kind-specific delay', () => {
         pushToast('info', 'hi');
         vi.advanceTimersByTime(3999);
-        expect(get(toasts)).toHaveLength(1);
+        expect(ui.toasts).toHaveLength(1);
         vi.advanceTimersByTime(1);
-        expect(get(toasts)).toEqual([]);
+        expect(ui.toasts).toEqual([]);
     });
 });
 
@@ -84,13 +83,13 @@ describe('first-order statement proved status', () => {
         registerDefaultSorts(sortStore);
         drawing.clear(true);
         drawingStore.clear();
-        activeDrawingName.set(null);
+        ui.activeDrawingName = null;
         vi.stubGlobal('confirm', () => true);
     });
 
     afterEach(() => {
         vi.unstubAllGlobals();
-        activeDrawingName.set(null);
+        ui.activeDrawingName = null;
     });
 
     function buildStatement(provable: boolean): void {
@@ -106,7 +105,7 @@ describe('first-order statement proved status', () => {
     it('marks a provable first-order statement as proved', () => {
         buildStatement(true);
         drawingStore.saveDrawing('Statement', drawing);
-        activeDrawingName.set('Statement');
+        ui.activeDrawingName = 'Statement';
         syncProvedStatus();
         expect(drawingStore.getDrawing('Statement')?.proved).toBe(true);
     });
@@ -115,7 +114,7 @@ describe('first-order statement proved status', () => {
         buildStatement(false);
         drawingStore.saveDrawing('Statement', drawing);
         drawingStore.setDrawingProved('Statement', true);
-        activeDrawingName.set('Statement');
+        ui.activeDrawingName = 'Statement';
         syncProvedStatus();
         expect(drawingStore.getDrawing('Statement')?.proved).toBe(false);
     });
@@ -129,7 +128,7 @@ describe('first-order statement proved status', () => {
     it('records an exact proof to the rocq recorder when proved', () => {
         buildStatement(true);
         drawingStore.saveDrawing('Statement', drawing);
-        activeDrawingName.set('Statement');
+        ui.activeDrawingName = 'Statement';
         rocqRecorder.start(drawing, 'Statement', sortStore);
         syncProvedStatus();
         const script = rocqRecorder.stop();
@@ -142,11 +141,11 @@ describe('auto-saving drawing after rule application', () => {
         registerDefaultSorts(sortStore);
         drawing.clear(true);
         drawingStore.clear();
-        activeDrawingName.set(null);
+        ui.activeDrawingName = null;
     });
 
     afterEach(() => {
-        activeDrawingName.set(null);
+        ui.activeDrawingName = null;
     });
 
     it('automatically saves the active drawing when a rule is applied', () => {
@@ -160,7 +159,7 @@ describe('auto-saving drawing after rule application', () => {
         drawing.newArtefact('Edge', { source: v1, target: v2 }, { width: 2, bend: 0, label: 'e2' }, 'root');
 
         drawingStore.saveDrawing('HostDrawing', drawing);
-        activeDrawingName.set('HostDrawing');
+        ui.activeDrawingName = 'HostDrawing';
         expect(drawingStore.getDrawing('HostDrawing')?.artefacts.length).toBe(5);
 
         applyRuleAt('CompRule', 0);
@@ -183,7 +182,7 @@ describe('auto-saving drawing after rule application', () => {
 
         drawingStore.saveDrawing('ChildDrawing', drawing);
         drawingStore.setDrawingParent('ChildDrawing', 'ParentDrawing');
-        activeDrawingName.set('ChildDrawing');
+        ui.activeDrawingName = 'ChildDrawing';
 
         expect(drawingStore.getDrawing('ChildDrawing')?.parentName).toBe('ParentDrawing');
 
@@ -204,7 +203,7 @@ describe('auto-saving drawing after rule application', () => {
         drawing.newArtefact('Edge', { source: v0, target: v1 }, { width: 2, bend: 0, label: 'e1' }, 'root');
         drawing.newArtefact('Edge', { source: v1, target: v2 }, { width: 2, bend: 0, label: 'e2' }, 'root');
 
-        activeDrawingName.set(null);
+        ui.activeDrawingName = null;
 
         expect(() => applyRuleAt('CompRule', 0)).not.toThrow();
         expect(drawing.getArtefacts().length).toBe(6);
@@ -221,7 +220,7 @@ describe('position picker', () => {
         if (!sortStore.getSort('Rel')) sortStore.newSort('Rel', { anchor: 'Anchor' }, { position: { type: 'relativePosition', target: 'anchor.position' } }, noop);
         drawing.clear(true);
         drawingStore.clear();
-        activeDrawingName.set(null);
+        ui.activeDrawingName = null;
         resetInteractionState();
         vi.stubGlobal('confirm', () => true);
     });
@@ -239,19 +238,19 @@ describe('position picker', () => {
         drawing.removeArtefact(a);
         expect(drawing.getArtefactById(a.id)).toBeUndefined();
         expect(() => applyPickedPosition(5, 5)).not.toThrow();
-        expect(get(positionPicker)).toBeNull();
+        expect(ui.positionPicker).toBeNull();
         expect(a.data.position).toEqual([0, 0]);
     });
 
     it('writes a draft relativePosition offset relative to its dependency', () => {
         const anchor = drawing.newArtefact('Anchor', {}, { position: [100, 100] }, 'root');
-        draftArtefact.set({ sortName: 'Rel', dependencies: { anchor }, data: { position: [0, 0] }, layerId: 'root' });
+        ui.draftArtefact = { sortName: 'Rel', dependencies: { anchor }, data: { position: [0, 0] }, layerId: 'root' };
         startPositionPicker({ kind: 'draft', attrName: 'position' });
 
         applyPickedPosition(110, 120);
 
-        expect(get(draftArtefact)!.data.position).toEqual([10, 20]);
-        expect(get(positionPicker)).toBeNull();
+        expect(ui.draftArtefact!.data.position).toEqual([10, 20]);
+        expect(ui.positionPicker).toBeNull();
     });
 
     it('writes an absolute position onto a real artefact and clears the picker', () => {
@@ -262,12 +261,12 @@ describe('position picker', () => {
         applyPickedPosition(400, 500);
 
         expect(a.data.position).toEqual([400, 500]);
-        expect(get(positionPicker)).toBeNull();
+        expect(ui.positionPicker).toBeNull();
     });
 
     it('does not treat a draft picker as active on a real artefact sharing its data object', () => {
         const a = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'a' }, 'root');
-        draftArtefact.set({ sortName: 'Vertex', dependencies: {}, data: a.data, layerId: 'root' });
+        ui.draftArtefact = { sortName: 'Vertex', dependencies: {}, data: a.data, layerId: 'root' };
         startPositionPicker({ kind: 'draft', attrName: 'position' });
 
         expect(isDraftPickerActive('position')).toBe(true);
@@ -279,24 +278,24 @@ describe('position picker', () => {
         const e = drawing.newArtefact('Edge', { source: v, target: v }, { width: 2, bend: 0, label: 'e' }, 'root');
         selectArtefactToInspect(e);
         togglePositionPicker(e, 'bend');
-        expect(get(inspectedArtefact)).toBe(e);
+        expect(ui.inspectedArtefact).toBe(e);
 
         removeArtefactNode(v);
 
         expect(drawing.getArtefactById(e.id)).toBeUndefined();
-        expect(get(inspectedArtefact)).toBeNull();
-        expect(get(positionPicker)).toBeNull();
+        expect(ui.inspectedArtefact).toBeNull();
+        expect(ui.positionPicker).toBeNull();
     });
 
     it('clears inspection and the picker when the picked artefact is removed directly', () => {
         const a = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'a' }, 'root');
         selectArtefactToInspect(a);
         togglePositionPicker(a, 'position');
-        expect(get(inspectedArtefact)).toBe(a);
+        expect(ui.inspectedArtefact).toBe(a);
 
         removeArtefactNode(a);
 
-        expect(get(inspectedArtefact)).toBeNull();
-        expect(get(positionPicker)).toBeNull();
+        expect(ui.inspectedArtefact).toBeNull();
+        expect(ui.positionPicker).toBeNull();
     });
 });

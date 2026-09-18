@@ -1,11 +1,9 @@
 <script lang="ts">
     import DrawingNode from './DrawingNode.svelte';
     import {
-        activeDrawingName,
         allDrawings,
-        exportSelection,
+        ui,
         isCurrentDrawingRule,
-        rocqRecordingActive,
         pendingProofCount,
         ruleTag
     } from './store.svelte.ts';
@@ -66,7 +64,7 @@
             <input
                 type="checkbox"
                 title="Select all drawings for export"
-                checked={$exportSelection.size === allDrawings().length && allDrawings().length > 0}
+                checked={ui.exportSelection.size === allDrawings().length && allDrawings().length > 0}
                 onchange={(e) => setExportSelectionAll((e.currentTarget as HTMLInputElement).checked)}
             />
             <button class="layer-btn new-btn" title="Start a new blank drawing" onclick={newDrawing}>New</button>
@@ -78,7 +76,7 @@
                 title="Start or stop Rocq recording for the active drawing"
                 onclick={toggleRocqRecording}
             >
-                {$rocqRecordingActive ? (pendingProofCount() > 0 ? `Stop recording (${pendingProofCount()} pending)` : 'Stop recording') : 'Rocq recording'}
+                {ui.rocqRecordingActive ? (pendingProofCount() > 0 ? `Stop recording (${pendingProofCount()} pending)` : 'Stop recording') : 'Rocq recording'}
             </button>
             <button class="layer-btn save-btn" title="Save current drawing" onclick={saveActiveDrawing}>Save</button>
             <button class="layer-btn dup-btn" title="Duplicate the current drawing under a new name" onclick={duplicateCurrentDrawing}>Dup.</button>
@@ -99,7 +97,7 @@
 
     <div class="current-drawing-banner">
         <span style="color: #555;">
-            Editing: <strong style="color: #2c3e50;">{$activeDrawingName ?? 'Unsaved Drawing'}</strong>
+            Editing: <strong style="color: #2c3e50;">{ui.activeDrawingName ?? 'Unsaved Drawing'}</strong>
         </span>
         <label
             class="rule-checkbox-label"
