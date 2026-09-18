@@ -180,7 +180,7 @@ export class Artefact {
     public svgElement: D3Context | null = null; // Store the rendered SVG element
     public readonly id: string;
     public sortName = $state<string>('');
-    public dependencies = $state<Record<string, Artefact>>({});
+    public dependencies = $state.raw<Record<string, Artefact>>({});
     public data = $state<Record<string, any>>({});
     protected drawFunction: (data: any, context: D3Context) => D3Context | null;
     public layerId = $state<string>('root');
@@ -259,7 +259,7 @@ export class Artefact {
 }
 
 export class EqualityArtefact extends Artefact {
-    public children = $state<Artefact[]>([]);
+    public children = $state.raw<Artefact[]>([]);
 
     constructor(
         id: string,
@@ -726,47 +726,7 @@ export class Drawing {
 
     public areEqual(a: Artefact, b: Artefact, layerId: string): boolean {
         if (a === b) return true;
-
-        const allowedAncestors = this.getAncestors(layerId);
-        
-        const adj = new Map<Artefact, Set<Artefact>>();
-        for (const art of this.artefacts) {
-            if (art.sortName === "Equality" && allowedAncestors.has(art.layerId)) {
-                const children = artefactChildren(art);
-                for (let i = 0; i < children.length; i++) {
-                    for (let j = i + 1; j < children.length; j++) {
-                        const c1 = children[i];
-                        const c2 = children[j];
-                        if (!adj.has(c1)) adj.set(c1, new Set());
-                        if (!adj.has(c2)) adj.set(c2, new Set());
-                        adj.get(c1)!.add(c2);
-                        adj.get(c2)!.add(c1);
-                    }
-                }
-            }
-        }
-
-        if (!adj.has(a)) return false;
-
-        const visited = new Set<Artefact>();
-        const queue: Artefact[] = [a];
-        visited.add(a);
-
-        while (queue.length > 0) {
-            const current = queue.shift()!;
-            if (current === b) return true;
-            const neighbors = adj.get(current);
-            if (neighbors) {
-                for (const neighbor of neighbors) {
-                    if (!visited.has(neighbor)) {
-                        visited.add(neighbor);
-                        queue.push(neighbor);
-                    }
-                }
-            }
-        }
-
-        return false;
+        return isEqualityConnected(buildEqualityAdjacency(this, layerId), a, b);
     }
 
     public validateEqualityDependencies(artefacts: Artefact[], layerId: string): void {
@@ -1816,6 +1776,19 @@ function findRuleApplicationsInternal(
     const assignment = new Map<Artefact, Artefact>();
     const used = new Set<Artefact>();
 
+    // Equality-adjacency graphs are host-invariant during a single match run, so
+    // build each once per layer and reuse it instead of rebuilding on every check.
+    const areEqualMemo = new Map<string, Map<Artefact, Set<Artefact>>>();
+    const hostAreEqual = (a: Artefact, b: Artefact, layerId: string): boolean => {
+        if (a === b) return true;
+        let adj = areEqualMemo.get(layerId);
+        if (!adj) {
+            adj = buildEqualityAdjacency(host, layerId);
+            areEqualMemo.set(layerId, adj);
+        }
+        return isEqualityConnected(adj, a, b);
+    };
+
     const checkEqualityConstraints = (): boolean => {
         for (const c of applicableConstraints) {
             const imgs: Artefact[] = [];
@@ -1825,7 +1798,7 @@ function findRuleApplicationsInternal(
                 imgs.push(img);
             }
             for (let i = 1; i < imgs.length; i++) {
-                if (!host.areEqual(imgs[0], imgs[i], imgs[0].layerId)) {
+                if (!hostAreEqual(imgs[0], imgs[i], imgs[0].layerId)) {
                     return false;
                 }
             }
@@ -1851,8 +1824,40 @@ function findRuleApplicationsInternal(
         }
 
         const a = ordered[i];
+        // Candidates that are equality-connected for this slot produce duplicate
+        // applications, and the final dedupe collapses them by equality anyway, so
+        // in non-strict mode explore a single representative per equality class.
+        const triedCandidates: Artefact[] = [];
         for (const cand of hostCandidates) {
             if (cand.sortName !== a.sortName || used.has(cand)) continue;
+
+            if (!strictMatching) {
+                let skip = false;
+                for (const tried of triedCandidates) {
+                    if (!hostAreEqual(tried, cand, cand.layerId)) continue;
+                    // Guard against unvalidated equality artefacts: only treat two
+                    // candidates as interchangeable when their dependency graphs
+                    // agree up to equality as well.
+                    const triedDeps = tried.dependencies;
+                    const candDeps = cand.dependencies;
+                    const triedKeys = Object.keys(triedDeps);
+                    if (triedKeys.length === Object.keys(candDeps).length) {
+                        let depsEqual = true;
+                        for (const k of triedKeys) {
+                            const tv = triedDeps[k];
+                            const cv = candDeps[k];
+                            if (tv === undefined || cv === undefined || !hostAreEqual(tv, cv, cand.layerId)) {
+                                depsEqual = false;
+                                break;
+                            }
+                        }
+                        if (depsEqual) skip = true;
+                    }
+                    if (skip) break;
+                }
+                if (skip) continue;
+                triedCandidates.push(cand);
+            }
 
             let ok = true;
             for (const [k, dep] of Object.entries(a.dependencies)) {
@@ -1867,7 +1872,7 @@ function findRuleApplicationsInternal(
                         ok = false;
                         break;
                     }
-                    if (strictMatching ? hostDep !== img : hostDep !== img && !host.areEqual(hostDep, img, cand.layerId)) {
+                    if (strictMatching ? hostDep !== img : hostDep !== img && !hostAreEqual(hostDep, img, cand.layerId)) {
                         ok = false;
                         break;
                     }
@@ -1887,7 +1892,7 @@ function findRuleApplicationsInternal(
 
     const uniqueResults: RuleApplication[] = [];
     for (const r of results) {
-        if (!uniqueResults.some(u => applicationsEquivalent(host, patternSet, r, u, strictMatching))) {
+        if (!uniqueResults.some(u => applicationsEquivalent(hostAreEqual, patternSet, r, u, strictMatching))) {
             uniqueResults.push(r);
         }
     }
@@ -1895,7 +1900,7 @@ function findRuleApplicationsInternal(
 }
 
 function applicationsEquivalent(
-    host: Drawing,
+    areEqual: (a: Artefact, b: Artefact, layerId: string) => boolean,
     patternSet: Set<Artefact>,
     a: RuleApplication,
     b: RuleApplication,
@@ -1905,7 +1910,7 @@ function applicationsEquivalent(
         const img1 = a.matchedArtefacts.get(p);
         const img2 = b.matchedArtefacts.get(p);
         if (!img1 || !img2) return false;
-        if (strictMatching ? img1 !== img2 : img1 !== img2 && !host.areEqual(img1, img2, img1.layerId)) return false;
+        if (strictMatching ? img1 !== img2 : img1 !== img2 && !areEqual(img1, img2, img1.layerId)) return false;
     }
     return true;
 }
@@ -2419,6 +2424,54 @@ function artefactChildren(art: Artefact): Artefact[] {
     return art instanceof EqualityArtefact
         ? art.children
         : Object.values(art.dependencies);
+}
+
+// Build the undirected equality-connexity graph over a drawing's artefacts,
+// restricted to equality artefacts living in ancestor layers of `layerId`.
+function buildEqualityAdjacency(host: Drawing, layerId: string): Map<Artefact, Set<Artefact>> {
+    const allowedAncestors = host.getAncestors(layerId);
+    const adj = new Map<Artefact, Set<Artefact>>();
+    for (const art of host.getArtefacts()) {
+        if (art.sortName === "Equality" && allowedAncestors.has(art.layerId)) {
+            const children = artefactChildren(art);
+            for (let i = 0; i < children.length; i++) {
+                for (let j = i + 1; j < children.length; j++) {
+                    const c1 = children[i];
+                    const c2 = children[j];
+                    if (!adj.has(c1)) adj.set(c1, new Set());
+                    if (!adj.has(c2)) adj.set(c2, new Set());
+                    adj.get(c1)!.add(c2);
+                    adj.get(c2)!.add(c1);
+                }
+            }
+        }
+    }
+    return adj;
+}
+
+function isEqualityConnected(adj: Map<Artefact, Set<Artefact>>, a: Artefact, b: Artefact): boolean {
+    if (a === b) return true;
+    if (!adj.has(a)) return false;
+
+    const visited = new Set<Artefact>();
+    const queue: Artefact[] = [a];
+    visited.add(a);
+
+    while (queue.length > 0) {
+        const current = queue.shift()!;
+        if (current === b) return true;
+        const neighbors = adj.get(current);
+        if (neighbors) {
+            for (const neighbor of neighbors) {
+                if (!visited.has(neighbor)) {
+                    visited.add(neighbor);
+                    queue.push(neighbor);
+                }
+            }
+        }
+    }
+
+    return false;
 }
 
 function topologicallyOrderPattern(pattern: Artefact[]): Artefact[] | null {

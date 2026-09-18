@@ -1,3 +1,4 @@
+import { untrack } from 'svelte';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import * as d3 from 'd3';
 import {
@@ -1208,7 +1209,20 @@ export interface RuleAppEntry {
     hiddenSolvesGoal: number;
 }
 
-export function computeRuleApplications(): RuleAppEntry[] {
+export function computeRuleMatches(): RuleAppEntry[] {
+    // Tracked structural guard: the matcher below runs under `untrack`, so this
+    // derived still invalidates when the host drawing changes. We deliberately
+    // read each artefact's reactive fields (membership, sort, layer, dependency
+    // record) and the layer set so that any structural edit re-runs the search.
+    const hostGuard = drawing.getArtefacts().map(a => {
+        void a.sortName;
+        void a.layerId;
+        void a.dependencies;
+        return a;
+    });
+    void hostGuard;
+    void drawing.getAllLayers();
+
     const entries: RuleAppEntry[] = [];
     for (const savedRule of drawingStore.getAllDrawings()) {
         if (!savedRule.isRule) continue;
@@ -1220,38 +1234,52 @@ export function computeRuleApplications(): RuleAppEntry[] {
             continue;
         }
         let applications: RuleApplication[];
+        const strict = ui.filterStrictMatches;
         try {
-            applications = savedRule.isFirstOrder
-                ? findFirstOrderRuleApplications(ruleDrawing, drawing, ui.filterStrictMatches)
-                : findSecondOrderRuleApplications(ruleDrawing, drawing, ui.filterStrictMatches);
+            applications = untrack(() => savedRule.isFirstOrder
+                ? findFirstOrderRuleApplications(ruleDrawing, drawing, strict)
+                : findSecondOrderRuleApplications(ruleDrawing, drawing, strict));
         } catch {
             continue;
         }
 
+        entries.push({ savedRule, ruleDrawing, applications, hiddenRedundant: 0, hiddenNoProgress: 0, hiddenSolvesGoal: 0 });
+    }
+    return entries;
+}
+
+export function applyRuleFilters(entries: RuleAppEntry[]): RuleAppEntry[] {
+    return entries.map(entry => {
+        const { savedRule, ruleDrawing } = entry;
+        let applications = entry.applications;
+
         let hiddenRedundant = 0;
         if (ui.filterRedundantMatches && applications.length > 1) {
             const total = applications.length;
-            applications = filterRedundantRuleApplications(ruleDrawing, drawing, applications);
+            applications = untrack(() => filterRedundantRuleApplications(ruleDrawing, drawing, applications));
             hiddenRedundant = total - applications.length;
         }
 
         let hiddenNoProgress = 0;
         if (ui.filterNoProgressMatches && applications.length > 0) {
             const total = applications.length;
-            applications = filterNoProgressRuleApplications(ruleDrawing, drawing, applications);
+            applications = untrack(() => filterNoProgressRuleApplications(ruleDrawing, drawing, applications));
             hiddenNoProgress = total - applications.length;
         }
 
         let hiddenSolvesGoal = 0;
         if (ui.filterSolvesGoalMatches && applications.length > 0) {
             const total = applications.length;
-            applications = filterSolvesGoalRuleApplications(ruleDrawing, drawing, applications);
+            applications = untrack(() => filterSolvesGoalRuleApplications(ruleDrawing, drawing, applications));
             hiddenSolvesGoal = total - applications.length;
         }
 
-        entries.push({ savedRule, ruleDrawing, applications, hiddenRedundant, hiddenNoProgress, hiddenSolvesGoal });
-    }
-    return entries;
+        return { savedRule, ruleDrawing, applications, hiddenRedundant, hiddenNoProgress, hiddenSolvesGoal };
+    });
+}
+
+export function computeRuleApplications(): RuleAppEntry[] {
+    return applyRuleFilters(computeRuleMatches());
 }
 
 export function applyRuleAt(savedRuleName: string, appIndex: number): void {
