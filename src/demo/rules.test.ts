@@ -11,7 +11,7 @@ import {
     filterSolvesGoalRuleApplications,
     EqualityArtefact,
     type Drawing
-} from '../index';
+} from '../index.svelte.ts';
 import {
     makeDrawing,
     makeVertex,

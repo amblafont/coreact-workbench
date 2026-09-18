@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { Layer } from '../index';
+    import type { Layer } from '../index.svelte.ts';
     import { allLayers } from './store';
     import { addRootLayer } from './store';
     import LayerNode from './LayerNode.svelte';

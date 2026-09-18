@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { EqualityArtefact } from '../index';
+import { EqualityArtefact } from '../index.svelte.ts';
 import { makeDrawing, makeVertex, makeEdge } from './helpers';
 
 describe('consistency checks', () => {

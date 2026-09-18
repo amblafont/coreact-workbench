@@ -13,11 +13,11 @@ import {
     type Artefact,
     type RuleApplication,
     type SortStore
-} from '../index';
+} from '../index.svelte.ts';
 import { exportDrawingsToRocq } from '../rocq_export';
 import { RocqRecorder } from '../rocq_recording';
 import { newSortStore, makeVertex, makeEdge, buildIsMonoOnlyConclusionRule } from './helpers';
-import { getFirstOrderStatementChildLayer } from '../index';
+import { getFirstOrderStatementChildLayer } from '../index.svelte.ts';
 
 const rocqAvailable = ((): boolean => {
     try {

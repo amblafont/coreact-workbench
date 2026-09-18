@@ -1,5 +1,5 @@
-import { Artefact, Drawing, DrawingStore, SortStore } from "./index";
-import type { DerivedRule } from "./index";
+import { Artefact, Drawing, DrawingStore, SortStore } from "./index.svelte.ts";
+import type { DerivedRule } from "./index.svelte.ts";
 import { drawingExportNames, ruleTypeInfo, newExportRegistry, renderExactTerm, renderForallChain, renderSigma, sanitizeIdent } from "./rocq_export";
 import type { LayerElement, RuleTypeInfo } from "./rocq_export";
 

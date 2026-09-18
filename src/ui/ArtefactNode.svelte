@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { Artefact, Layer } from '../index';
+    import type { Artefact, Layer } from '../index.svelte.ts';
     import { drawing } from './store';
     import {
         mergeMode,

@@ -1,4 +1,4 @@
-import { Drawing, DrawingStore, SortStore } from '../index';
+import { Drawing, DrawingStore, SortStore } from '../index.svelte.ts';
 import { registerDefaultSorts } from './buildDemo';
 
 export function newSortStore(): SortStore {

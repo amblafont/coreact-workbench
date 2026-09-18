@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { Layer } from '../index';
+    import type { Layer } from '../index.svelte.ts';
     import { drawing, allLayers, layerProvability, focusedLayerId } from './store';
     import {
         toggleLayerVisibility,

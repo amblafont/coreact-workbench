@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { Artefact } from '../index';
+    import type { Artefact } from '../index.svelte.ts';
     import { get } from 'svelte/store';
     import { computeRuleApplications, applyRuleAt, mergeMode, ruleHoverArtefacts, version, filterRedundantMatches, toggleFilterRedundantMatches, filterNoProgressMatches, toggleFilterNoProgressMatches, filterStrictMatches, toggleFilterStrictMatches, filterSolvesGoalMatches, toggleFilterSolvesGoalMatches, solvesGoalFilterApplicable } from './store';
 

@@ -1,6 +1,6 @@
 <script lang="ts">
-    import type { Artefact } from '../index';
-    import { getAttributeType, getRelativePositionMeta } from '../index';
+    import type { Artefact } from '../index.svelte.ts';
+    import { getAttributeType, getRelativePositionMeta } from '../index.svelte.ts';
     import DataAttributeFields from './DataAttributeFields.svelte';
     import { drawing, sortStore, allLayers } from './store';
     import {

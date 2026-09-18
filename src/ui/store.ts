@@ -22,7 +22,7 @@ import {
     getAttributeType,
     getSliderMeta,
     getRelativePositionMeta
-} from '../index';
+} from '../index.svelte.ts';
 import { RocqRecorder } from '../rocq_recording';
 import { exportDrawingsToRocq, drawingExportNames } from '../rocq_export';
 

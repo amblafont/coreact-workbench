@@ -4,7 +4,7 @@ import {
     DrawingStore,
     SortStore,
     type Artefact
-} from '../index';
+} from '../index.svelte.ts';
 import defaultSortsCode from '../generated/default_sorts.js?raw';
 
 export interface DemoContext {

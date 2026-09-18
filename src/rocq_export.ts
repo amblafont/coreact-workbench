@@ -1,4 +1,4 @@
-import type { ArtefactData, LayerData, SavedDrawing, SortDefinition, SortStore } from "./index";
+import type { ArtefactData, LayerData, SavedDrawing, SortDefinition, SortStore } from "./index.svelte.ts";
 
 const ROCQ_KEYWORDS: ReadonlySet<string> = new Set([
     "Match", "End", "match", "end", "let", "in", "fun", "forall", "exists",

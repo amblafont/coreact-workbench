@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Drawing, SortStore } from '../index';
+import { Drawing, SortStore } from '../index.svelte.ts';
 import type { D3Context } from '../types';
 
 function sortStoreWithRelativeChain(): SortStore {

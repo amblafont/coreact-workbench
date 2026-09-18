@@ -5,7 +5,7 @@ import {
     computeProved,
     type Drawing,
     type Layer
-} from '../index';
+} from '../index.svelte.ts';
 import { makeDrawing, makeVertex, makeEdge, makeStore } from './helpers';
 
 function childIdOf(child: Layer | null): string | null {

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { SavedDrawing } from '../index';
+    import type { SavedDrawing } from '../index.svelte.ts';
     import {
         activeDrawingName,
         allDrawings,

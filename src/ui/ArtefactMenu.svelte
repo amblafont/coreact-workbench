@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { Artefact, SortDefinition } from '../index';
+    import type { Artefact, SortDefinition } from '../index.svelte.ts';
     import { sortStore, drawing, allArtefacts, dependencyPickingFor, draftArtefact } from './store';
     import { startDraftForSort } from './store';
     import ArtefactNode from './ArtefactNode.svelte';

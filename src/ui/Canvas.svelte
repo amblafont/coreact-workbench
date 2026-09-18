@@ -2,7 +2,7 @@
     import { onMount } from 'svelte';
     import { get } from 'svelte/store';
     import * as d3 from 'd3';
-    import { Artefact } from '../index';
+    import { Artefact } from '../index.svelte.ts';
     import type { D3Context } from '../types';
     import {
         drawing,

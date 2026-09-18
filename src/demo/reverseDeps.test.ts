@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { Artefact, Drawing } from '../index';
+import type { Artefact, Drawing } from '../index.svelte.ts';
 import { makeDrawing, makeVertex, makeEdge } from './helpers';
 
 function resolvedWithReverseInfo(drawing: Drawing, artefact: Artefact): Record<string, any> {

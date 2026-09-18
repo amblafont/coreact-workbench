@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { exportDrawingsToRocq, ruleParamBaseName } from '../rocq_export';
 import { RocqRecorder } from '../rocq_recording';
-import { Drawing, DrawingStore, findFirstOrderRuleApplications, applyFirstOrderRule, findSecondOrderRuleApplications, applySecondOrderRule, getFirstOrderStatementChildLayer } from '../index';
+import { Drawing, DrawingStore, findFirstOrderRuleApplications, applyFirstOrderRule, findSecondOrderRuleApplications, applySecondOrderRule, getFirstOrderStatementChildLayer } from '../index.svelte.ts';
 import { newSortStore, makeVertex, makeEdge, makeDrawing, buildComposableHost, buildIsMonoInChildLayerRule, buildIsMonoOnlyConclusionRule, buildSecondOrderRule } from './helpers';
 
 describe('rocq export', () => {
