@@ -1,6 +1,6 @@
 <script lang="ts">
     import type { Layer } from '../index.svelte.ts';
-    import { drawing, allLayers, layerProvability, focusedLayerId } from './store';
+    import { drawing, allLayers, layerProvability, focusedLayerId } from './store.svelte.ts';
     import {
         toggleLayerVisibility,
         toggleLayerFocus,
@@ -10,7 +10,7 @@
         renameLayer,
         deleteLayer,
         checkLayerProvable
-    } from './store';
+    } from './store.svelte.ts';
     import LayerNode from './LayerNode.svelte';
 
     let { layer }: { layer: Layer } = $props();

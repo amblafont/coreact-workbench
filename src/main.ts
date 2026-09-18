@@ -1,6 +1,6 @@
 import { mount } from 'svelte';
 import './demo';
-import { activeDrawingName, drawing, drawingStore } from './ui/store';
+import { activeDrawingName, drawing, drawingStore } from './ui/store.svelte.ts';
 import App from './ui/App.svelte';
 import './ui/app.css';
 

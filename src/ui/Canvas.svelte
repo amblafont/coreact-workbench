@@ -17,7 +17,7 @@
         inspectedArtefact,
         menuHoverArtefact,
         ruleHoverArtefacts
-    } from './store';
+    } from './store.svelte.ts';
 
     let svgElement!: SVGSVGElement;
     let svgContext: d3.Selection<SVGSVGElement, unknown, null, undefined> | null = null;

@@ -1,5 +1,5 @@
 import { buildDemo } from './demo/buildDemo';
-import { sortStore, drawing, drawingStore } from './ui/store';
+import { sortStore, drawing, drawingStore } from './ui/store.svelte.ts';
 const globalScope = globalThis as unknown as { sortStore: typeof sortStore };
 globalScope.sortStore = sortStore;
 

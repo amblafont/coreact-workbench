@@ -7,7 +7,7 @@
     import Inspector from './Inspector.svelte';
     import RuleApplications from './RuleApplications.svelte';
     import Toasts from './Toasts.svelte';
-    import { loadSortScript, clearAll, mergeMode, startMergeMode, cancelMergeMode, inspectedArtefact } from './store';
+    import { loadSortScript, clearAll, mergeMode, startMergeMode, cancelMergeMode, inspectedArtefact } from './store.svelte.ts';
 
     let scriptUpload: HTMLInputElement;
 

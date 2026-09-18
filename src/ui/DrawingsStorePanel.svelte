@@ -8,8 +8,8 @@
         rocqRecordingActive,
         pendingProofCount,
         ruleTag
-    } from './store';
-    import type { RuleTag } from './store';
+    } from './store.svelte.ts';
+    import type { RuleTag } from './store.svelte.ts';
     import {
         saveActiveDrawing,
         duplicateCurrentDrawing,
@@ -23,7 +23,7 @@
         setExportSelectionAll,
         getSelectedDrawingNames,
         pushToast
-    } from './store';
+    } from './store.svelte.ts';
 
     let importInput: HTMLInputElement;
 

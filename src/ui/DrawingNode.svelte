@@ -5,7 +5,7 @@
         allDrawings,
         exportSelection,
         recordedStatementByDrawing
-    } from './store';
+    } from './store.svelte.ts';
     import {
         loadDrawingByName,
         renameDrawingName,
@@ -13,7 +13,7 @@
         deleteSelectedDrawings,
         generateReverseRulesFor,
         toggleExportSelection
-    } from './store';
+    } from './store.svelte.ts';
     import DrawingNode from './DrawingNode.svelte';
 
     let { drawing, isChild = false }: { drawing: SavedDrawing; isChild?: boolean } = $props();

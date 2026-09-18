@@ -2,7 +2,7 @@
     import type { Artefact } from '../index.svelte.ts';
     import { getAttributeType, getRelativePositionMeta } from '../index.svelte.ts';
     import DataAttributeFields from './DataAttributeFields.svelte';
-    import { drawing, sortStore, allLayers } from './store';
+    import { drawing, sortStore, allLayers } from './store.svelte.ts';
     import {
         mergeMode,
         mergeFirstArtefact,
@@ -12,7 +12,7 @@
         dependencyPickingFor,
         inspectedArtefact,
         ruleTag
-    } from './store';
+    } from './store.svelte.ts';
     import {
         cancelMergeMode,
         performMerge,
@@ -32,7 +32,7 @@
         isDraftPickerActive,
         equalityChildren,
         pushToast
-    } from './store';
+    } from './store.svelte.ts';
 
     // --- Merge view helpers ---
     let provablyEqualCandidates = $derived.by(() => {

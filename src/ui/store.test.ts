@@ -4,7 +4,7 @@ import { drawing, drawingStore, activeDrawingName, sortStore, rocqRecorder, sync
     inspectedArtefact, positionPicker, draftArtefact,
     resetInteractionState, togglePositionPicker, isPositionPickerActive, isDraftPickerActive,
     applyPickedPosition, startPositionPicker, selectArtefactToInspect, removeArtefactNode
-} from './store';
+} from './store.svelte.ts';
 import { registerDefaultSorts } from '../demo/buildDemo';
 import { buildComposableEdgesRule } from '../demo/helpers';
 

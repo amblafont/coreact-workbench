@@ -1,7 +1,7 @@
 <script lang="ts">
     import type { Artefact } from '../index.svelte.ts';
     import { get } from 'svelte/store';
-    import { computeRuleApplications, applyRuleAt, mergeMode, ruleHoverArtefacts, filterRedundantMatches, toggleFilterRedundantMatches, filterNoProgressMatches, toggleFilterNoProgressMatches, filterStrictMatches, toggleFilterStrictMatches, filterSolvesGoalMatches, toggleFilterSolvesGoalMatches, solvesGoalFilterApplicable } from './store';
+    import { computeRuleApplications, applyRuleAt, mergeMode, ruleHoverArtefacts, filterRedundantMatches, toggleFilterRedundantMatches, filterNoProgressMatches, toggleFilterNoProgressMatches, filterStrictMatches, toggleFilterStrictMatches, filterSolvesGoalMatches, toggleFilterSolvesGoalMatches, solvesGoalFilterApplicable } from './store.svelte.ts';
 
     let entries = $derived(computeRuleApplications());
 

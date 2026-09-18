@@ -1,6 +1,6 @@
 <script lang="ts">
     import type { Artefact } from '../index.svelte.ts';
-    import { drawing } from './store';
+    import { drawing } from './store.svelte.ts';
     import {
         mergeMode,
         mergeFirstArtefact,
@@ -9,7 +9,7 @@
         inspectedArtefact,
         menuHoverArtefact,
         dependencyPickingFor
-    } from './store';
+    } from './store.svelte.ts';
     import {
         getArtefactLabel,
         equalityChildren,
@@ -22,7 +22,7 @@
         moveArtefactDown,
         canMoveArtefactUp,
         canMoveArtefactDown
-    } from './store';
+    } from './store.svelte.ts';
     import ArtefactNode from './ArtefactNode.svelte';
 
     let {

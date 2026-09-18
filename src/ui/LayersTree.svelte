@@ -1,7 +1,7 @@
 <script lang="ts">
     import type { Layer } from '../index.svelte.ts';
-    import { allLayers } from './store';
-    import { addRootLayer } from './store';
+    import { allLayers } from './store.svelte.ts';
+    import { addRootLayer } from './store.svelte.ts';
     import LayerNode from './LayerNode.svelte';
 
     let rootLayers: Layer[] = $derived(allLayers().filter(l => l.parentId === null));

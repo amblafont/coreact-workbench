@@ -1,7 +1,7 @@
 <script lang="ts">
     import type { Artefact, SortDefinition } from '../index.svelte.ts';
-    import { sortStore, drawing, allArtefacts, dependencyPickingFor, draftArtefact } from './store';
-    import { startDraftForSort } from './store';
+    import { sortStore, drawing, allArtefacts, dependencyPickingFor, draftArtefact } from './store.svelte.ts';
+    import { startDraftForSort } from './store.svelte.ts';
     import ArtefactNode from './ArtefactNode.svelte';
 
     let sortDefs: SortDefinition[] = $derived(sortStore.getAllSorts());
