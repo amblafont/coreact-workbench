@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
+    import { onMount, untrack } from 'svelte';
     import { get } from 'svelte/store';
     import * as d3 from 'd3';
     import { Artefact } from '../index.svelte.ts';
@@ -7,7 +7,6 @@
     import {
         drawing,
         sortStore,
-        version,
         draftArtefact,
         positionPicker,
         applyPickedPosition,
@@ -22,6 +21,7 @@
 
     let svgElement!: SVGSVGElement;
     let svgContext: d3.Selection<SVGSVGElement, unknown, null, undefined> | null = null;
+    let svgReady = $state(false);
 
     let mergeOn = false;
     let focusedId: string | null = null;
@@ -29,22 +29,35 @@
     let inspected: Artefact | null = null;
     let menuHover: Artefact | null = null;
     let ruleHover: Set<Artefact> | null = null;
- 
-    $: {
-        mergeOn = $mergeMode;
-        focusedId = $focusedLayerId;
-        mergeHover = $mergeHoverArtefact;
-        inspected = $inspectedArtefact;
-        menuHover = $menuHoverArtefact;
-        ruleHover = $ruleHoverArtefacts;
-        if (svgContext) {
+
+    $effect(() => {
+        if (!svgReady) return;
+        const activeMerge = $mergeMode;
+        const activeFocus = $focusedLayerId;
+        const activeMergeHover = $mergeHoverArtefact;
+        const activeInspected = $inspectedArtefact;
+        const activeMenuHover = $menuHoverArtefact;
+        const activeRuleHover = $ruleHoverArtefacts;
+        untrack(() => {
+            mergeOn = activeMerge;
+            focusedId = activeFocus;
+            mergeHover = activeMergeHover;
+            inspected = activeInspected;
+            menuHover = activeMenuHover;
+            ruleHover = activeRuleHover;
             if (mergeOn || ruleHover || menuHover || inspected || focusedId) {
                 applyOverlays();
             } else {
                 redraw();
             }
-        }
-    }
+        });
+    });
+
+    $effect(() => {
+        if (!svgReady) return;
+        redraw();
+        applyOverlaysFromStores();
+    });
 
 
     function canvasOpacity(art: Artefact): number | null {
@@ -83,12 +96,12 @@
     }
 
     function applyOverlaysFromStores(): void {
-        const a = get(inspectedArtefact);
-        const mh = get(menuHoverArtefact);
-        const mge = get(mergeHoverArtefact);
-        const rh = get(ruleHoverArtefacts);
-        const fi = get(focusedLayerId);
-        const mo = get(mergeMode);
+        const a = untrack(() => get(inspectedArtefact));
+        const mh = untrack(() => get(menuHoverArtefact));
+        const mge = untrack(() => get(mergeHoverArtefact));
+        const rh = untrack(() => get(ruleHoverArtefacts));
+        const fi = untrack(() => get(focusedLayerId));
+        const mo = untrack(() => get(mergeMode));
         const prev = { mergeOn, focusedId, mergeHover, inspected, menuHover, ruleHover };
         mergeOn = mo; focusedId = fi; mergeHover = mge; inspected = a; menuHover = mh; ruleHover = rh;
         try { applyOverlays(); } finally { Object.assign({ mergeOn, focusedId, mergeHover, inspected, menuHover, ruleHover }, prev); }
@@ -151,13 +164,7 @@
     onMount(() => {
         svgContext = d3.select(svgElement);
         svgContext.on('click', onSvgClick);
-        const unsub = version.subscribe(() => {
-            redraw();
-            applyOverlaysFromStores();
-        });
-        return () => {
-            unsub();
-        };
+        svgReady = true;
     });
 </script>
 
