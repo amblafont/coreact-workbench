@@ -35,14 +35,28 @@ export interface SortDefinition {
 }
 
 export class Layer {
+    public id: string;
+    public name: string;
+    public parentId: string | null;
+    public color: string;
+    public colorEnabled: boolean;
+    public visible: boolean;
+
     constructor(
-        public id: string,
-        public name: string,
-        public parentId: string | null = null,
-        public color: string = "#3498db",
-        public colorEnabled: boolean = false,
-        public visible: boolean = true
-    ) {}
+        id: string,
+        name: string,
+        parentId: string | null = null,
+        color: string = "#3498db",
+        colorEnabled: boolean = false,
+        visible: boolean = true
+    ) {
+        this.id = id;
+        this.name = name;
+        this.parentId = parentId;
+        this.color = color;
+        this.colorEnabled = colorEnabled;
+        this.visible = visible;
+    }
 }
 
 export class SortStore {
@@ -163,15 +177,28 @@ export interface ReverseDependencyInfo {
 
 export class Artefact {
     public svgElement: D3Context | null = null; // Store the rendered SVG element
+    public readonly id: string;
+    public sortName: string;
+    public dependencies: Record<string, Artefact>;
+    public data: Record<string, any>;
+    protected drawFunction: (data: any, context: D3Context) => D3Context | null;
+    public layerId: string;
 
     constructor(
-        public readonly id: string,
-        public sortName: string,
-        public dependencies: Record<string, Artefact>,
-        public data: Record<string, any>,
-        protected drawFunction: (data: any, context: D3Context) => D3Context | null,
-        public layerId: string = "root"
-    ) {}
+        id: string,
+        sortName: string,
+        dependencies: Record<string, Artefact>,
+        data: Record<string, any>,
+        drawFunction: (data: any, context: D3Context) => D3Context | null,
+        layerId: string = "root"
+    ) {
+        this.id = id;
+        this.sortName = sortName;
+        this.dependencies = dependencies;
+        this.data = data;
+        this.drawFunction = drawFunction;
+        this.layerId = layerId;
+    }
 
     getResolvedData(
         isLayerVisible?: (layerId: string) => boolean,
@@ -330,13 +357,15 @@ export function checkRuleStructure(layers: Array<{ id: string; name: string; par
 }
 
 export class Drawing {
+    public sortStore: SortStore;
     private artefacts: Artefact[] = [];
     private layers: Map<string, Layer> = new Map();
     private focusedLayerId: string | null = null;
     private ruleFlag: boolean = false;
     private nextArtefactId: number = 1;
 
-    constructor(public sortStore: SortStore) {
+    constructor(sortStore: SortStore) {
+        this.sortStore = sortStore;
         this.addLayer("root", "Root Layer", null, "#3498db", false);
     }
 
