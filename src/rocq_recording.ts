@@ -282,7 +282,7 @@ export class RocqRecorder {
             }
             const hostId = artefactToDataId(hostDrawing, hostCopy);
             const hostFieldName = el.kind === "equation"
-                ? hostNames.equalityFieldNames.get(hostId) ?? hostNames.fieldNames.get(hostId)
+                ? hostNames.equalityFieldNames.get(hostId)?.[el.eqIndex ?? 0] ?? hostNames.fieldNames.get(hostId)
                 : hostNames.fieldNames.get(hostId);
             if (!hostFieldName) {
                 throw new Error(`Consistency Check Failed: No field name assigned for created host artefact '${el.name}' in rule '${savedRuleName}'.`);
@@ -340,7 +340,7 @@ export class RocqRecorder {
                         if (derivedArt) {
                             const derivedArtId = artefactToDataId(derivedDrawing.drawing, derivedArt);
                             const derivedFieldName = el.kind === "equation"
-                                ? derivedExport.equalityFieldNames.get(derivedArtId) ?? derivedExport.fieldNames.get(derivedArtId)
+                                ? derivedExport.equalityFieldNames.get(derivedArtId)?.[el.eqIndex ?? 0] ?? derivedExport.fieldNames.get(derivedArtId)
                                 : derivedExport.fieldNames.get(derivedArtId);
                             if (derivedFieldName) {
                                 effectiveNameMap.set(el.name, derivedFieldName);
@@ -515,16 +515,8 @@ export class RocqRecorder {
                     }
                     return hostFieldName;
                 }
-                case "equation": {
-                    const artData = el.artefactId ? info.model.artefactById.get(el.artefactId) : undefined;
-                    const childCount = artData ? Object.values(artData.dependencies).filter(v => typeof v === "string").length : 2;
-                    const eqCount = Math.max(1, childCount - 1);
-                    let w = "eq_refl";
-                    for (let i = 1; i < eqCount; i++) {
-                        w = `conj eq_refl (${w})`;
-                    }
-                    return w;
-                }
+                case "equation":
+                    return "eq_refl";
             }
         };
 

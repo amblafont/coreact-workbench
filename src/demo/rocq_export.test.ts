@@ -446,6 +446,57 @@ describe('rocq export', () => {
         expect(code).toContain('Edge x y');
     });
 
+    it('exports a rule with a three-artefact root equality as separate equality binders', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+
+        const rule = new Drawing(sortStore);
+        const rx = makeVertex(rule, 'r3');
+        const ry = makeVertex(rule, 'r4');
+        const rz = makeVertex(rule, 'r2');
+        rule.newEqualityArtefact([rx, ry, rz], 'root');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        makeEdge(rule, 'f', rx, rz, 'conclusion');
+        rule.setIsRule(true);
+        store.saveDrawing('TriEqRoot', rule);
+
+        const code = exportDrawingsToRocq(store.getAllDrawings(), sortStore);
+        expect(code).toContain('Parameter TriEqRoot_rule : forall (r3 r4 r2 : Vertex)(eq_r3_r4_r2 : r3 = r4)(eq_r3_r4_r2_2 : r4 = r2),');
+        expect(code).not.toContain('r3 = r4 /\\');
+    });
+
+    it('records a rule application with a three-artefact root equality using two eq_refl witnesses', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+
+        const host = new Drawing(sortStore);
+        const ha = makeVertex(host, 'a');
+        const hb = makeVertex(host, 'b');
+        const hc = makeVertex(host, 'c');
+        host.newEqualityArtefact([ha, hb, hc], 'root');
+        store.saveDrawing('MainDrawing', host);
+
+        const rule = new Drawing(sortStore);
+        const rx = makeVertex(rule, 'x');
+        const ry = makeVertex(rule, 'y');
+        const rz = makeVertex(rule, 'z');
+        rule.newEqualityArtefact([rx, ry, rz], 'root');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        makeEdge(rule, 'f', rx, rz, 'conclusion');
+        rule.setIsRule(true);
+        store.saveDrawing('TriEqRoot', rule);
+
+        const recorder = new RocqRecorder();
+        recorder.start(host, 'MainDrawing', sortStore);
+        const apps = findFirstOrderRuleApplications(rule, host);
+        expect(apps.length).toBe(1);
+        const created = applyFirstOrderRule(rule, host, apps[0]);
+        recorder.recordRuleApply(rule, 'TriEqRoot', apps[0], host, created, 'MainDrawing', sortStore);
+        const script = recorder.stop();
+
+        expect(script).toContain('destruct_sigma (@TriEqRoot_rule a b c eq_refl eq_refl) as');
+    });
+
     it('records an exact proof of a provable child layer, naming the matched parent', () => {
         const sortStore = newSortStore();
         const store = new DrawingStore();

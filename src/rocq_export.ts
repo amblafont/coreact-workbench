@@ -321,21 +321,25 @@ function equalityFieldName(model: DrawingModel, art: ArtefactData): string {
     return childLabels.length > 0 ? `eq_${childLabels.join("_")}` : "eq_x";
 }
 
-function equalityFieldType(model: DrawingModel, art: ArtefactData): string {
+function equalityConjunctCount(art: ArtefactData): number {
+    const childIds = stringDepEntries(art.dependencies);
+    if (childIds.length < 2) {
+        throw new Error("Consistency Check Failed: A degenerate equality artefact (fewer than 2 children) cannot be exported.");
+    }
+    return childIds.length - 1;
+}
+
+function equalityConjunctType(model: DrawingModel, art: ArtefactData, index: number): string {
     const childIds = stringDepEntries(art.dependencies).map(([, value]) => value);
     if (childIds.length < 2) {
         throw new Error("Consistency Check Failed: A degenerate equality artefact (fewer than 2 children) cannot be exported.");
     }
     const refs = childIds.map(id => refFrom(model, art.layerId, id));
-    const pairs: string[] = [];
-    for (let i = 0; i + 1 < refs.length; i++) {
-        pairs.push(`${refs[i]} = ${refs[i + 1]}`);
-    }
-    return pairs.join(" /\\ ");
+    return `${refs[index]} = ${refs[index + 1]}`;
 }
 
 export interface ProofFieldNames {
-    equalityFieldNames: Map<string, string>;
+    equalityFieldNames: Map<string, string[]>;
 }
 
 export function computeProofFieldNames(
@@ -343,14 +347,19 @@ export function computeProofFieldNames(
     model: DrawingModel,
     registry: NameRegistry
 ): ProofFieldNames {
-    const equalityFieldNames = new Map<string, string>();
+    const equalityFieldNames = new Map<string, string[]>();
     for (const layer of model.layerOrder) {
         const layerArtefacts = savedDrawing.artefacts.filter(art => art.layerId === layer.id);
         for (const art of layerArtefacts) {
             if (art.sortName !== "Equality") {
                 continue;
             }
-            equalityFieldNames.set(art.id, registry.unique(equalityFieldName(model, art)));
+            const base = equalityFieldName(model, art);
+            const names: string[] = [];
+            for (let i = 0; i < equalityConjunctCount(art); i++) {
+                names.push(registry.unique(base));
+            }
+            equalityFieldNames.set(art.id, names);
         }
     }
 
@@ -364,6 +373,7 @@ export function computeProofFieldNames(
 export interface LayerElement extends FieldItem {
     kind: "artefact" | "equation";
     artefactId?: string;
+    eqIndex?: number;
 }
 
 export function buildLayerElements(
@@ -378,16 +388,18 @@ export function buildLayerElements(
 
     for (const art of layerArtefacts) {
         if (art.sortName === "Equality") {
-            const name = proofNames.equalityFieldNames.get(art.id);
-            if (!name) {
-                throw new Error(`Consistency Check Failed: No field name computed for equality artefact '${labelOf(art)}'.`);
+            const names = proofNames.equalityFieldNames.get(art.id);
+            if (!names || names.length === 0) {
+                throw new Error(`Consistency Check Failed: No field names computed for equality artefact '${labelOf(art)}'.`);
             }
             const childIds = stringDepEntries(art.dependencies).map(([, value]) => value);
             const depFieldNames = childIds
                 .filter(id => model.artefactById.get(id)?.layerId === layerId)
                 .map(id => model.fieldNames.get(id))
                 .filter((name): name is string => !!name);
-            items.push({ name, type: equalityFieldType(model, art), deps: depFieldNames, kind: "equation", artefactId: art.id });
+            names.forEach((name, index) => {
+                items.push({ name, type: equalityConjunctType(model, art, index), deps: depFieldNames, kind: "equation", artefactId: art.id, eqIndex: index });
+            });
         } else {
             const fieldName = model.fieldNames.get(art.id);
             if (!fieldName) {
@@ -677,7 +689,7 @@ export interface DrawingExportNames {
     ruleParam: string | null;
     recordNames: Map<string, string>;
     fieldNames: Map<string, string>;
-    equalityFieldNames: Map<string, string>;
+    equalityFieldNames: Map<string, string[]>;
     model: DrawingModel;
 }
 

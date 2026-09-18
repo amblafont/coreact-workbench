@@ -94,6 +94,27 @@ function buildMultiEqConclusion(sortStore: SortStore): BuiltScenario {
     return { host, rule, ruleName: 'FooEq', secondOrder: false, apps };
 }
 
+function buildTriEqRoot(sortStore: SortStore): BuiltScenario {
+    const host = new Drawing(sortStore);
+    const ha = makeVertex(host, 'a');
+    const hb = makeVertex(host, 'b');
+    const hc = makeVertex(host, 'c');
+    host.newEqualityArtefact([ha, hb, hc], 'root');
+    const rule = new Drawing(sortStore);
+    const rx = makeVertex(rule, 'x');
+    const ry = makeVertex(rule, 'y');
+    const rz = makeVertex(rule, 'z');
+    rule.newEqualityArtefact([rx, ry, rz], 'root');
+    rule.addLayer('conclusion', 'Conclusion', 'root');
+    makeEdge(rule, 'f', rx, rz, 'conclusion');
+    rule.setIsRule(true);
+    const apps = findFirstOrderRuleApplications(rule, host);
+    if (apps.length === 0) {
+        throw new Error('TriEqRoot produced no applications');
+    }
+    return { host, rule, ruleName: 'TriEqRoot', secondOrder: false, apps };
+}
+
 function buildSecondOrder(sortStore: SortStore): BuiltScenario {
     const host = new Drawing(sortStore);
     makeVertex(host, 'a');
@@ -169,6 +190,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
     it.each([
         { name: 'single_eq_conclusion', build: buildSingleEqConclusion },
         { name: 'multi_eq_conclusion', build: buildMultiEqConclusion },
+        { name: 'tri_eq_root', build: buildTriEqRoot },
         { name: 'second_order', build: buildSecondOrder },
         { name: 'isMono_only_conclusion', build: buildIsMonoOnlyConclusion }
     ])('compiles $name', ({ name, build }) => {
