@@ -15,40 +15,27 @@
     let svgContext: d3.Selection<SVGSVGElement, unknown, null, undefined> | null = null;
     let svgReady = $state(false);
 
-    let mergeOn = false;
-    let focusedId: string | null = null;
-    let mergeHover: Artefact | null = null;
-    let inspected: Artefact | null = null;
-    let menuHover: Artefact | null = null;
-    let ruleHover: Set<Artefact> | null = null;
+    const mergeOn = $derived(ui.mergeMode);
+    const focusedId = $derived(ui.focusedLayerId);
+    const mergeHover = $derived(ui.mergeHoverArtefact);
+    const inspected = $derived(ui.inspectedArtefact);
+    const menuHover = $derived(ui.menuHoverArtefact);
+    const ruleHover = $derived(ui.ruleHoverArtefacts);
 
     $effect(() => {
         if (!svgReady) return;
-        const activeMerge = ui.mergeMode;
-        const activeFocus = ui.focusedLayerId;
-        const activeMergeHover = ui.mergeHoverArtefact;
-        const activeInspected = ui.inspectedArtefact;
-        const activeMenuHover = ui.menuHoverArtefact;
-        const activeRuleHover = ui.ruleHoverArtefacts;
-        untrack(() => {
-            mergeOn = activeMerge;
-            focusedId = activeFocus;
-            mergeHover = activeMergeHover;
-            inspected = activeInspected;
-            menuHover = activeMenuHover;
-            ruleHover = activeRuleHover;
-            if (mergeOn || ruleHover || menuHover || inspected || focusedId) {
-                applyOverlays();
-            } else {
-                redraw();
-            }
-        });
+        if (mergeOn || ruleHover || menuHover || inspected || focusedId) {
+            applyOverlays();
+        } else {
+            redraw();
+        }
     });
 
     $effect(() => {
         if (!svgReady) return;
+        void ui.activeDrawingName;
         redraw();
-        applyOverlaysFromStores();
+        untrack(applyOverlays);
     });
 
 
@@ -85,18 +72,6 @@
                 art.svgElement.attr('opacity', opacity);
             }
         }
-    }
-
-    function applyOverlaysFromStores(): void {
-        const a = untrack(() => ui.inspectedArtefact);
-        const mh = untrack(() => ui.menuHoverArtefact);
-        const mge = untrack(() => ui.mergeHoverArtefact);
-        const rh = untrack(() => ui.ruleHoverArtefacts);
-        const fi = untrack(() => ui.focusedLayerId);
-        const mo = untrack(() => ui.mergeMode);
-        const prev = { mergeOn, focusedId, mergeHover, inspected, menuHover, ruleHover };
-        mergeOn = mo; focusedId = fi; mergeHover = mge; inspected = a; menuHover = mh; ruleHover = rh;
-        try { applyOverlays(); } finally { Object.assign({ mergeOn, focusedId, mergeHover, inspected, menuHover, ruleHover }, prev); }
     }
 
     function drawDraftPreview(): void {

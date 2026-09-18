@@ -1,0 +1,74 @@
+import { describe, it, expect } from 'vitest';
+import { flushSync } from 'svelte';
+import {
+    ui,
+    drawing,
+    drawingStore,
+    sortStore,
+    computeRuleApplications,
+    toggleFilterStrictMatches,
+    toggleFilterRedundantMatches,
+    toggleFilterNoProgressMatches,
+    toggleFilterSolvesGoalMatches
+} from './store.svelte.ts';
+import { registerDefaultSorts } from '../demo/buildDemo';
+import { buildComposableEdgesRule, buildComposableHost } from '../demo/helpers';
+
+describe('rule filter reactivity (ui.* state)', () => {
+    it('recompute the entries $derived when a filter toggles', () => {
+        registerDefaultSorts(sortStore);
+        drawingStore.clear();
+        drawing.clear(true);
+        const { rule } = buildComposableEdgesRule();
+        drawingStore.saveDrawing('Rule', rule);
+        const { host } = buildComposableHost();
+        drawingStore.saveDrawing('Host', host);
+        ui.activeDrawingName = 'Host';
+        drawingStore.loadDrawing('Host', drawing);
+
+        let entries = $derived(computeRuleApplications());
+        const read = () => entries;
+
+        const baseline = read();
+        expect(baseline.length).toBeGreaterThan(0);
+
+        toggleFilterStrictMatches();
+        expect(read()).not.toBe(baseline);
+
+        const afterStrict = read();
+        toggleFilterRedundantMatches();
+        expect(read()).not.toBe(afterStrict);
+
+        const afterRedundant = read();
+        toggleFilterNoProgressMatches();
+        expect(read()).not.toBe(afterRedundant);
+
+        const afterNoProgress = read();
+        toggleFilterSolvesGoalMatches();
+        expect(read()).not.toBe(afterNoProgress);
+    });
+});
+
+describe('draft preview reactivity (ui.draftArtefact)', () => {
+    it('is tracked by an effect the way the canvas redraw reads it', () => {
+        ui.draftArtefact = null;
+        let seen: string | null = null;
+        const readSeen = () => seen;
+        const cleanup = $effect.root(() => {
+            $effect(() => {
+                seen = ui.draftArtefact?.sortName ?? null;
+            });
+        });
+        flushSync();
+        expect(readSeen()).toBeNull();
+
+        ui.draftArtefact = { sortName: 'Vertex', dependencies: {}, data: {}, layerId: 'root' };
+        flushSync();
+        expect(readSeen()).toBe('Vertex');
+
+        ui.draftArtefact = null;
+        flushSync();
+        expect(readSeen()).toBeNull();
+        cleanup();
+    });
+});
