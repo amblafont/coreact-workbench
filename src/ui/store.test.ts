@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { get } from 'svelte/store';
-import { drawing, drawingStore, activeDrawingName, sortStore, rocqRecorder, syncProvedStatus, exportSelection, getSelectedDrawingNames, deleteSelectedDrawings, renameDrawingName, toasts, pushToast, dismissToast } from './store';
+import { drawing, drawingStore, activeDrawingName, sortStore, rocqRecorder, syncProvedStatus, exportSelection, getSelectedDrawingNames, deleteSelectedDrawings, renameDrawingName, toasts, pushToast, dismissToast, applyRuleAt } from './store';
 import { registerDefaultSorts } from '../demo/buildDemo';
+import { buildComposableEdgesRule } from '../demo/helpers';
 
 describe('export selection bookkeeping', () => {
     beforeEach(() => {
@@ -129,5 +130,80 @@ describe('first-order statement proved status', () => {
         syncProvedStatus();
         const script = rocqRecorder.stop();
         expect(script).toContain('exact ');
+    });
+});
+
+describe('auto-saving drawing after rule application', () => {
+    beforeEach(() => {
+        registerDefaultSorts(sortStore);
+        drawing.clear(true);
+        drawingStore.clear();
+        activeDrawingName.set(null);
+    });
+
+    afterEach(() => {
+        activeDrawingName.set(null);
+    });
+
+    it('automatically saves the active drawing when a rule is applied', () => {
+        const { rule } = buildComposableEdgesRule();
+        drawingStore.saveDrawing('CompRule', rule);
+
+        const v0 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v0' }, 'root');
+        const v1 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v1' }, 'root');
+        const v2 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v2' }, 'root');
+        drawing.newArtefact('Edge', { source: v0, target: v1 }, { width: 2, bend: 0, label: 'e1' }, 'root');
+        drawing.newArtefact('Edge', { source: v1, target: v2 }, { width: 2, bend: 0, label: 'e2' }, 'root');
+
+        drawingStore.saveDrawing('HostDrawing', drawing);
+        activeDrawingName.set('HostDrawing');
+        expect(drawingStore.getDrawing('HostDrawing')?.artefacts.length).toBe(5);
+
+        applyRuleAt('CompRule', 0);
+
+        expect(drawing.getArtefacts().length).toBe(6);
+        const saved = drawingStore.getDrawing('HostDrawing');
+        expect(saved).toBeDefined();
+        expect(saved?.artefacts.length).toBe(6);
+    });
+
+    it('preserves parentName when auto-saving the active drawing', () => {
+        const { rule } = buildComposableEdgesRule();
+        drawingStore.saveDrawing('CompRule', rule);
+
+        const v0 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v0' }, 'root');
+        const v1 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v1' }, 'root');
+        const v2 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v2' }, 'root');
+        drawing.newArtefact('Edge', { source: v0, target: v1 }, { width: 2, bend: 0, label: 'e1' }, 'root');
+        drawing.newArtefact('Edge', { source: v1, target: v2 }, { width: 2, bend: 0, label: 'e2' }, 'root');
+
+        drawingStore.saveDrawing('ChildDrawing', drawing);
+        drawingStore.setDrawingParent('ChildDrawing', 'ParentDrawing');
+        activeDrawingName.set('ChildDrawing');
+
+        expect(drawingStore.getDrawing('ChildDrawing')?.parentName).toBe('ParentDrawing');
+
+        applyRuleAt('CompRule', 0);
+
+        const saved = drawingStore.getDrawing('ChildDrawing');
+        expect(saved?.parentName).toBe('ParentDrawing');
+        expect(saved?.artefacts.length).toBe(6);
+    });
+
+    it('skips auto-saving silently when activeDrawingName is null', () => {
+        const { rule } = buildComposableEdgesRule();
+        drawingStore.saveDrawing('CompRule', rule);
+
+        const v0 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v0' }, 'root');
+        const v1 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v1' }, 'root');
+        const v2 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v2' }, 'root');
+        drawing.newArtefact('Edge', { source: v0, target: v1 }, { width: 2, bend: 0, label: 'e1' }, 'root');
+        drawing.newArtefact('Edge', { source: v1, target: v2 }, { width: 2, bend: 0, label: 'e2' }, 'root');
+
+        activeDrawingName.set(null);
+
+        expect(() => applyRuleAt('CompRule', 0)).not.toThrow();
+        expect(drawing.getArtefacts().length).toBe(6);
+        expect(drawingStore.getAllDrawings().map(d => d.name)).toEqual(['CompRule']);
     });
 });

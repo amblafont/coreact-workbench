@@ -1287,6 +1287,14 @@ export function applyRuleAt(savedRuleName: string, appIndex: number): void {
             rocqRecorder.recordRuleApply(ruleDrawing, savedRule.name, app, drawing, applicationResult, activeName, sortStore);
         }
         syncProvedStatus();
+        const currentActiveName = get(activeDrawingName);
+        if (currentActiveName) {
+            const existing = drawingStore.getDrawing(currentActiveName);
+            drawingStore.saveDrawing(currentActiveName, drawing);
+            if (existing?.parentName) {
+                drawingStore.setDrawingParent(currentActiveName, existing.parentName);
+            }
+        }
         refresh();
     } catch (err) {
         pushToast('error', `Error applying rule '${savedRule.name}':\n${(err as Error).message}`);
