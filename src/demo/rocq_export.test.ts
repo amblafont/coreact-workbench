@@ -579,6 +579,43 @@ describe('rocq export', () => {
         expect(script).toContain('exact (');
     });
 
+    it('preserves stable artefact ids across save/load (stable-id regression)', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+
+        const host = new Drawing(sortStore);
+        const ma = makeVertex(host, 'a');
+        const mb = makeVertex(host, 'b');
+        const g = makeEdge(host, 'g', ma, mb);
+        const eqRoot = host.addEqualityArtefactUnchecked([ma, mb], 'root');
+        host.addLayer('child', 'Child Layer', 'root');
+        const eqChild = host.addEqualityArtefactUnchecked([ma, mb], 'child');
+        const c = makeEdge(host, 'c', ma, mb, 'child');
+
+        const liveIds = [ma, mb, g, eqRoot, eqChild, c].map(a => a.id);
+        expect(new Set(liveIds).size).toBe(liveIds.length);
+
+        store.saveDrawing('MainDrawing', host);
+
+        // Serialization must emit the live ids verbatim.
+        const serialized = store.exportDrawingsJSON(['MainDrawing']);
+        for (const id of liveIds) {
+            expect(serialized).toContain(`"id": "${id}"`);
+        }
+
+        // Loading into a fresh drawing must adopt those ids verbatim and keep
+        // getArtefactById resolving against them.
+        const reloaded = new Drawing(sortStore);
+        store.loadDrawing('MainDrawing', reloaded);
+        const reloadedIds = reloaded.getArtefacts().map(a => a.id).sort();
+        expect(reloadedIds).toEqual([...liveIds].sort());
+        for (const id of liveIds) {
+            expect(reloaded.getArtefactById(id)).toBeDefined();
+        }
+        expect(reloaded.getArtefactById(c.id)).not.toBe(c);
+        expect(reloaded.getArtefactById(c.id)!.data.label).toBe('c');
+    });
+
     it('records an edge duplication as set (new := old : Sort deps...)', () => {
         const sortStore = newSortStore();
         const host = new Drawing(sortStore);

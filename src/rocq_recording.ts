@@ -3,14 +3,6 @@ import type { DerivedRule } from "./index";
 import { drawingExportNames, ruleTypeInfo, newExportRegistry, renderExactTerm, renderForallChain, renderSigma, sanitizeIdent } from "./rocq_export";
 import type { LayerElement, RuleTypeInfo } from "./rocq_export";
 
-function artefactToDataId(drawing: Drawing, art: Artefact): string {
-    const idx = drawing.getArtefacts().indexOf(art);
-    if (idx === -1) {
-        throw new Error("Consistency Check Failed: Artefact does not belong to drawing.");
-    }
-    return `art_${idx}`;
-}
-
 function escapeRegExp(s: string): string {
     return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -215,8 +207,8 @@ export class RocqRecorder {
         // Map pattern artefact ID -> matched host artefact ID
         const matchMap = new Map<string, string>();
         for (const [pArt, hArt] of application.matchedArtefacts.entries()) {
-            const pId = artefactToDataId(ruleDrawing, pArt);
-            const hId = artefactToDataId(hostDrawing, hArt);
+            const pId = pArt.id;
+            const hId = hArt.id;
             matchMap.set(pId, hId);
         }
 
@@ -268,7 +260,7 @@ export class RocqRecorder {
         // created host copies for artefacts/equalities.
         const ruleArtById = new Map<string, Artefact>();
         for (const ruleArt of ruleDrawing.getArtefacts()) {
-            ruleArtById.set(artefactToDataId(ruleDrawing, ruleArt), ruleArt);
+            ruleArtById.set(ruleArt.id, ruleArt);
         }
 
         const conclusionHostNames = ruleInfo.conclusionElements.map(el => {
@@ -280,7 +272,7 @@ export class RocqRecorder {
             if (!hostCopy) {
                 throw new Error(`Consistency Check Failed: No created host artefact for conclusion element '${el.name}' in rule '${savedRuleName}'.`);
             }
-            const hostId = artefactToDataId(hostDrawing, hostCopy);
+            const hostId = hostCopy.id;
             const hostFieldName = el.kind === "equation"
                 ? hostNames.equalityFieldNames.get(hostId)?.[el.eqIndex ?? 0] ?? hostNames.fieldNames.get(hostId)
                 : hostNames.fieldNames.get(hostId);
@@ -338,7 +330,7 @@ export class RocqRecorder {
                         const ruleArt = el.artefactId ? ruleArtById.get(el.artefactId) : undefined;
                         const derivedArt = ruleArt ? derivedDrawing.created.get(ruleArt) : undefined;
                         if (derivedArt) {
-                            const derivedArtId = artefactToDataId(derivedDrawing.drawing, derivedArt);
+                            const derivedArtId = derivedArt.id;
                             const derivedFieldName = el.kind === "equation"
                                 ? derivedExport.equalityFieldNames.get(derivedArtId)?.[el.eqIndex ?? 0] ?? derivedExport.fieldNames.get(derivedArtId)
                                 : derivedExport.fieldNames.get(derivedArtId);
@@ -418,13 +410,13 @@ export class RocqRecorder {
         const savedHost = DrawingStore.drawingToSavedDrawing(hostActiveName, hostDrawing);
         const hostNames = drawingExportNames(savedHost, sortStore);
 
-        const originalId = artefactToDataId(hostDrawing, original);
+        const originalId = original.id;
         const originalField = hostNames.fieldNames.get(originalId);
         if (!originalField) {
             throw new Error(`Consistency Check Failed: No field name assigned for original artefact '${original.data.label || original.sortName}'.`);
         }
 
-        const createdId = artefactToDataId(hostDrawing, created);
+        const createdId = created.id;
         const createdField = hostNames.fieldNames.get(createdId);
         if (!createdField) {
             throw new Error(`Consistency Check Failed: No field name assigned for created duplicate artefact '${created.data.label || created.sortName}'.`);
@@ -441,7 +433,7 @@ export class RocqRecorder {
             if (!dep) {
                 throw new Error(`Consistency Check Failed: Missing dependency '${depKey}' for duplicated artefact.`);
             }
-            const depId = artefactToDataId(hostDrawing, dep);
+            const depId = dep.id;
             const depField = hostNames.fieldNames.get(depId);
             if (!depField) {
                 throw new Error(`Consistency Check Failed: No field name assigned for dependency '${depKey}' of duplicated artefact.`);
@@ -497,7 +489,7 @@ export class RocqRecorder {
 
         const idToLiveArt = new Map<string, Artefact>();
         for (const art of hostDrawing.getArtefacts()) {
-            idToLiveArt.set(artefactToDataId(hostDrawing, art), art);
+            idToLiveArt.set(art.id, art);
         }
 
         const witnessFor = (el: LayerElement): string => {
@@ -508,7 +500,7 @@ export class RocqRecorder {
                     if (!parent) {
                         throw new Error(`Consistency Check Failed: No host parent matched for artefact '${el.artefactId}' in conclusion layer '${stmt.conclusionLayerId}'.`);
                     }
-                    const parentDataId = artefactToDataId(hostDrawing, parent);
+                    const parentDataId = parent.id;
                     const hostFieldName = hostNames.fieldNames.get(parentDataId);
                     if (!hostFieldName) {
                         throw new Error(`Consistency Check Failed: Matched parent for '${el.artefactId}' has no assigned field name in '${hostActiveName}'.`);

@@ -165,6 +165,7 @@ export class Artefact {
     public svgElement: D3Context | null = null; // Store the rendered SVG element
 
     constructor(
+        public readonly id: string,
         public sortName: string,
         public dependencies: Record<string, Artefact>,
         public data: Record<string, any>,
@@ -233,6 +234,7 @@ export class EqualityArtefact extends Artefact {
     public children: Artefact[];
 
     constructor(
+        id: string,
         children: Artefact[],
         data: Record<string, any> = {},
         layerId: string = "root"
@@ -241,7 +243,7 @@ export class EqualityArtefact extends Artefact {
         children.forEach((child, idx) => {
             deps[`${idx}`] = child;
         });
-        super("Equality", deps, data, () => null, layerId);
+        super(id, "Equality", deps, data, () => null, layerId);
         this.children = [...children];
     }
 
@@ -332,6 +334,7 @@ export class Drawing {
     private layers: Map<string, Layer> = new Map();
     private focusedLayerId: string | null = null;
     private ruleFlag: boolean = false;
+    private nextArtefactId: number = 1;
 
     constructor(public sortStore: SortStore) {
         this.addLayer("root", "Root Layer", null, "#3498db", false);
@@ -786,7 +789,7 @@ export class Drawing {
         layerId: string,
         data: Record<string, any> = {}
     ): EqualityArtefact {
-        const eq = new EqualityArtefact(children, data, layerId);
+        const eq = new EqualityArtefact(this.mintId(), children, data, layerId);
         this.artefacts.push(eq);
         return eq;
     }
@@ -837,7 +840,7 @@ export class Drawing {
                 resultEq = mainEq;
             } else {
                 const idx = this.artefacts.indexOf(mainEq);
-                resultEq = new EqualityArtefact(combinedChildren, { ...mainEq.data, ...data }, targetLayerId);
+                resultEq = new EqualityArtefact(this.mintId(), combinedChildren, { ...mainEq.data, ...data }, targetLayerId);
                 if (idx !== -1) this.artefacts[idx] = resultEq;
             }
 
@@ -851,7 +854,7 @@ export class Drawing {
             const initialChildren = Array.from(inputSet);
             this.validateEqualityDependencies(initialChildren, targetLayerId);
 
-            const newEq = new EqualityArtefact(initialChildren, data, targetLayerId);
+            const newEq = new EqualityArtefact(this.mintId(), initialChildren, data, targetLayerId);
             this.artefacts.push(newEq);
             return newEq;
         }
@@ -944,7 +947,7 @@ export class Drawing {
             }
         }
 
-        const artefact = new Artefact(sortName, { ...dependencies }, data, sortDef.drawFunction, targetLayerId);
+        const artefact = new Artefact(this.mintId(), sortName, { ...dependencies }, data, sortDef.drawFunction, targetLayerId);
         this.artefacts.push(artefact);
         
         return artefact;
@@ -1085,6 +1088,45 @@ export class Drawing {
 
     getArtefacts(): Artefact[] {
         return this.artefacts;
+    }
+
+    private mintId(): string {
+        return `a${this.nextArtefactId++}`;
+    }
+
+    // Restore a persisted artefact carrying its own stable id (e.g. legacy
+    // `art_N` or freshly-minted `aN`), advancing the minting counter past
+    // adopted ids and rejecting duplicates.
+    public adoptArtefact(
+        id: string,
+        sortName: string,
+        dependencies: Record<string, Artefact>,
+        data: Record<string, any>,
+        layerId: string
+    ): Artefact {
+        if (this.getArtefactById(id)) {
+            throw new Error(`Consistency Check Failed: Duplicate artefact id '${id}' while loading drawing.`);
+        }
+        const match = /^a(\d+)$/.exec(id);
+        if (match) {
+            this.nextArtefactId = Math.max(this.nextArtefactId, parseInt(match[1], 10) + 1);
+        }
+        let art: Artefact;
+        if (sortName === "Equality") {
+            art = new EqualityArtefact(id, Object.values(dependencies), data, layerId);
+        } else {
+            const sortDef = this.sortStore.getSort(sortName);
+            if (!sortDef) {
+                throw new Error(`Consistency Check Failed: Sort '${sortName}' is not defined.`);
+            }
+            art = new Artefact(id, sortName, { ...dependencies }, data, sortDef.drawFunction, layerId);
+        }
+        this.artefacts.push(art);
+        return art;
+    }
+
+    getArtefactById(id: string): Artefact | undefined {
+        return this.artefacts.find(art => art.id === id);
     }
 
     moveArtefact(artefact: Artefact, delta: -1 | 1): void {
@@ -1274,6 +1316,7 @@ export class Drawing {
         this.layers.clear();
         this.focusedLayerId = null;
         this.ruleFlag = false;
+        this.nextArtefactId = 1;
         if (keepDefaultRoot) {
             this.addLayer("root", "Root Layer", null, "#3498db", false);
         }
@@ -1364,10 +1407,6 @@ export class DrawingStore {
         const markedAsRule = drawing.isRule;
 
         const artefacts = drawing.getArtefacts();
-        const artefactToId = new Map<Artefact, string>();
-        artefacts.forEach((art, index) => {
-            artefactToId.set(art, `art_${index}`);
-        });
 
         const layersData: LayerData[] = drawing.getAllLayers().map(l => ({
             id: l.id,
@@ -1381,13 +1420,13 @@ export class DrawingStore {
         const artefactsData: ArtefactData[] = artefacts.map(art => {
             const serializedDeps: Record<string, string> = {};
             for (const [key, val] of Object.entries(art.dependencies)) {
-                if (val && artefactToId.has(val)) {
-                    serializedDeps[key] = artefactToId.get(val)!;
+                if (val) {
+                    serializedDeps[key] = val.id;
                 }
             }
 
             return {
-                id: artefactToId.get(art)!,
+                id: art.id,
                 sortName: art.sortName,
                 layerId: art.layerId,
                 dependencies: serializedDeps,
@@ -1476,7 +1515,8 @@ export class DrawingStore {
                 }
 
                 if (ready) {
-                    const newArt = drawing.newArtefact(
+                    const newArt = drawing.adoptArtefact(
+                        artData.id,
                         artData.sortName,
                         resolvedDeps,
                         artData.data,
@@ -2165,10 +2205,14 @@ function cloneDrawing(host: Drawing): { clone: Drawing; origToClone: Map<Artefac
                 .filter((c): c is Artefact => c !== undefined);
             const uniqueChildren = Array.from(new Set(children));
             if (uniqueChildren.length >= 2) {
-                const copy = clone.addEqualityArtefactUnchecked(
-                    uniqueChildren,
-                    a.layerId,
-                    JSON.parse(JSON.stringify(a.data))
+                const deps: Record<string, Artefact> = {};
+                uniqueChildren.forEach((c, i) => { deps[`${i}`] = c; });
+                const copy = clone.adoptArtefact(
+                    a.id,
+                    a.sortName,
+                    deps,
+                    JSON.parse(JSON.stringify(a.data)),
+                    a.layerId
                 );
                 origToClone.set(a, copy);
             }
@@ -2181,7 +2225,7 @@ function cloneDrawing(host: Drawing): { clone: Drawing; origToClone: Map<Artefac
                 }
                 copiedDeps[key] = copy;
             }
-            const copy = clone.newArtefact(a.sortName, copiedDeps, JSON.parse(JSON.stringify(a.data)), a.layerId);
+            const copy = clone.adoptArtefact(a.id, a.sortName, copiedDeps, JSON.parse(JSON.stringify(a.data)), a.layerId);
             origToClone.set(a, copy);
         }
     }

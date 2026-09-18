@@ -117,6 +117,7 @@
 
         try {
             const tempArt = new Artefact(
+                '__preview__',
                 draft.sortName,
                 draft.dependencies,
                 draft.data,

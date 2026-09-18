@@ -649,10 +649,7 @@ export function setInspectedLabel(art: Artefact, rawLabel: string): void {
     if (rocqRecorder.isActive() && isRootLayer) {
         const savedOld = DrawingStore.drawingToSavedDrawing(activeName, drawing);
         const oldExport = drawingExportNames(savedOld, sortStore);
-        const artIdx = drawing.getArtefacts().indexOf(art);
-        if (artIdx !== -1) {
-            oldFieldName = oldExport.fieldNames.get(`art_${artIdx}`) ?? null;
-        }
+        oldFieldName = oldExport.fieldNames.get(art.id) ?? null;
     }
     if (target === '') {
         delete art.data.label;
@@ -662,12 +659,9 @@ export function setInspectedLabel(art: Artefact, rawLabel: string): void {
     if (rocqRecorder.isActive() && isRootLayer && oldFieldName) {
         const savedNew = DrawingStore.drawingToSavedDrawing(activeName, drawing);
         const newExport = drawingExportNames(savedNew, sortStore);
-        const artIdx = drawing.getArtefacts().indexOf(art);
-        if (artIdx !== -1) {
-            const newFieldName = newExport.fieldNames.get(`art_${artIdx}`);
-            if (newFieldName && newFieldName !== oldFieldName) {
-                rocqRecorder.recordRename(oldFieldName, newFieldName, activeName);
-            }
+        const newFieldName = newExport.fieldNames.get(art.id);
+        if (newFieldName && newFieldName !== oldFieldName) {
+            rocqRecorder.recordRename(oldFieldName, newFieldName, activeName);
         }
     }
     refresh();
