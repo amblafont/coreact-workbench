@@ -29,6 +29,8 @@
         startDuplicateArtefact,
         togglePositionPicker,
         isPositionPickerActive,
+        toggleDraftPicker,
+        isDraftPickerActive,
         equalityChildren,
         pushToast
     } from './store';
@@ -243,7 +245,6 @@
 {:else if $draftArtefact}
     {@const draft = $draftArtefact}
     {@const draftSortDef = sortStore.getSort(draft.sortName)}
-    {@const draftProxy = { data: draft.data, dependencies: draft.dependencies, sortName: draft.sortName } as Artefact}
     {#if draftSortDef}
         {@const allDeps = Object.entries(draftSortDef.dependencies)}
         <h3 style="margin-top: 0;">
@@ -335,8 +336,8 @@
                     if (!currentDraft) return;
                     updatePosition(currentDraft, attrName, newVal, axis, (v) => setDraftDataField(attrName, v));
                 }}
-                isPickerActive={(attrName) => isPositionPickerActive(draftProxy, attrName)}
-                onPickPosition={(attrName) => togglePositionPicker(draftProxy, attrName)}
+                isPickerActive={(attrName) => isDraftPickerActive(attrName)}
+                onPickPosition={(attrName) => toggleDraftPicker(attrName)}
                 isDepReady={makeIsDepReady(draft.dependencies, draft.sortName)}
             />
 

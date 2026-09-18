@@ -68,10 +68,9 @@ export interface DraftArtefact {
 export const draftArtefact = writable<DraftArtefact | null>(null);
 export const dependencyPickingFor = writable<string | null>(null);
 
-export interface PositionPicker {
-    artefact: Artefact;
-    attrName: string;
-}
+export type PositionPicker =
+    | { kind: 'draft'; attrName: string }
+    | { kind: 'artefact'; id: string; attrName: string };
 
 export const positionPicker = writable<PositionPicker | null>(null);
 
@@ -139,31 +138,50 @@ export const ruleTag = derived([version, activeDrawingName], () => {
 // Position picker helpers
 // ---------------------------------------------------------------------------
 
+function setBodyCursor(cursor: string): void {
+    if (typeof document === 'undefined') return;
+    d3.select('body').style('cursor', cursor);
+}
+
 export function stopPositionPicker(): void {
     positionPicker.set(null);
-    d3.select('body').style('cursor', 'default');
+    setBodyCursor('default');
 }
 
 export function startPositionPicker(target: PositionPicker): void {
     positionPicker.set(target);
-    d3.select('body').style('cursor', 'crosshair');
+    setBodyCursor('crosshair');
+}
+
+function resolvePickerTarget(picker: PositionPicker):
+    { sortName: string; data: Record<string, DataAttributeValue>; dependencies: Record<string, Artefact>; isDraft: boolean } | null {
+    if (picker.kind === 'draft') {
+        const draft = get(draftArtefact);
+        if (!draft) return null;
+        return { sortName: draft.sortName, data: draft.data, dependencies: draft.dependencies, isDraft: true };
+    }
+    const artefact = drawing.getArtefactById(picker.id);
+    if (!artefact) return null;
+    return { sortName: artefact.sortName, data: artefact.data, dependencies: artefact.dependencies, isDraft: false };
 }
 
 export function applyPickedPosition(x: number, y: number): void {
     const picker = get(positionPicker);
     if (!picker) return;
-    const sortDef = sortStore.getSort(picker.artefact.sortName);
+    const target = resolvePickerTarget(picker);
+    if (!target) {
+        stopPositionPicker();
+        return;
+    }
+    const sortDef = sortStore.getSort(target.sortName);
     const attrType = sortDef?.attributes[picker.attrName];
-
-    // Detect draft context: the picker artefact's data is the draft's data
-    const draft = get(draftArtefact);
-    const isDraft = !!draft && picker.artefact.data === draft.data;
+    const { isDraft } = target;
 
     if (attrType && getAttributeType(attrType) === 'relativePosition') {
         const rpMeta = getRelativePositionMeta(attrType);
         if (rpMeta) {
             const [depKey, fieldPath] = rpMeta.target.split(".");
-            const depArtefact = picker.artefact.dependencies?.[depKey];
+            const depArtefact = target.dependencies[depKey];
             if (depArtefact) {
                 const depSortDef = sortStore.getSort(depArtefact.sortName);
                 const depResolved = depArtefact.getResolvedData(undefined, undefined, depSortDef, (n) => sortStore.getSort(n));
@@ -174,7 +192,7 @@ export function applyPickedPosition(x: number, y: number): void {
                     if (isDraft) {
                         setDraftDataField(picker.attrName, value);
                     } else {
-                        picker.artefact.data[picker.attrName] = value;
+                        target.data[picker.attrName] = value;
                         refresh();
                     }
                     stopPositionPicker();
@@ -187,7 +205,7 @@ export function applyPickedPosition(x: number, y: number): void {
         setDraftDataField(picker.attrName, [x, y]);
         finalizeDraftIfComplete();
     } else {
-        picker.artefact.data[picker.attrName] = [x, y];
+        target.data[picker.attrName] = [x, y];
         refresh();
     }
     stopPositionPicker();
@@ -204,14 +222,28 @@ export function isPositionPickerActive(artefact: Artefact, attrName: string): bo
     const picker = get(positionPicker);
     if (!picker) return false;
     if (picker.attrName !== attrName) return false;
-    return picker.artefact === artefact || picker.artefact.data === artefact.data;
+    return picker.kind === 'artefact' && picker.id === artefact.id;
+}
+
+export function isDraftPickerActive(attrName: string): boolean {
+    const picker = get(positionPicker);
+    if (!picker) return false;
+    return picker.kind === 'draft' && picker.attrName === attrName;
 }
 
 export function togglePositionPicker(artefact: Artefact, attrName: string): void {
     if (isPositionPickerActive(artefact, attrName)) {
         stopPositionPicker();
     } else {
-        startPositionPicker({ artefact, attrName });
+        startPositionPicker({ kind: 'artefact', id: artefact.id, attrName });
+    }
+}
+
+export function toggleDraftPicker(attrName: string): void {
+    if (isDraftPickerActive(attrName)) {
+        stopPositionPicker();
+    } else {
+        startPositionPicker({ kind: 'draft', attrName });
     }
 }
 
@@ -307,7 +339,7 @@ export function startDraftForSort(sortDef: SortDefinition): void {
 
     const singlePositionAttr = getSinglePositionAttr(sortDef);
     if (singlePositionAttr) {
-        startPositionPicker({ artefact: { data: initialData } as Artefact, attrName: singlePositionAttr });
+        startPositionPicker({ kind: 'draft', attrName: singlePositionAttr });
     }
 
     refresh();
@@ -731,13 +763,7 @@ export function pickDraftDependency(artefact: Artefact): void {
                 if (getAttributeType(attrType) !== 'relativePosition') continue;
                 const rpMeta = getRelativePositionMeta(attrType);
                 if (!rpMeta || rpMeta.target.split('.')[0] !== picking) continue;
-                const draftNow = get(draftArtefact);
-                if (draftNow) {
-                    startPositionPicker({
-                        artefact: { data: draftNow.data, dependencies: draftNow.dependencies, sortName: draftNow.sortName } as Artefact,
-                        attrName
-                    });
-                }
+                startPositionPicker({ kind: 'draft', attrName });
                 break;
             }
         }
@@ -754,7 +780,24 @@ export function removeArtefactNode(artefact: Artefact, parentArtefact: Artefact 
     } else {
         drawing.removeArtefact(artefact);
     }
+    pruneStaleArtefactRefs();
     refresh();
+}
+
+// Clear interaction state that references artefacts no longer present in the
+// drawing. This is a validity sweep rather than a check against the removed
+// artefact on purpose: removeArtefact also removes every transitive dependent,
+// so the inspected/picked artefact can disappear as collateral without being
+// the node the user deleted.
+function pruneStaleArtefactRefs(): void {
+    const inspected = get(inspectedArtefact);
+    if (inspected && !drawing.getArtefactById(inspected.id)) {
+        inspectedArtefact.set(null);
+    }
+    const picker = get(positionPicker);
+    if (picker?.kind === 'artefact' && !drawing.getArtefactById(picker.id)) {
+        stopPositionPicker();
+    }
 }
 
 function hasSameSortLayerNeighbour(artefact: Artefact, delta: -1 | 1): boolean {

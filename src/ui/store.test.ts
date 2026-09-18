@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { get } from 'svelte/store';
-import { drawing, drawingStore, activeDrawingName, sortStore, rocqRecorder, syncProvedStatus, exportSelection, getSelectedDrawingNames, deleteSelectedDrawings, renameDrawingName, toasts, pushToast, dismissToast, applyRuleAt } from './store';
+import { drawing, drawingStore, activeDrawingName, sortStore, rocqRecorder, syncProvedStatus, exportSelection, getSelectedDrawingNames, deleteSelectedDrawings, renameDrawingName, toasts, pushToast, dismissToast, applyRuleAt,
+    inspectedArtefact, positionPicker, draftArtefact,
+    resetInteractionState, togglePositionPicker, isPositionPickerActive, isDraftPickerActive,
+    applyPickedPosition, startPositionPicker, selectArtefactToInspect, removeArtefactNode
+} from './store';
 import { registerDefaultSorts } from '../demo/buildDemo';
 import { buildComposableEdgesRule } from '../demo/helpers';
 
@@ -205,5 +209,94 @@ describe('auto-saving drawing after rule application', () => {
         expect(() => applyRuleAt('CompRule', 0)).not.toThrow();
         expect(drawing.getArtefacts().length).toBe(6);
         expect(drawingStore.getAllDrawings().map(d => d.name)).toEqual(['CompRule']);
+    });
+});
+
+describe('position picker', () => {
+    const noop = (_data: any, _context: any): any => null;
+
+    beforeEach(() => {
+        registerDefaultSorts(sortStore);
+        if (!sortStore.getSort('Anchor')) sortStore.newSort('Anchor', {}, { position: 'position' }, noop);
+        if (!sortStore.getSort('Rel')) sortStore.newSort('Rel', { anchor: 'Anchor' }, { position: { type: 'relativePosition', target: 'anchor.position' } }, noop);
+        drawing.clear(true);
+        drawingStore.clear();
+        activeDrawingName.set(null);
+        resetInteractionState();
+        vi.stubGlobal('confirm', () => true);
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        resetInteractionState();
+    });
+
+    it('bails out when the picked artefact has been removed (bypassing the prune sweep)', () => {
+        const a = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'a' }, 'root');
+        togglePositionPicker(a, 'position');
+        expect(isPositionPickerActive(a, 'position')).toBe(true);
+
+        drawing.removeArtefact(a);
+        expect(drawing.getArtefactById(a.id)).toBeUndefined();
+        expect(() => applyPickedPosition(5, 5)).not.toThrow();
+        expect(get(positionPicker)).toBeNull();
+        expect(a.data.position).toEqual([0, 0]);
+    });
+
+    it('writes a draft relativePosition offset relative to its dependency', () => {
+        const anchor = drawing.newArtefact('Anchor', {}, { position: [100, 100] }, 'root');
+        draftArtefact.set({ sortName: 'Rel', dependencies: { anchor }, data: { position: [0, 0] }, layerId: 'root' });
+        startPositionPicker({ kind: 'draft', attrName: 'position' });
+
+        applyPickedPosition(110, 120);
+
+        expect(get(draftArtefact)!.data.position).toEqual([10, 20]);
+        expect(get(positionPicker)).toBeNull();
+    });
+
+    it('writes an absolute position onto a real artefact and clears the picker', () => {
+        const a = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'a' }, 'root');
+        togglePositionPicker(a, 'position');
+        expect(isPositionPickerActive(a, 'position')).toBe(true);
+
+        applyPickedPosition(400, 500);
+
+        expect(a.data.position).toEqual([400, 500]);
+        expect(get(positionPicker)).toBeNull();
+    });
+
+    it('does not treat a draft picker as active on a real artefact sharing its data object', () => {
+        const a = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'a' }, 'root');
+        draftArtefact.set({ sortName: 'Vertex', dependencies: {}, data: a.data, layerId: 'root' });
+        startPositionPicker({ kind: 'draft', attrName: 'position' });
+
+        expect(isDraftPickerActive('position')).toBe(true);
+        expect(isPositionPickerActive(a, 'position')).toBe(false);
+    });
+
+    it('clears inspection and the picker when the picked artefact is removed as a transitive dependent', () => {
+        const v = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v' }, 'root');
+        const e = drawing.newArtefact('Edge', { source: v, target: v }, { width: 2, bend: 0, label: 'e' }, 'root');
+        selectArtefactToInspect(e);
+        togglePositionPicker(e, 'bend');
+        expect(get(inspectedArtefact)).toBe(e);
+
+        removeArtefactNode(v);
+
+        expect(drawing.getArtefactById(e.id)).toBeUndefined();
+        expect(get(inspectedArtefact)).toBeNull();
+        expect(get(positionPicker)).toBeNull();
+    });
+
+    it('clears inspection and the picker when the picked artefact is removed directly', () => {
+        const a = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'a' }, 'root');
+        selectArtefactToInspect(a);
+        togglePositionPicker(a, 'position');
+        expect(get(inspectedArtefact)).toBe(a);
+
+        removeArtefactNode(a);
+
+        expect(get(inspectedArtefact)).toBeNull();
+        expect(get(positionPicker)).toBeNull();
     });
 });
