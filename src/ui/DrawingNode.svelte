@@ -19,8 +19,8 @@
     let { drawing, isChild = false }: { drawing: SavedDrawing; isChild?: boolean } = $props();
 
     let isActive = $derived(drawing.name === $activeDrawingName);
-    let children = $derived($allDrawings.filter(d => d.parentName === drawing.name && d.name !== drawing.name));
-    let recStatus = $derived($recordedStatementByDrawing.get(drawing.name));
+    let children = $derived(allDrawings().filter(d => d.parentName === drawing.name && d.name !== drawing.name));
+    let recStatus = $derived(recordedStatementByDrawing().get(drawing.name));
 
     function onRename(saved: SavedDrawing): void {
         const newName = prompt(`Enter new name for drawing '${saved.name}':`, saved.name);

@@ -58,8 +58,8 @@
         <input type="checkbox" checked={$filterStrictMatches} onchange={toggleFilterStrictMatches} />
         Strict matching
     </label>
-    <label class="rule-checkbox-label" class:disabled={!$solvesGoalFilterApplicable} title={$solvesGoalFilterApplicable ? 'Only show matchings whose conclusion would make the child layer provable' : 'Requires a drawing with exactly one root and one child layer'}>
-        <input type="checkbox" checked={$filterSolvesGoalMatches} disabled={!$solvesGoalFilterApplicable} onchange={toggleFilterSolvesGoalMatches} />
+    <label class="rule-checkbox-label" class:disabled={!solvesGoalFilterApplicable()} title={solvesGoalFilterApplicable() ? 'Only show matchings whose conclusion would make the child layer provable' : 'Requires a drawing with exactly one root and one child layer'}>
+        <input type="checkbox" checked={$filterSolvesGoalMatches} disabled={!solvesGoalFilterApplicable()} onchange={toggleFilterSolvesGoalMatches} />
         Solves the goal
     </label>
 </div>

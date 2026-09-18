@@ -1,4 +1,4 @@
-import { writable, derived, get } from 'svelte/store';
+import { writable, get } from 'svelte/store';
 import * as d3 from 'd3';
 import {
     SortStore,
@@ -15,6 +15,7 @@ import {
     filterSolvesGoalRuleApplications,
     getFirstOrderStatementChildLayer,
     type SortDefinition,
+    type Layer,
     type SavedDrawing,
     type RuleApplication,
     type DataAttributeValue,
@@ -23,32 +24,18 @@ import {
     getSliderMeta,
     getRelativePositionMeta
 } from '../index.svelte.ts';
-import { RocqRecorder } from '../rocq_recording';
+import { RocqRecorder } from '../rocq_recording.svelte.ts';
 import { exportDrawingsToRocq, drawingExportNames } from '../rocq_export';
 
 // ---------------------------------------------------------------------------
-// Core singletons (non-reactive class instances; mutations are signalled via
-// the `version` store + `refresh()` below).
+// Core singletons (reactive instances backed by fine-grained $state; derived
+// views recompute automatically whenever the signals they read change).
 // ---------------------------------------------------------------------------
 
 export const sortStore = new SortStore();
 export const drawing = new Drawing(sortStore);
 export const drawingStore = new DrawingStore();
 export const rocqRecorder = new RocqRecorder();
-
-// ---------------------------------------------------------------------------
-// Versioning
-//
-// The core `Drawing`/`DrawingStore` classes are plain mutable objects with no
-// reactivity. After any mutation of their state, call `refresh()` so that all
-// derived stores recompute and every subscribed component re-renders.
-// ---------------------------------------------------------------------------
-
-export const version = writable(0);
-
-export function refresh(): void {
-    version.update(v => v + 1);
-}
 
 // ---------------------------------------------------------------------------
 // Interaction state
@@ -114,16 +101,23 @@ export function pushToast(kind: ToastKind, message: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// Derived collections (recomputed whenever `version` bumps)
+// Derived collections (reactively recomputed by callers from the signals they
+// read: drawing artefacts/layers, the drawing store, and the recorder).
 // ---------------------------------------------------------------------------
 
-export const allArtefacts = derived(version, () => drawing.getArtefacts());
-export const allLayers = derived(version, () => drawing.getAllLayers());
-export const allDrawings = derived(version, () => drawingStore.getAllDrawings());
+export function allArtefacts(): Artefact[] {
+    return drawing.getArtefacts();
+}
+export function allLayers(): Layer[] {
+    return drawing.getAllLayers();
+}
+export function allDrawings(): SavedDrawing[] {
+    return drawingStore.getAllDrawings();
+}
 
 export type RuleTag = { kind: 'invalid'; reason: string } | { kind: 'first' } | { kind: 'second' };
 
-export const ruleTag = derived([version, activeDrawingName], () => {
+export function ruleTag(): RuleTag | null {
     if (!drawing.isRule) return null;
     const check = drawing.checkRuleConditions();
     if (!check.isRule) {
@@ -132,7 +126,7 @@ export const ruleTag = derived([version, activeDrawingName], () => {
     return drawingStore.checkIsFirstOrder(drawing)
         ? ({ kind: 'first' } satisfies RuleTag)
         : ({ kind: 'second' } satisfies RuleTag);
-});
+}
 
 // ---------------------------------------------------------------------------
 // Position picker helpers
@@ -193,7 +187,7 @@ export function applyPickedPosition(x: number, y: number): void {
                         setDraftDataField(picker.attrName, value);
                     } else {
                         target.data[picker.attrName] = value;
-                        refresh();
+
                     }
                     stopPositionPicker();
                     return;
@@ -206,7 +200,7 @@ export function applyPickedPosition(x: number, y: number): void {
         finalizeDraftIfComplete();
     } else {
         target.data[picker.attrName] = [x, y];
-        refresh();
+
     }
     stopPositionPicker();
 }
@@ -273,7 +267,7 @@ export function setDraftDataField(name: string, value: DataAttributeValue): void
         }
         return { ...d, data: nextData };
     });
-    refresh();
+
 }
 
 export function setDraftLayer(layerId: string): void {
@@ -281,7 +275,7 @@ export function setDraftLayer(layerId: string): void {
         if (!d) return d;
         return { ...d, layerId };
     });
-    refresh();
+
 }
 
 export function startDraftForSort(sortDef: SortDefinition): void {
@@ -342,7 +336,7 @@ export function startDraftForSort(sortDef: SortDefinition): void {
         startPositionPicker({ kind: 'draft', attrName: singlePositionAttr });
     }
 
-    refresh();
+
 }
 
 export function startDuplicateArtefact(art: Artefact): void {
@@ -374,7 +368,7 @@ export function startDuplicateArtefact(art: Artefact): void {
     const firstDep = findNextUnfilledDependency(draft);
     dependencyPickingFor.set(firstDep);
 
-    refresh();
+
 }
 
 export function duplicateArtefactNode(art: Artefact): void {
@@ -385,7 +379,7 @@ export function cancelDraft(): void {
     draftArtefact.set(null);
     dependencyPickingFor.set(null);
     stopPositionPicker();
-    refresh();
+
 }
 
 export function createDraftArtefact(): Artefact | null {
@@ -407,7 +401,7 @@ export function createDraftArtefact(): Artefact | null {
         draftArtefact.set(null);
         dependencyPickingFor.set(null);
         stopPositionPicker();
-        refresh();
+
         return created;
     } catch (err) {
         pushToast('error', (err as Error).message);
@@ -465,7 +459,7 @@ export function startMergeMode(preselectFirst: Artefact | null = null): void {
         mergeSecondArtefact.set(null);
         mergePickingFor.set('first');
     }
-    refresh();
+
 }
 
 export function cancelMergeMode(): void {
@@ -474,7 +468,7 @@ export function cancelMergeMode(): void {
     mergeSecondArtefact.set(null);
     mergePickingFor.set(null);
     mergeHoverArtefact.set(null);
-    refresh();
+
 }
 
 export function selectMergeArtefact(artefact: Artefact): void {
@@ -497,7 +491,7 @@ export function selectMergeArtefact(artefact: Artefact): void {
             mergePickingFor.set(null);
         }
     }
-    refresh();
+
 }
 
 export function performMerge(): void {
@@ -512,7 +506,7 @@ export function performMerge(): void {
         mergePickingFor.set(null);
         mergeHoverArtefact.set(null);
         inspectedArtefact.set(mergedResult);
-        refresh();
+
     } catch (err) {
         pushToast('error', (err as Error).message);
     }
@@ -595,7 +589,7 @@ export function loadDrawingByName(name: string): boolean {
         activeDrawingName.set(name);
         resetInteractionState();
         syncProvedStatus();
-        refresh();
+
         return true;
     } catch (err) {
         pushToast('error', `Error loading drawing:\n${(err as Error).message}`);
@@ -661,7 +655,7 @@ export function selectArtefactToInspect(art: Artefact): void {
         dependencyPickingFor.set(null);
         stopPositionPicker();
     }
-    refresh();
+
 }
 
 export function setArtefactDataField(art: Artefact, name: string, value: DataAttributeValue): void {
@@ -670,7 +664,7 @@ export function setArtefactDataField(art: Artefact, name: string, value: DataAtt
     } else {
         art.data[name] = value;
     }
-    refresh();
+
 }
 
 export function setInspectedLabel(art: Artefact, rawLabel: string): void {
@@ -696,12 +690,12 @@ export function setInspectedLabel(art: Artefact, rawLabel: string): void {
             rocqRecorder.recordRename(oldFieldName, newFieldName, activeName);
         }
     }
-    refresh();
+
 }
 
 export function setArtefactLayer(art: Artefact, targetLayerId: string): void {
     drawing.setArtefactLayer(art, targetLayerId);
-    refresh();
+
 }
 
 function autoSelectLayerFromDependencies(): void {
@@ -731,7 +725,7 @@ export function pickDraftDependency(artefact: Artefact): void {
             const nextIdx = Object.keys(d.dependencies).length;
             return { ...d, dependencies: { ...d.dependencies, [`${nextIdx}`]: artefact } };
         });
-        refresh();
+
         autoSelectLayerFromDependencies();
         finalizeDraftIfComplete();
         return;
@@ -756,7 +750,7 @@ export function pickDraftDependency(artefact: Artefact): void {
             return d;
         });
         dependencyPickingFor.set(findNextUnfilledDependency(get(draftArtefact) as DraftArtefact));
-        refresh();
+
         // Auto-activate picker for relativePosition attrs targeting this dep key
         if (sortDef) {
             for (const [attrName, attrType] of Object.entries(sortDef.attributes)) {
@@ -781,7 +775,7 @@ export function removeArtefactNode(artefact: Artefact, parentArtefact: Artefact 
         drawing.removeArtefact(artefact);
     }
     pruneStaleArtefactRefs();
-    refresh();
+
 }
 
 // Clear interaction state that references artefacts no longer present in the
@@ -824,7 +818,7 @@ export function canMoveArtefactDown(artefact: Artefact): boolean {
 export function moveArtefactUp(artefact: Artefact): void {
     try {
         drawing.moveArtefact(artefact, -1);
-        refresh();
+
     } catch (err) {
         pushToast('error', (err as Error).message);
     }
@@ -833,7 +827,7 @@ export function moveArtefactUp(artefact: Artefact): void {
 export function moveArtefactDown(artefact: Artefact): void {
     try {
         drawing.moveArtefact(artefact, 1);
-        refresh();
+
     } catch (err) {
         pushToast('error', (err as Error).message);
     }
@@ -856,7 +850,9 @@ export function onArtefactNodeClick(art: Artefact): void {
 // ---------------------------------------------------------------------------
 
 export const rocqRecordingActive = writable(false);
-export const isCurrentDrawingRule = derived(version, () => drawing.isRule);
+export function isCurrentDrawingRule(): boolean {
+    return drawing.isRule;
+}
 
 export interface RecordedStatementInfo {
     drawingName: string;
@@ -865,24 +861,26 @@ export interface RecordedStatementInfo {
     isMain: boolean;
 }
 
-export const recordedStatements = derived(version, () => rocqRecorder.getRecordedStatements());
+export function recordedStatements(): RecordedStatementInfo[] {
+    return rocqRecorder.getRecordedStatements();
+}
 
-export const recordedStatementByDrawing = derived(recordedStatements, stmts => {
+export function recordedStatementByDrawing(): Map<string, RecordedStatementInfo> {
     const map = new Map<string, RecordedStatementInfo>();
-    for (const s of stmts) {
+    for (const s of rocqRecorder.getRecordedStatements()) {
         map.set(s.drawingName, s);
     }
     return map;
-});
+}
 
-export const pendingProofCount = derived(recordedStatements, stmts =>
-    stmts.filter(s => !s.isMain && !s.proved).length
-);
+export function pendingProofCount(): number {
+    return rocqRecorder.getRecordedStatements().filter(s => !s.isMain && !s.proved).length;
+}
 
 export function setCurrentDrawingRule(checked: boolean): void {
     try {
         drawing.setIsRule(checked);
-        refresh();
+
     } catch (err) {
         pushToast('error', (err as Error).message);
     }
@@ -898,7 +896,7 @@ export function saveActiveDrawing(): void {
     try {
         drawingStore.saveDrawing(name, drawing);
         activeDrawingName.set(name);
-        refresh();
+
     } catch (err) {
         pushToast('error', `Error saving drawing:\n${(err as Error).message}`);
     }
@@ -917,7 +915,7 @@ export function duplicateCurrentDrawing(): void {
     try {
         drawingStore.saveDrawing(name, drawing);
         activeDrawingName.set(name);
-        refresh();
+
         pushToast('info', `Duplicated drawing as '${name}'.`);
     } catch (err) {
         pushToast('error', (err as Error).message);
@@ -941,7 +939,7 @@ export function newDrawing(): void {
     try {
         drawingStore.saveDrawing(name, drawing);
         activeDrawingName.set(name);
-        refresh();
+
     } catch (err) {
         pushToast('error', (err as Error).message);
     }
@@ -956,7 +954,7 @@ export async function importDrawingsFile(file: File): Promise<void> {
             summary += `\nRenamed on collision: ${renames.map(r => `'${r.requested}' -> '${r.actual}'`).join(', ')}.`;
         }
         pushToast('info', summary);
-        refresh();
+
     } catch (err) {
         pushToast('error', `Error importing drawing:\n${(err as Error).message}`);
     }
@@ -984,7 +982,7 @@ export function deleteSelectedDrawings(names: string[]): void {
         }
         return next;
     });
-    refresh();
+
 }
 
 export function renameDrawingName(oldName: string, newName: string): void {
@@ -1002,7 +1000,7 @@ export function renameDrawingName(oldName: string, newName: string): void {
             next.add(newName);
             return next;
         });
-        refresh();
+
     } catch (err) {
         pushToast('error', (err as Error).message);
     }
@@ -1014,7 +1012,7 @@ export function markDrawingAsRule(name: string, isRule: boolean): void {
             drawing.setIsRule(isRule);
         }
         drawingStore.markAsRule(name, isRule);
-        refresh();
+
     } catch (err) {
         pushToast('error', (err as Error).message);
     }
@@ -1043,7 +1041,7 @@ export function toggleRocqRecording(): void {
             rocqRecorder.start(drawing, name, sortStore);
             rocqRecordingActive.set(true);
         }
-        refresh();
+
     } catch (err) {
         pushToast('error', `Rocq Recording Error:\n${(err as Error).message}`);
     }
@@ -1073,7 +1071,7 @@ export function clearAll(): void {
     focusedLayerId.set(null);
     activeDrawingName.set(null);
     resetInteractionState();
-    refresh();
+
 }
 
 export async function loadSortScript(file: File): Promise<void> {
@@ -1084,7 +1082,7 @@ export async function loadSortScript(file: File): Promise<void> {
         resetInteractionState();
         const executor = new Function('sortStore', 'd3', code);
         executor(sortStore, d3);
-        refresh();
+
     } catch (err) {
         pushToast('error', `Error executing sort script:\n${(err as Error).message}`);
         console.error('Script Execution Error:', err);
@@ -1100,7 +1098,7 @@ export function addRootLayer(): void {
     if (name && name.trim()) {
         const id = `layer-${Date.now().toString(36)}`;
         drawing.addLayer(id, name.trim(), null, '#9b59b6', true);
-        refresh();
+
     }
 }
 
@@ -1110,7 +1108,7 @@ export function addChildLayer(layer: { id: string; name: string }): void {
         const childId = `layer-${Date.now().toString(36)}`;
         const randomColor = `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`;
         drawing.addLayer(childId, childName.trim(), layer.id, randomColor, true);
-        refresh();
+
     }
 }
 
@@ -1118,7 +1116,7 @@ export function renameLayer(layer: { id: string; name: string }): void {
     const newName = prompt(`Enter new name for layer '${layer.name}':`, layer.name);
     if (newName && newName.trim() && newName.trim() !== layer.name) {
         layer.name = newName.trim();
-        refresh();
+
     }
 }
 
@@ -1132,13 +1130,13 @@ export function deleteLayer(layer: { id: string; name: string }): void {
         if (get(focusedLayerId) && descendants.has(get(focusedLayerId)!)) {
             focusedLayerId.set(null);
         }
-        refresh();
+
     }
 }
 
 export function toggleLayerVisibility(layer: { id: string; visible: boolean }): void {
     layer.visible = !layer.visible;
-    refresh();
+
 }
 
 export function toggleLayerFocus(layerId: string): void {
@@ -1150,18 +1148,18 @@ export function toggleLayerFocus(layerId: string): void {
         focusedLayerId.set(layerId);
         drawing.setFocusedLayer(layerId);
     }
-    refresh();
+
 }
 
 export function setLayerColor(layer: { id: string; color: string; colorEnabled: boolean }, color: string): void {
     layer.color = color;
     layer.colorEnabled = true;
-    refresh();
+
 }
 
 export function toggleLayerColorEnabled(layer: { id: string; colorEnabled: boolean }, checked: boolean): void {
     layer.colorEnabled = checked;
-    refresh();
+
 }
 
 export function checkLayerProvable(layerId: string): void {
@@ -1175,7 +1173,7 @@ export function checkLayerProvable(layerId: string): void {
         if (result.provable) {
             rocqRecorder.recordProveSuccess(drawing, layerId, result.match ?? null, get(activeDrawingName) ?? 'Unsaved Drawing');
         }
-        refresh();
+
     } catch (err) {
         pushToast('error', (err as Error).message);
     }
@@ -1225,9 +1223,9 @@ export function toggleFilterSolvesGoalMatches(): void {
     filterSolvesGoalMatches.update(v => !v);
 }
 
-export const solvesGoalFilterApplicable = derived(version, () => {
+export function solvesGoalFilterApplicable(): boolean {
     return getFirstOrderStatementChildLayer(drawing) !== null;
-});
+}
 
 // ---------------------------------------------------------------------------
 // Applyable rules (computed reactively by RuleApplications.svelte)
@@ -1261,7 +1259,7 @@ export function computeRuleApplications(): RuleAppEntry[] {
         } catch {
             continue;
         }
-        
+
         let hiddenRedundant = 0;
         if (get(filterRedundantMatches) && applications.length > 1) {
             const total = applications.length;
@@ -1332,7 +1330,7 @@ export function applyRuleAt(savedRuleName: string, appIndex: number): void {
                 drawingStore.setDrawingParent(currentActiveName, existing.parentName);
             }
         }
-        refresh();
+
     } catch (err) {
         pushToast('error', `Error applying rule '${savedRule.name}':\n${(err as Error).message}`);
     }
@@ -1370,7 +1368,7 @@ export function generateReverseRulesFor(savedRuleName: string): void {
             console.log(`Generated reverse rule '${name}': isRule=${result.drawing.isRule}, artefacts=${result.drawing.getArtefacts().length}.`);
         }
         pushToast('info', `Generated ${createdNames.length} reverse rule(s) for '${savedRuleName}':\n- ${createdNames.join('\n- ')}`);
-        refresh();
+
     } catch (err) {
         pushToast('error', `Error generating reverse rules for '${savedRuleName}':\n${(err as Error).message}`);
     }

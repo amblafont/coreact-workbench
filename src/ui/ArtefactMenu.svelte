@@ -5,7 +5,7 @@
     import ArtefactNode from './ArtefactNode.svelte';
 
     let sortDefs: SortDefinition[] = $derived(sortStore.getAllSorts());
-    let grouped: Record<string, Artefact[]> = $derived($allArtefacts.reduce((acc, artefact) => {
+    let grouped: Record<string, Artefact[]> = $derived(allArtefacts().reduce((acc, artefact) => {
         if (!acc[artefact.sortName]) acc[artefact.sortName] = [];
         acc[artefact.sortName].push(artefact);
         return acc;

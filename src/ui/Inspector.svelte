@@ -252,7 +252,7 @@
                     value={draft.layerId}
                     onchange={(e) => setDraftLayer((e.currentTarget as HTMLSelectElement).value)}
                 >
-                    {#each $allLayers as l}
+                    {#each allLayers() as l}
                         <option value={l.id}>{l.name}</option>
                     {/each}
                 </select>
@@ -304,7 +304,7 @@
                     onchange={(e) => setDraftDataField('label', (e.currentTarget as HTMLInputElement).value)}
                 />
             </div>
-            {#if $ruleTag}
+            {#if ruleTag()}
                 <p style="color: #888; font-style: italic; font-size: 0.78rem; margin: 2px 0 0 0;">
                     Use $name to reference root artefact labels when applying rules (e.g. $x → $y)
                 </p>
@@ -364,7 +364,7 @@
                         }
                     }}
                 >
-                    {#each $allLayers as l}
+                    {#each allLayers() as l}
                         <option value={l.id}>{l.name}</option>
                     {/each}
                 </select>
@@ -382,7 +382,7 @@
                     onchange={(e) => setInspectedLabel(art, (e.currentTarget as HTMLInputElement).value)}
                 />
             </div>
-            {#if $ruleTag}
+            {#if ruleTag()}
                 <p style="color: #888; font-style: italic; font-size: 0.78rem; margin: 2px 0 0 0;">
                     Use $name to reference root artefact labels when applying rules (e.g. $x → $y)
                 </p>

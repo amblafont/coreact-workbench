@@ -1,3 +1,4 @@
+import { SvelteMap } from 'svelte/reactivity';
 import { Artefact, Drawing, DrawingStore, SortStore } from "./index.svelte.ts";
 import type { DerivedRule } from "./index.svelte.ts";
 import { drawingExportNames, ruleTypeInfo, newExportRegistry, renderExactTerm, renderForallChain, renderSigma, sanitizeIdent } from "./rocq_export";
@@ -68,24 +69,40 @@ interface InlineSubgoal {
     premiseType: string;
 }
 
-interface RecordedStatement {
-    drawingName: string;
-    lemmaName: string;
-    lemmaType: string;
-    bodyLines: string[];
-    proved: boolean;
-    isMain: boolean;
-    conclusionLayerId: string | null;
-    ruleInfo: RuleTypeInfo | null;
-    inlineSubgoals: InlineSubgoal[];
-    proofClosedAt: number | null;
+class RecordedStatement {
+    readonly drawingName: string;
+    readonly lemmaName: string;
+    readonly lemmaType: string;
+    readonly isMain: boolean;
+    bodyLines = $state<string[]>(["intros_sigma ()."]);
+    proved = $state(false);
+    conclusionLayerId = $state<string | null>(null);
+    ruleInfo = $state<RuleTypeInfo | null>(null);
+    inlineSubgoals = $state<InlineSubgoal[]>([]);
+    proofClosedAt = $state<number | null>(null);
+
+    constructor(init: {
+        drawingName: string;
+        lemmaName: string;
+        lemmaType: string;
+        isMain: boolean;
+        conclusionLayerId: string | null;
+        ruleInfo: RuleTypeInfo | null;
+    }) {
+        this.drawingName = init.drawingName;
+        this.lemmaName = init.lemmaName;
+        this.lemmaType = init.lemmaType;
+        this.isMain = init.isMain;
+        this.conclusionLayerId = init.conclusionLayerId;
+        this.ruleInfo = init.ruleInfo;
+    }
 }
 
 export class RocqRecorder {
-    private active: boolean = false;
-    private mainName: string | null = null;
-    private sortStore: SortStore | null = null;
-    private statements: Map<string, RecordedStatement> = new Map();
+    private active = $state(false);
+    private mainName = $state<string | null>(null);
+    private sortStore = $state<SortStore | null>(null);
+    private statements = new SvelteMap<string, RecordedStatement>();
 
     public isActive(): boolean {
         return this.active;
@@ -98,7 +115,7 @@ export class RocqRecorder {
     public start(drawing: Drawing, activeDrawingName: string, sortStore: SortStore): void {
         this.mainName = activeDrawingName;
         this.sortStore = sortStore;
-        this.statements = new Map();
+        this.statements.clear();
 
         const savedDrawing = DrawingStore.drawingToSavedDrawing(activeDrawingName, drawing);
         const exportNames = drawingExportNames(savedDrawing, sortStore);
@@ -113,18 +130,14 @@ export class RocqRecorder {
         const info = ruleTypeInfo(savedDrawing, sortStore, registry, { reserveParam: false, includePremises: false });
         const lemmaName = `${moduleName}_rule`;
 
-        this.statements.set(activeDrawingName, {
+        this.statements.set(activeDrawingName, new RecordedStatement({
             drawingName: activeDrawingName,
             lemmaName,
             lemmaType: info.type,
-            bodyLines: ["intros_sigma ()."],
-            proved: false,
             isMain: true,
             conclusionLayerId: info.conclusionLayerId,
-            ruleInfo: info,
-            inlineSubgoals: [],
-            proofClosedAt: null
-        });
+            ruleInfo: info
+        }));
 
         this.active = true;
     }
@@ -164,18 +177,14 @@ export class RocqRecorder {
         if ([...this.statements.values()].some(s => s.lemmaName === lemmaName)) {
             return;
         }
-        this.statements.set(drawingName, {
+        this.statements.set(drawingName, new RecordedStatement({
             drawingName,
             lemmaName,
             lemmaType,
-            bodyLines: ["intros_sigma ()."],
-            proved: false,
             isMain: false,
             conclusionLayerId: null,
-            ruleInfo: null,
-            inlineSubgoals: [],
-            proofClosedAt: null
-        });
+            ruleInfo: null
+        }));
     }
 
     public recordRuleApply(
@@ -583,7 +592,7 @@ export class RocqRecorder {
             }
             script.push("Qed.");
         }
-        this.statements = new Map();
+        this.statements.clear();
         this.mainName = null;
         this.sortStore = null;
         return `Lemma ${main.lemmaName} : ${main.lemmaType}.\n${script.join("\n")}\n`;

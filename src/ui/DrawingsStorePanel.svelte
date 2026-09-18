@@ -9,6 +9,7 @@
         pendingProofCount,
         ruleTag
     } from './store';
+    import type { RuleTag } from './store';
     import {
         saveActiveDrawing,
         duplicateCurrentDrawing,
@@ -26,8 +27,9 @@
 
     let importInput: HTMLInputElement;
 
-    let names = $derived(new Set($allDrawings.map(d => d.name)));
-    let roots = $derived($allDrawings.filter(d => !d.parentName || !names.has(d.parentName)));
+    let names = $derived(new Set(allDrawings().map(d => d.name)));
+    let roots = $derived(allDrawings().filter(d => !d.parentName || !names.has(d.parentName)));
+    let tag: RuleTag | null = $derived(ruleTag());
 
     function onImportFile(event: Event): void {
         const target = event.currentTarget as HTMLInputElement;
@@ -64,7 +66,7 @@
             <input
                 type="checkbox"
                 title="Select all drawings for export"
-                checked={$exportSelection.size === $allDrawings.length && $allDrawings.length > 0}
+                checked={$exportSelection.size === allDrawings().length && allDrawings().length > 0}
                 onchange={(e) => setExportSelectionAll((e.currentTarget as HTMLInputElement).checked)}
             />
             <button class="layer-btn new-btn" title="Start a new blank drawing" onclick={newDrawing}>New</button>
@@ -76,7 +78,7 @@
                 title="Start or stop Rocq recording for the active drawing"
                 onclick={toggleRocqRecording}
             >
-                {$rocqRecordingActive ? ($pendingProofCount > 0 ? `Stop recording (${$pendingProofCount} pending)` : 'Stop recording') : 'Rocq recording'}
+                {$rocqRecordingActive ? (pendingProofCount() > 0 ? `Stop recording (${pendingProofCount()} pending)` : 'Stop recording') : 'Rocq recording'}
             </button>
             <button class="layer-btn save-btn" title="Save current drawing" onclick={saveActiveDrawing}>Save</button>
             <button class="layer-btn dup-btn" title="Duplicate the current drawing under a new name" onclick={duplicateCurrentDrawing}>Dup.</button>
@@ -103,13 +105,13 @@
             class="rule-checkbox-label"
             title="Explicitly mark the current drawing as a rule (must satisfy rule conditions)"
         >
-            <input type="checkbox" checked={$isCurrentDrawingRule} onchange={(e) => setCurrentDrawingRule((e.currentTarget as HTMLInputElement).checked)} />
+            <input type="checkbox" checked={isCurrentDrawingRule()} onchange={(e) => setCurrentDrawingRule((e.currentTarget as HTMLInputElement).checked)} />
             Rule
         </label>
-        {#if $ruleTag}
-            {#if $ruleTag.kind === 'invalid'}
-                <span class="rule-badge rule-badge-invalid" title={$ruleTag.reason}>Invalid Rule</span>
-            {:else if $ruleTag.kind === 'first'}
+        {#if tag}
+            {#if tag.kind === 'invalid'}
+                <span class="rule-badge rule-badge-invalid" title={tag.reason}>Invalid Rule</span>
+            {:else if tag.kind === 'first'}
                 <span class="first-order-badge" title="First-order rule: root layer has only one child">First-Order</span>
             {:else}
                 <span class="second-order-badge" title="Second-order rule: root layer has several child layers">Second-Order</span>
@@ -117,7 +119,7 @@
         {/if}
     </div>
 
-    {#if $allDrawings.length === 0}
+    {#if allDrawings().length === 0}
         <div class="empty-msg">No drawings saved yet.</div>
     {:else}
         {#each roots as savedDrawing (savedDrawing.name)}

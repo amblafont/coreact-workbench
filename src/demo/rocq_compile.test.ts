@@ -15,7 +15,7 @@ import {
     type SortStore
 } from '../index.svelte.ts';
 import { exportDrawingsToRocq } from '../rocq_export';
-import { RocqRecorder } from '../rocq_recording';
+import { RocqRecorder } from '../rocq_recording.svelte.ts';
 import { newSortStore, makeVertex, makeEdge, buildIsMonoOnlyConclusionRule } from './helpers';
 import { getFirstOrderStatementChildLayer } from '../index.svelte.ts';
 

@@ -4,7 +4,7 @@
     import { addRootLayer } from './store';
     import LayerNode from './LayerNode.svelte';
 
-    let rootLayers: Layer[] = $derived($allLayers.filter(l => l.parentId === null));
+    let rootLayers: Layer[] = $derived(allLayers().filter(l => l.parentId === null));
 </script>
 
 <div class="layers-tree-container">

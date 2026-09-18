@@ -15,7 +15,7 @@
 
     let { layer }: { layer: Layer } = $props();
 
-    let childLayers = $derived($allLayers.filter(l => l.parentId === layer.id));
+    let childLayers = $derived(allLayers().filter(l => l.parentId === layer.id));
     let isEffectivelyVisible = $derived(drawing.isLayerVisible(layer.id));
     let provableResult = $derived($layerProvability.get(layer.id));
 </script>
