@@ -84,6 +84,7 @@ export const ui = $state({
     exportSelection: new SvelteSet<string>(),
     toasts: [] as Toast[],
     rocqRecordingActive: false,
+    drawingsStoreCollapsed: false,
     filterRedundantMatches: false,
     filterNoProgressMatches: false,
     filterStrictMatches: false,

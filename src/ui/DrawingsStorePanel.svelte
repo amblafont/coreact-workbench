@@ -27,6 +27,11 @@
     let names = $derived(new Set(allDrawings().map(d => d.name)));
     let roots = $derived(allDrawings().filter(d => !d.parentName || !names.has(d.parentName)));
     let tag: RuleTag | null = $derived(ruleTag());
+    let collapsed = $derived(ui.drawingsStoreCollapsed);
+
+    function toggleCollapsed(): void {
+        ui.drawingsStoreCollapsed = !ui.drawingsStoreCollapsed;
+    }
 
     function onImportFile(event: Event): void {
         const target = event.currentTarget as HTMLInputElement;
@@ -58,8 +63,18 @@
 
 <div class="drawings-container">
     <div class="drawings-header">
-        <h3 class="panel-subtitle">Drawing Store</h3>
-        <div class="drawings-actions">
+        <div class="drawings-title-row">
+            <button
+                class="panel-toggle-btn"
+                class:collapsed={collapsed}
+                title={collapsed ? 'Expand Drawing Store panel' : 'Collapse Drawing Store panel'}
+                aria-label={collapsed ? 'Expand panel' : 'Collapse panel'}
+                onclick={toggleCollapsed}
+            ></button>
+            <h3 class="panel-subtitle">Drawing Store</h3>
+        </div>
+        {#if !collapsed}
+            <div class="drawings-actions">
             <input
                 type="checkbox"
                 title="Select all drawings for export"
@@ -90,9 +105,11 @@
                 style="display: none;"
                 onchange={onImportFile}
             />
-        </div>
+            </div>
+        {/if}
     </div>
 
+    {#if !collapsed}
     <div class="current-drawing-banner">
         <span style="color: #555;">
             Editing: <strong style="color: #2c3e50;">{ui.activeDrawingName ?? 'Unsaved Drawing'}</strong>
@@ -121,5 +138,6 @@
         {#each roots as savedDrawing (savedDrawing.name)}
             <DrawingNode drawing={savedDrawing} />
         {/each}
+    {/if}
     {/if}
 </div>
