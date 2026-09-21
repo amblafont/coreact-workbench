@@ -22,7 +22,7 @@
         pushToast
     } from './store.svelte.ts';
 
-    let importInput: HTMLInputElement;
+    let importInput = $state<HTMLInputElement>();
 
     let names = $derived(new Set(allDrawings().map(d => d.name)));
     let roots = $derived(allDrawings().filter(d => !d.parentName || !names.has(d.parentName)));
@@ -82,7 +82,7 @@
                 onchange={(e) => setExportSelectionAll((e.currentTarget as HTMLInputElement).checked)}
             />
             <button class="layer-btn new-btn" title="Start a new blank drawing" onclick={newDrawing}>New</button>
-            <button class="layer-btn import-btn" title="Import one or more drawings from a JSON file" onclick={() => importInput.click()}>Import</button>
+            <button class="layer-btn import-btn" title="Import one or more drawings from a JSON file" onclick={() => importInput!.click()}>Import</button>
             <button class="layer-btn export-btn" title="Export the checked drawings to a JSON file" onclick={onExportJson}>Export</button>
             <button class="layer-btn rocq-btn" title="Copy the checked drawings to the clipboard as Rocq code" onclick={onRocqExport}>Rocq</button>
             <button
