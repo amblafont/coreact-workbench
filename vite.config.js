@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
+import { viteSingleFile } from 'vite-plugin-singlefile'
 import { execSync } from 'child_process'
 
 function buildSortsPlugin() {
@@ -20,5 +21,14 @@ function buildSortsPlugin() {
 
 export default defineConfig({
   base: './',
-  plugins: [svelte(), buildSortsPlugin()]
+  plugins: [
+    svelte(),
+    buildSortsPlugin(),
+    ...(process.env.SINGLEFILE ? [viteSingleFile()] : [])
+  ],
+  build: {
+    target: 'esnext',
+    cssCodeSplit: false,
+    rollupOptions: { output: { inlineDynamicImports: true } }
+  }
 })

@@ -7,6 +7,7 @@
     "dev": "vite",
     "predev": "npm run build:sorts",
     "build": "vite build",
+    "build:standalone": "SINGLEFILE=true vite build",
     "prebuild": "npm run build:sorts",
     "build:sorts": "tsc src/default_sorts.ts --target esnext --moduleResolution node --outDir src/generated",
     "preview": "vite preview",
@@ -23,6 +24,7 @@
     "svelte-check": "^4.0.0",
     "typescript": "^5.0.0",
     "vite": "^5.0.0",
+    "vite-plugin-singlefile": "^2.3.3",
     "vitest": "^2.0.0"
   },
   "dependencies": {
