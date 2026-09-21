@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { makeDrawing, makeVertex, makeEdge, makeStore } from './helpers';
+import { DrawingStore } from '../index.svelte.ts';
+import { makeDrawing, makeVertex, makeEdge, makeStore, newSortStore } from './helpers';
 
 describe('Drawing.moveArtefact', () => {
     it('swaps two same-sort same-layer artefacts', () => {
@@ -104,10 +105,9 @@ describe('moveArtefact roundtrip (save → load)', () => {
         d.moveArtefact(v1, -1);
         expect(d.getArtefacts()).toEqual([v1, v0, v2]);
 
-        store.saveDrawing('Test', d);
+        store.addDrawing('Test', d);
 
-        const d2 = makeDrawing();
-        store.loadDrawing('Test', d2);
+        const d2 = DrawingStore.hydrateDrawing(DrawingStore.drawingToSavedDrawing('Test', store.getDrawing('Test')!.drawing), newSortStore());
 
         const labels = d2.getArtefacts().map(a => a.data.label);
         expect(labels).toEqual(['v1', 'v0', 'v2']);
@@ -124,10 +124,9 @@ describe('moveArtefact roundtrip (save → load)', () => {
         d.moveArtefact(v1, -1);
         expect(d.getArtefacts().map(a => a.data.label)).toEqual(['v0', 'v1', 'e0', 'e1']);
 
-        store.saveDrawing('Test', d);
+        store.addDrawing('Test', d);
 
-        const d2 = makeDrawing();
-        store.loadDrawing('Test', d2);
+        const d2 = DrawingStore.hydrateDrawing(DrawingStore.drawingToSavedDrawing('Test', store.getDrawing('Test')!.drawing), newSortStore());
 
         expect(d2.getArtefacts().map(a => a.data.label)).toEqual(['v0', 'v1', 'e0', 'e1']);
     });

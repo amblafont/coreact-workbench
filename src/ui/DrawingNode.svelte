@@ -1,12 +1,12 @@
 <script lang="ts">
-    import type { SavedDrawing } from '../index.svelte.ts';
     import {
         allDrawings,
         ui,
-        recordedStatementByDrawing
+        recordedStatementByDrawing,
+        type StoreDrawing
     } from './store.svelte.ts';
     import {
-        loadDrawingByName,
+        setActiveDrawing,
         renameDrawingName,
         markDrawingAsRule,
         deleteSelectedDrawings,
@@ -15,28 +15,28 @@
     } from './store.svelte.ts';
     import DrawingNode from './DrawingNode.svelte';
 
-    let { drawing, isChild = false }: { drawing: SavedDrawing; isChild?: boolean } = $props();
+    let { drawing, isChild = false }: { drawing: StoreDrawing; isChild?: boolean } = $props();
 
     let isActive = $derived(drawing.name === ui.activeDrawingName);
     let children = $derived(allDrawings().filter(d => d.parentName === drawing.name && d.name !== drawing.name));
     let recStatus = $derived(recordedStatementByDrawing().get(drawing.name));
 
-    function onRename(saved: SavedDrawing): void {
-        const newName = prompt(`Enter new name for drawing '${saved.name}':`, saved.name);
-        if (!newName || !newName.trim() || newName.trim() === saved.name) return;
-        renameDrawingName(saved.name, newName.trim());
+    function onRename(entry: StoreDrawing): void {
+        const newName = prompt(`Enter new name for drawing '${entry.name}':`, entry.name);
+        if (!newName || !newName.trim() || newName.trim() === entry.name) return;
+        renameDrawingName(entry.name, newName.trim());
     }
 
-    function onToggleRule(saved: SavedDrawing): void {
-        markDrawingAsRule(saved.name, !saved.isRule);
+    function onToggleRule(entry: StoreDrawing): void {
+        markDrawingAsRule(entry.name, !entry.drawing.isRule);
     }
 
-    function onDelete(saved: SavedDrawing): void {
-        deleteSelectedDrawings([saved.name]);
+    function onDelete(entry: StoreDrawing): void {
+        deleteSelectedDrawings([entry.name]);
     }
 
-    function onGenerateReverseRules(saved: SavedDrawing): void {
-        generateReverseRulesFor(saved.name);
+    function onGenerateReverseRules(entry: StoreDrawing): void {
+        generateReverseRulesFor(entry.name);
     }
 </script>
 
@@ -57,7 +57,7 @@
         />
         <span
             class="drawing-title"
-            title="Drawing: {drawing.name} ({drawing.layers.length} layers, {drawing.artefacts.length} artefacts){drawing.isRule ? (drawing.isFirstOrder ? ' [First-Order Rule]' : ' [Rule]') : ''}{drawing.proved ? ' [Proved]' : ''}"
+            title="Drawing: {drawing.name} ({drawing.drawing.getAllLayers().length} layers, {drawing.drawing.getArtefacts().length} artefacts){drawing.isRule ? (drawing.isFirstOrder ? ' [First-Order Rule]' : ' [Rule]') : ''}{drawing.proved ? ' [Proved]' : ''}"
         >{drawing.name}</span>
         {#if isActive}
             <span class="active-badge" title="Currently active on canvas">Editing</span>
@@ -83,7 +83,7 @@
         {/if}
     </div>
     <div class="drawing-row-actions">
-        <button class="layer-btn" title="Load drawing '{drawing.name}' to edit further" onclick={() => loadDrawingByName(drawing.name)}>Load</button>
+        <button class="layer-btn" title="Open drawing '{drawing.name}' to edit further" onclick={() => setActiveDrawing(drawing.name)}>Open</button>
         <button class="layer-btn" title="Rename drawing '{drawing.name}'" onclick={() => onRename(drawing)}>Rename</button>
         {#if drawing.isRule && !drawing.isFirstOrder && !isChild}
             <button class="layer-btn gen-reverse-btn" title="Generate a first-order reverse rule for each premise layer of this second-order rule" onclick={() => onGenerateReverseRules(drawing)}>Gen Reverse</button>

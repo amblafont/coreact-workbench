@@ -1,4 +1,9 @@
-import type { ArtefactData, LayerData, SavedDrawing, SortDefinition, SortStore } from "./index.svelte.ts";
+import type { Artefact, Drawing, Layer, SortDefinition, SortStore } from "./index.svelte.ts";
+
+export interface RocqDrawingRef {
+    name: string;
+    drawing: Drawing;
+}
 
 const ROCQ_KEYWORDS: ReadonlySet<string> = new Set([
     "Match", "End", "match", "end", "let", "in", "fun", "forall", "exists",
@@ -200,22 +205,25 @@ export function topoSortFields(items: FieldItem[]): FieldItem[] {
 
 export interface DrawingModel {
     name: string;
-    layerById: Map<string, LayerData>;
-    artefactById: Map<string, ArtefactData>;
-    layerOrder: LayerData[];
+    layerById: Map<string, Layer>;
+    artefactById: Map<string, Artefact>;
+    layerOrder: Layer[];
     ancestors: Map<string, string[]>;
     recordNames: Map<string, string>;
     fieldNames: Map<string, string>;
 }
 
 export function buildDrawingModel(
-    savedDrawing: SavedDrawing,
+    drawing: Drawing,
+    name: string,
     registry: NameRegistry
 ): DrawingModel {
-    const layerById = new Map(savedDrawing.layers.map(layer => [layer.id, layer] as const));
-    const artefactById = new Map(savedDrawing.artefacts.map(art => [art.id, art] as const));
+    const layers = drawing.getAllLayers();
+    const artefacts = drawing.getArtefacts();
+    const layerById = new Map(layers.map(layer => [layer.id, layer] as const));
+    const artefactById = new Map(artefacts.map(art => [art.id, art] as const));
 
-    const layerOrder: LayerData[] = [];
+    const layerOrder: Layer[] = [];
     const visited = new Set<string>();
     const visit = (layerId: string): void => {
         if (visited.has(layerId)) {
@@ -231,12 +239,12 @@ export function buildDrawingModel(
         visited.add(layerId);
         layerOrder.push(layer);
     };
-    for (const layer of savedDrawing.layers) {
+    for (const layer of layers) {
         visit(layer.id);
     }
 
     const ancestors = new Map<string, string[]>();
-    for (const layer of savedDrawing.layers) {
+    for (const layer of layers) {
         const chain: string[] = [];
         let current: string | null = layer.id;
         while (current !== null && layerById.has(current)) {
@@ -247,18 +255,18 @@ export function buildDrawingModel(
     }
 
     const recordNames = new Map<string, string>();
-    for (const layer of savedDrawing.layers) {
+    for (const layer of layers) {
         const baseName = sanitizeIdent(layer.name || layer.id);
         recordNames.set(layer.id, registry.unique(baseName));
     }
 
     const fieldNames = new Map<string, string>();
-    for (const art of savedDrawing.artefacts) {
+    for (const art of artefacts) {
         const baseName = sanitizeIdent(typeof art.data.label === "string" && art.data.label ? art.data.label : art.sortName);
         fieldNames.set(art.id, registry.unique(baseName));
     }
 
-    return { name: savedDrawing.name, layerById, artefactById, layerOrder, ancestors, recordNames, fieldNames };
+    return { name, layerById, artefactById, layerOrder, ancestors, recordNames, fieldNames };
 }
 
 function refFrom(model: DrawingModel, fromLayerId: string, artefactId: string): string {
@@ -282,32 +290,33 @@ function refFrom(model: DrawingModel, fromLayerId: string, artefactId: string): 
     return fieldName;
 }
 
-function labelOf(art: ArtefactData): string {
+function labelOf(art: Artefact): string {
     return typeof art.data.label === "string" && art.data.label ? art.data.label : art.sortName;
 }
 
-function stringDepEntries(dependencies: Record<string, string | boolean>): Array<[string, string]> {
+function stringDepEntries(dependencies: Record<string, Artefact>): Array<[string, string]> {
     return Object.entries(dependencies)
-        .filter((entry): entry is [string, string] => typeof entry[1] === "string")
-        .sort(([a], [b]) => a.localeCompare(b, "en", { numeric: true }));
+        .filter((entry): entry is [string, Artefact] => !!entry[1])
+        .sort(([a], [b]) => a.localeCompare(b, "en", { numeric: true }))
+        .map(([key, art]) => [key, art.id] as [string, string]);
 }
 
-function fieldType(model: DrawingModel, sortStore: SortStore, art: ArtefactData): string {
+function fieldType(model: DrawingModel, sortStore: SortStore, art: Artefact): string {
     const def = getSort(sortStore, art.sortName);
     const depRefs: string[] = [];
     for (const [depKey] of Object.entries(def.dependencies)) {
         const depValue = art.dependencies[depKey];
-        if (typeof depValue !== "string") {
+        if (!depValue) {
             throw new Error(
                 `Consistency Check Failed: Missing artefact dependency '${depKey}' for artefact '${labelOf(art)}' (sort '${art.sortName}').`
             );
         }
-        depRefs.push(refFrom(model, art.layerId, depValue));
+        depRefs.push(refFrom(model, art.layerId, depValue.id));
     }
     return depRefs.length === 0 ? art.sortName : `${art.sortName} ${depRefs.join(" ")}`;
 }
 
-function equalityFieldName(model: DrawingModel, art: ArtefactData): string {
+function equalityFieldName(model: DrawingModel, art: Artefact): string {
     const label = art.data.label;
     if (typeof label === "string" && label) {
         return `eq_${sanitizeIdent(label)}`;
@@ -315,13 +324,13 @@ function equalityFieldName(model: DrawingModel, art: ArtefactData): string {
     const childIds = stringDepEntries(art.dependencies).map(([, value]) => value);
     const childLabels = childIds
         .map(id => model.artefactById.get(id))
-        .filter((child): child is ArtefactData => !!child)
+        .filter((child): child is Artefact => !!child)
         .map(labelOf)
         .map(sanitizeIdent);
     return childLabels.length > 0 ? `eq_${childLabels.join("_")}` : "eq_x";
 }
 
-function equalityConjunctCount(art: ArtefactData): number {
+function equalityConjunctCount(art: Artefact): number {
     const childIds = stringDepEntries(art.dependencies);
     if (childIds.length < 2) {
         throw new Error("Consistency Check Failed: A degenerate equality artefact (fewer than 2 children) cannot be exported.");
@@ -329,7 +338,7 @@ function equalityConjunctCount(art: ArtefactData): number {
     return childIds.length - 1;
 }
 
-function equalityConjunctType(model: DrawingModel, art: ArtefactData, index: number): string {
+function equalityConjunctType(model: DrawingModel, art: Artefact, index: number): string {
     const childIds = stringDepEntries(art.dependencies).map(([, value]) => value);
     if (childIds.length < 2) {
         throw new Error("Consistency Check Failed: A degenerate equality artefact (fewer than 2 children) cannot be exported.");
@@ -343,13 +352,13 @@ export interface ProofFieldNames {
 }
 
 export function computeProofFieldNames(
-    savedDrawing: SavedDrawing,
+    drawing: Drawing,
     model: DrawingModel,
     registry: NameRegistry
 ): ProofFieldNames {
     const equalityFieldNames = new Map<string, string[]>();
     for (const layer of model.layerOrder) {
-        const layerArtefacts = savedDrawing.artefacts.filter(art => art.layerId === layer.id);
+        const layerArtefacts = drawing.getArtefacts().filter(art => art.layerId === layer.id);
         for (const art of layerArtefacts) {
             if (art.sortName !== "Equality") {
                 continue;
@@ -377,14 +386,14 @@ export interface LayerElement extends FieldItem {
 }
 
 export function buildLayerElements(
-    savedDrawing: SavedDrawing,
+    drawing: Drawing,
     sortStore: SortStore,
     model: DrawingModel,
     proofNames: ProofFieldNames,
     layerId: string
 ): LayerElement[] {
     const items: LayerElement[] = [];
-    const layerArtefacts = savedDrawing.artefacts.filter(art => art.layerId === layerId);
+    const layerArtefacts = drawing.getArtefacts().filter(art => art.layerId === layerId);
 
     for (const art of layerArtefacts) {
         if (art.sortName === "Equality") {
@@ -409,13 +418,14 @@ export function buildLayerElements(
             const def = getSort(sortStore, art.sortName);
             for (const [depKey] of Object.entries(def.dependencies)) {
                 const depValue = art.dependencies[depKey];
-                if (typeof depValue === "string") {
-                    const depArt = model.artefactById.get(depValue);
-                    if (depArt && depArt.layerId === layerId) {
-                        const depFieldName = model.fieldNames.get(depValue);
-                        if (depFieldName) {
-                            depFieldNames.push(depFieldName);
-                        }
+                if (!depValue) {
+                    continue;
+                }
+                const depArt = model.artefactById.get(depValue.id);
+                if (depArt && depArt.layerId === layerId) {
+                    const depFieldName = model.fieldNames.get(depValue.id);
+                    if (depFieldName) {
+                        depFieldNames.push(depFieldName);
                     }
                 }
             }
@@ -522,35 +532,36 @@ export interface RuleTypeOptions {
 }
 
 export function ruleTypeInfo(
-    savedDrawing: SavedDrawing,
+    drawing: Drawing,
+    name: string,
     sortStore: SortStore,
     registry: NameRegistry,
     options: RuleTypeOptions
 ): RuleTypeInfo {
-    const model = buildDrawingModel(savedDrawing, registry);
-    const proofNames = computeProofFieldNames(savedDrawing, model, registry);
+    const model = buildDrawingModel(drawing, name, registry);
+    const proofNames = computeProofFieldNames(drawing, model, registry);
 
-    const rootLayers = savedDrawing.layers.filter(l => l.parentId === null);
+    const rootLayers = drawing.getAllLayers().filter(l => l.parentId === null);
     if (rootLayers.length !== 1) {
-        throw new Error(`Consistency Check Failed: Rule drawing '${savedDrawing.name}' must have exactly one root layer.`);
+        throw new Error(`Consistency Check Failed: Rule drawing '${name}' must have exactly one root layer.`);
     }
     const root = rootLayers[0];
-    const rootElements = buildLayerElements(savedDrawing, sortStore, model, proofNames, root.id);
+    const rootElements = buildLayerElements(drawing, sortStore, model, proofNames, root.id);
 
-    const rootChildren = savedDrawing.layers.filter(l => l.parentId === root.id);
+    const rootChildren = drawing.getAllLayers().filter(l => l.parentId === root.id);
     const conclusion = rootChildren.find(child => {
-        const childrenOfChild = savedDrawing.layers.filter(l => l.parentId === child.id);
+        const childrenOfChild = drawing.getAllLayers().filter(l => l.parentId === child.id);
         return childrenOfChild.length === 0;
     });
 
     let paramName: string | null = null;
     if (options.reserveParam) {
-        paramName = registry.unique(ruleParamBaseName(savedDrawing.name));
+        paramName = registry.unique(ruleParamBaseName(name));
     }
 
     if (!conclusion) {
         if (options.includePremises) {
-            throw new Error(`Consistency Check Failed: Rule drawing '${savedDrawing.name}' has no conclusion layer.`);
+            throw new Error(`Consistency Check Failed: Rule drawing '${name}' has no conclusion layer.`);
         }
         return {
             paramName,
@@ -565,7 +576,7 @@ export function ruleTypeInfo(
         };
     }
 
-    const conclusionElements = buildLayerElements(savedDrawing, sortStore, model, proofNames, conclusion.id);
+    const conclusionElements = buildLayerElements(drawing, sortStore, model, proofNames, conclusion.id);
     const conclusionStr = renderSigma(conclusionElements);
 
     let type: string;
@@ -574,13 +585,13 @@ export function ruleTypeInfo(
         const premises = rootChildren
             .filter(child => child !== conclusion)
             .map(premise => {
-                const childOfPremise = savedDrawing.layers.find(l => l.parentId === premise.id);
+                const childOfPremise = drawing.getAllLayers().find(l => l.parentId === premise.id);
                 if (!childOfPremise) {
-                    throw new Error(`Consistency Check Failed: Premise layer '${premise.name}' in rule drawing '${savedDrawing.name}' has no child layer.`);
+                    throw new Error(`Consistency Check Failed: Premise layer '${premise.name}' in rule drawing '${name}' has no child layer.`);
                 }
                 return {
-                    premiseElements: buildLayerElements(savedDrawing, sortStore, model, proofNames, premise.id),
-                    childElements: buildLayerElements(savedDrawing, sortStore, model, proofNames, childOfPremise.id)
+                    premiseElements: buildLayerElements(drawing, sortStore, model, proofNames, premise.id),
+                    childElements: buildLayerElements(drawing, sortStore, model, proofNames, childOfPremise.id)
                 };
             });
         premiseLayers = premises;
@@ -620,8 +631,8 @@ export function newExportRegistry(sortStore: SortStore): NameRegistry {
     return registry;
 }
 
-export function exportDrawingsToRocq(savedDrawings: SavedDrawing[], sortStore: SortStore): string {
-    if (savedDrawings.length === 0) {
+export function exportDrawingsToRocq(drawings: Array<{ name: string; drawing: Drawing }>, sortStore: SortStore): string {
+    if (drawings.length === 0) {
         throw new Error("Consistency Check Failed: No drawings selected for export.");
     }
 
@@ -668,15 +679,15 @@ export function exportDrawingsToRocq(savedDrawings: SavedDrawing[], sortStore: S
         emitSort(def.name);
     }
 
-    const rules = savedDrawings.filter(drawing => drawing.isRule);
+    const rules = drawings.filter(ref => ref.drawing.isRule);
     if (rules.length > 0) {
         lines.push("");
     }
-    for (const drawing of rules) {
+    for (const ref of rules) {
         const registry = newExportRegistry(sortStore);
-        const info = ruleTypeInfo(drawing, sortStore, registry, { reserveParam: true, includePremises: true });
+        const info = ruleTypeInfo(ref.drawing, ref.name, sortStore, registry, { reserveParam: true, includePremises: true });
         if (!info.paramName) {
-            throw new Error(`Consistency Check Failed: Rule drawing '${drawing.name}' has no rule parameter.`);
+            throw new Error(`Consistency Check Failed: Rule drawing '${ref.name}' has no rule parameter.`);
         }
         lines.push(`Parameter ${info.paramName} : ${info.type}.`);
     }
@@ -693,7 +704,7 @@ export interface DrawingExportNames {
     model: DrawingModel;
 }
 
-export function drawingExportNames(savedDrawing: SavedDrawing, sortStore: SortStore): DrawingExportNames {
+export function drawingExportNames(drawing: Drawing, name: string, sortStore: SortStore): DrawingExportNames {
     const registry = new NameRegistry();
     const sortDefs = sortStore.getAllSorts().filter(def => def.name !== "Equality");
 
@@ -701,16 +712,16 @@ export function drawingExportNames(savedDrawing: SavedDrawing, sortStore: SortSt
         registry.reserve(def.name);
     }
     registry.reserve("Equality");
-    if (savedDrawing.isRule) {
+    if (drawing.isRule) {
         registry.reserve("rule");
     }
 
-    const moduleName = registry.unique(sanitizeIdent(savedDrawing.name || "Drawing"));
-    const model = buildDrawingModel(savedDrawing, registry);
-    const proofNames = computeProofFieldNames(savedDrawing, model, registry);
+    const moduleName = registry.unique(sanitizeIdent(name || "Drawing"));
+    const model = buildDrawingModel(drawing, name, registry);
+    const proofNames = computeProofFieldNames(drawing, model, registry);
     let ruleParam: string | null = null;
-    if (savedDrawing.isRule) {
-        ruleParam = registry.unique(ruleParamBaseName(savedDrawing.name));
+    if (drawing.isRule) {
+        ruleParam = registry.unique(ruleParamBaseName(name));
     }
 
     return {

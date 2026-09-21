@@ -6,7 +6,7 @@
     const entries = $derived(applyRuleFilters(matches));
 
     function matchLabels(entry: (typeof entries)[number], app: (typeof entry.applications)[number]): string[] {
-        const ruleDrawing = entry.ruleDrawing;
+        const ruleDrawing = entry.drawing;
         const ruleRootId = ruleDrawing.getAllLayers().find(l => l.parentId === null)?.id;
         const patternArts = ruleRootId
             ? ruleDrawing.getArtefacts().filter(a => a.sortName !== 'Equality' && a.layerId === ruleRootId)
@@ -32,7 +32,7 @@
     }
 
     function onApply(entry: (typeof entries)[number], index: number): void {
-        applyRuleAt(entry.savedRule.name, index);
+        applyRuleAt(entry.name, index);
     }
 
     function onHover(activeSet: Set<Artefact>): void {
@@ -64,21 +64,20 @@
     </label>
 </div>
 
-{#each entries as entry (entry.savedRule.name)}
-    {#each entry.applications as app, index (entry.savedRule.name + '-' + index)}
-        {@const savedRule = entry.savedRule}
+{#each entries as entry (entry.name)}
+    {#each entry.applications as app, index (entry.name + '-' + index)}
         {@const labels = matchLabels(entry, app)}
         <div
             role="group"
-            class:first-order={savedRule.isFirstOrder}
-            class:second-order={!savedRule.isFirstOrder}
+            class:first-order={entry.isFirstOrder}
+            class:second-order={!entry.isFirstOrder}
             class="rule-app-row"
             onmouseenter={() => onHover(app.hostArtefacts)}
             onmouseleave={onLeave}
         >
             <div class="rule-app-name">
-                {savedRule.name}
-                {#if savedRule.isFirstOrder}
+                {entry.name}
+                {#if entry.isFirstOrder}
                     <span class="first-order-badge" title="First-order rule: root layer has only one child">First-Order</span>
                 {:else}
                     <span class="second-order-badge" title="Second-order rule: root layer has several child layers">Second-Order</span>
@@ -87,7 +86,7 @@
             <div class="rule-app-match">{labels.length > 0 ? labels.join(', ') : '(no labelled artefacts)'}</div>
             <button
                 class="apply-btn"
-                title={savedRule.isFirstOrder ? 'Apply this first-order rule to the matched artefacts' : 'Apply this second-order rule to the matched artefacts'}
+                title={entry.isFirstOrder ? 'Apply this first-order rule to the matched artefacts' : 'Apply this second-order rule to the matched artefacts'}
                 onclick={(e) => {
                     e.stopPropagation();
                     onApply(entry, index);

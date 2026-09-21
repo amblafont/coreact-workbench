@@ -6,7 +6,7 @@ import {
     type Drawing,
     type Layer
 } from '../index.svelte.ts';
-import { makeDrawing, makeVertex, makeEdge, makeStore } from './helpers';
+import { makeDrawing, makeVertex, makeEdge, makeStore, newSortStore } from './helpers';
 
 function childIdOf(child: Layer | null): string | null {
     return child ? child.id : null;
@@ -70,47 +70,33 @@ describe('computeProved', () => {
     });
 });
 
-describe('saving a drawing records the proved flag', () => {
-    it('marks a provable first-order statement as proved', () => {
+describe('proved flag management', () => {
+    it('does not pre-set the proved flag when a drawing is added', () => {
         const store = makeStore();
         const host = buildProvableStatement();
-        const saved = store.saveDrawing('Statement', host);
-        expect(saved.proved).toBe(true);
-    });
-
-    it('does not mark an unprovable first-order statement as proved', () => {
-        const store = makeStore();
-        const host = buildUnprovableStatement();
-        const saved = store.saveDrawing('Statement', host);
-        expect(saved.proved).toBe(false);
-    });
-
-    it('does not mark non-statement drawings as proved', () => {
-        const store = makeStore();
-        const saved = store.saveDrawing('Plain', makeDrawing());
-        expect(saved.proved).toBe(false);
+        store.addDrawing('Statement', host);
+        expect(store.getDrawing('Statement')?.proved).toBe(false);
     });
 
     it('preserves proved across an export/import round-trip', () => {
         const store = makeStore();
-        store.saveDrawing('Statement', buildProvableStatement());
+        store.addDrawing('Statement', buildProvableStatement());
+        store.setDrawingProved('Statement', true);
         const json = store.exportDrawingsJSON(['Statement']);
 
         const imported = new DrawingStore();
-        const result = imported.importDrawingsJSON(json);
-        expect(result.drawings[0].proved).toBe(true);
+        imported.importDrawingsJSON(json, newSortStore());
+        expect(imported.getDrawing('Statement')?.proved).toBe(true);
     });
 
-    it('recomputes proved from content on save', () => {
+    it('keeps the cached proved flag when the drawing content changes', () => {
         const store = makeStore();
         const host = buildProvableStatement();
-        store.saveDrawing('Statement', host);
+        store.addDrawing('Statement', host);
+        store.setDrawingProved('Statement', true);
 
-        const reloaded = makeDrawing();
-        store.loadDrawing('Statement', reloaded);
-        reloaded.removeLayer('child');
-        const saved = store.saveDrawing('Statement', reloaded);
-        expect(saved.proved).toBe(false);
+        host.removeLayer('child');
+        expect(store.getDrawing('Statement')?.proved).toBe(true);
     });
 });
 
@@ -118,7 +104,7 @@ describe('DrawingStore.setDrawingProved', () => {
     it('updates the proved flag on the stored record', () => {
         const store = makeStore();
         const host = buildProvableStatement();
-        store.saveDrawing('Statement', host);
+        store.addDrawing('Statement', host);
         store.setDrawingProved('Statement', false);
         expect(store.getDrawing('Statement')?.proved).toBe(false);
         store.setDrawingProved('Statement', true);

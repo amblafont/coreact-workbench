@@ -1,18 +1,19 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SvelteSet } from 'svelte/reactivity';
-import { drawing, drawingStore, ui, sortStore, rocqRecorder, syncProvedStatus, getSelectedDrawingNames, deleteSelectedDrawings, renameDrawingName, pushToast, dismissToast, applyRuleAt,
+import { getDrawing, drawingStore, ui, sortStore, rocqRecorder, syncProvedStatus, getSelectedDrawingNames, deleteSelectedDrawings, renameDrawingName, pushToast, dismissToast, applyRuleAt,
     resetInteractionState, togglePositionPicker, isPositionPickerActive, isDraftPickerActive,
     applyPickedPosition, startPositionPicker, selectArtefactToInspect, removeArtefactNode
 } from './store.svelte.ts';
+import { Drawing } from '../index.svelte.ts';
 import { registerDefaultSorts } from '../demo/buildDemo';
 import { buildComposableEdgesRule } from '../demo/helpers';
 
 describe('export selection bookkeeping', () => {
     beforeEach(() => {
-        drawing.clear(false);
+        getDrawing().clear(false);
         drawingStore.clear();
-        drawingStore.saveDrawing('Initial Drawing', drawing);
-        drawingStore.saveDrawing('Rule Drawing Demo', drawing);
+        drawingStore.addDrawing('Initial Drawing', new Drawing(sortStore));
+        drawingStore.addDrawing('Rule Drawing Demo', new Drawing(sortStore));
         ui.exportSelection = new SvelteSet(['Initial Drawing', 'Rule Drawing Demo']);
         vi.stubGlobal('confirm', () => true);
     });
@@ -81,7 +82,7 @@ describe('toasts', () => {
 describe('first-order statement proved status', () => {
     beforeEach(() => {
         registerDefaultSorts(sortStore);
-        drawing.clear(true);
+        getDrawing().clear(true);
         drawingStore.clear();
         ui.activeDrawingName = null;
         vi.stubGlobal('confirm', () => true);
@@ -93,18 +94,18 @@ describe('first-order statement proved status', () => {
     });
 
     function buildStatement(provable: boolean): void {
-        const a = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'a' }, 'root');
-        const b = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'b' }, 'root');
+        const a = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'a' }, 'root');
+        const b = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'b' }, 'root');
         if (provable) {
-            drawing.newArtefact('Edge', { source: a, target: b }, { width: 2, bend: 0, label: 'g' }, 'root');
+            getDrawing().newArtefact('Edge', { source: a, target: b }, { width: 2, bend: 0, label: 'g' }, 'root');
         }
-        drawing.addLayer('goal', 'Goal', 'root');
-        drawing.newArtefact('Edge', { source: a, target: b }, { width: 2, bend: 0, label: 'c' }, 'goal');
+        getDrawing().addLayer('goal', 'Goal', 'root');
+        getDrawing().newArtefact('Edge', { source: a, target: b }, { width: 2, bend: 0, label: 'c' }, 'goal');
     }
 
     it('marks a provable first-order statement as proved', () => {
         buildStatement(true);
-        drawingStore.saveDrawing('Statement', drawing);
+        drawingStore.addDrawing('Statement', getDrawing());
         ui.activeDrawingName = 'Statement';
         syncProvedStatus();
         expect(drawingStore.getDrawing('Statement')?.proved).toBe(true);
@@ -112,7 +113,7 @@ describe('first-order statement proved status', () => {
 
     it('clears a previously set proved flag when the statement is no longer provable', () => {
         buildStatement(false);
-        drawingStore.saveDrawing('Statement', drawing);
+        drawingStore.addDrawing('Statement', getDrawing());
         drawingStore.setDrawingProved('Statement', true);
         ui.activeDrawingName = 'Statement';
         syncProvedStatus();
@@ -127,19 +128,19 @@ describe('first-order statement proved status', () => {
 
     it('records an exact proof to the rocq recorder when proved', () => {
         buildStatement(true);
-        drawingStore.saveDrawing('Statement', drawing);
+        drawingStore.addDrawing('Statement', getDrawing());
         ui.activeDrawingName = 'Statement';
-        rocqRecorder.start(drawing, 'Statement', sortStore);
+        rocqRecorder.start(getDrawing(), 'Statement', sortStore);
         syncProvedStatus();
         const script = rocqRecorder.stop();
         expect(script).toContain('exact ');
     });
 });
 
-describe('auto-saving drawing after rule application', () => {
+describe('active drawing after rule application', () => {
     beforeEach(() => {
         registerDefaultSorts(sortStore);
-        drawing.clear(true);
+        getDrawing().clear(true);
         drawingStore.clear();
         ui.activeDrawingName = null;
     });
@@ -148,39 +149,39 @@ describe('auto-saving drawing after rule application', () => {
         ui.activeDrawingName = null;
     });
 
-    it('automatically saves the active drawing when a rule is applied', () => {
+    it('mutates the stored active drawing when a rule is applied', () => {
         const { rule } = buildComposableEdgesRule();
-        drawingStore.saveDrawing('CompRule', rule);
+        drawingStore.addDrawing('CompRule', rule);
 
-        const v0 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v0' }, 'root');
-        const v1 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v1' }, 'root');
-        const v2 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v2' }, 'root');
-        drawing.newArtefact('Edge', { source: v0, target: v1 }, { width: 2, bend: 0, label: 'e1' }, 'root');
-        drawing.newArtefact('Edge', { source: v1, target: v2 }, { width: 2, bend: 0, label: 'e2' }, 'root');
+        const v0 = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'v0' }, 'root');
+        const v1 = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'v1' }, 'root');
+        const v2 = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'v2' }, 'root');
+        getDrawing().newArtefact('Edge', { source: v0, target: v1 }, { width: 2, bend: 0, label: 'e1' }, 'root');
+        getDrawing().newArtefact('Edge', { source: v1, target: v2 }, { width: 2, bend: 0, label: 'e2' }, 'root');
 
-        drawingStore.saveDrawing('HostDrawing', drawing);
+        drawingStore.addDrawing('HostDrawing', getDrawing());
         ui.activeDrawingName = 'HostDrawing';
-        expect(drawingStore.getDrawing('HostDrawing')?.artefacts.length).toBe(5);
+        expect(drawingStore.getDrawing('HostDrawing')?.drawing.getArtefacts().length).toBe(5);
 
         applyRuleAt('CompRule', 0);
 
-        expect(drawing.getArtefacts().length).toBe(6);
+        expect(getDrawing().getArtefacts().length).toBe(6);
         const saved = drawingStore.getDrawing('HostDrawing');
         expect(saved).toBeDefined();
-        expect(saved?.artefacts.length).toBe(6);
+        expect(saved?.drawing.getArtefacts().length).toBe(6);
     });
 
-    it('preserves parentName when auto-saving the active drawing', () => {
+    it('preserves parentName of the active drawing across a rule application', () => {
         const { rule } = buildComposableEdgesRule();
-        drawingStore.saveDrawing('CompRule', rule);
+        drawingStore.addDrawing('CompRule', rule);
 
-        const v0 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v0' }, 'root');
-        const v1 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v1' }, 'root');
-        const v2 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v2' }, 'root');
-        drawing.newArtefact('Edge', { source: v0, target: v1 }, { width: 2, bend: 0, label: 'e1' }, 'root');
-        drawing.newArtefact('Edge', { source: v1, target: v2 }, { width: 2, bend: 0, label: 'e2' }, 'root');
+        const v0 = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'v0' }, 'root');
+        const v1 = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'v1' }, 'root');
+        const v2 = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'v2' }, 'root');
+        getDrawing().newArtefact('Edge', { source: v0, target: v1 }, { width: 2, bend: 0, label: 'e1' }, 'root');
+        getDrawing().newArtefact('Edge', { source: v1, target: v2 }, { width: 2, bend: 0, label: 'e2' }, 'root');
 
-        drawingStore.saveDrawing('ChildDrawing', drawing);
+        drawingStore.addDrawing('ChildDrawing', getDrawing());
         drawingStore.setDrawingParent('ChildDrawing', 'ParentDrawing');
         ui.activeDrawingName = 'ChildDrawing';
 
@@ -190,23 +191,23 @@ describe('auto-saving drawing after rule application', () => {
 
         const saved = drawingStore.getDrawing('ChildDrawing');
         expect(saved?.parentName).toBe('ParentDrawing');
-        expect(saved?.artefacts.length).toBe(6);
+        expect(saved?.drawing.getArtefacts().length).toBe(6);
     });
 
-    it('skips auto-saving silently when activeDrawingName is null', () => {
+    it('mutates the unsaved canvas when no active drawing is set', () => {
         const { rule } = buildComposableEdgesRule();
-        drawingStore.saveDrawing('CompRule', rule);
+        drawingStore.addDrawing('CompRule', rule);
 
-        const v0 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v0' }, 'root');
-        const v1 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v1' }, 'root');
-        const v2 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v2' }, 'root');
-        drawing.newArtefact('Edge', { source: v0, target: v1 }, { width: 2, bend: 0, label: 'e1' }, 'root');
-        drawing.newArtefact('Edge', { source: v1, target: v2 }, { width: 2, bend: 0, label: 'e2' }, 'root');
+        const v0 = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'v0' }, 'root');
+        const v1 = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'v1' }, 'root');
+        const v2 = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'v2' }, 'root');
+        getDrawing().newArtefact('Edge', { source: v0, target: v1 }, { width: 2, bend: 0, label: 'e1' }, 'root');
+        getDrawing().newArtefact('Edge', { source: v1, target: v2 }, { width: 2, bend: 0, label: 'e2' }, 'root');
 
         ui.activeDrawingName = null;
 
         expect(() => applyRuleAt('CompRule', 0)).not.toThrow();
-        expect(drawing.getArtefacts().length).toBe(6);
+        expect(getDrawing().getArtefacts().length).toBe(6);
         expect(drawingStore.getAllDrawings().map(d => d.name)).toEqual(['CompRule']);
     });
 });
@@ -218,7 +219,7 @@ describe('position picker', () => {
         registerDefaultSorts(sortStore);
         if (!sortStore.getSort('Anchor')) sortStore.newSort('Anchor', {}, { position: 'position' }, noop);
         if (!sortStore.getSort('Rel')) sortStore.newSort('Rel', { anchor: 'Anchor' }, { position: { type: 'relativePosition', target: 'anchor.position' } }, noop);
-        drawing.clear(true);
+        getDrawing().clear(true);
         drawingStore.clear();
         ui.activeDrawingName = null;
         resetInteractionState();
@@ -231,19 +232,19 @@ describe('position picker', () => {
     });
 
     it('bails out when the picked artefact has been removed (bypassing the prune sweep)', () => {
-        const a = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'a' }, 'root');
+        const a = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'a' }, 'root');
         togglePositionPicker(a, 'position');
         expect(isPositionPickerActive(a, 'position')).toBe(true);
 
-        drawing.removeArtefact(a);
-        expect(drawing.getArtefactById(a.id)).toBeUndefined();
+        getDrawing().removeArtefact(a);
+        expect(getDrawing().getArtefactById(a.id)).toBeUndefined();
         expect(() => applyPickedPosition(5, 5)).not.toThrow();
         expect(ui.positionPicker).toBeNull();
         expect(a.data.position).toEqual([0, 0]);
     });
 
     it('writes a draft relativePosition offset relative to its dependency', () => {
-        const anchor = drawing.newArtefact('Anchor', {}, { position: [100, 100] }, 'root');
+        const anchor = getDrawing().newArtefact('Anchor', {}, { position: [100, 100] }, 'root');
         ui.draftArtefact = { sortName: 'Rel', dependencies: { anchor }, data: { position: [0, 0] }, layerId: 'root' };
         startPositionPicker({ kind: 'draft', attrName: 'position' });
 
@@ -254,7 +255,7 @@ describe('position picker', () => {
     });
 
     it('writes an absolute position onto a real artefact and clears the picker', () => {
-        const a = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'a' }, 'root');
+        const a = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'a' }, 'root');
         togglePositionPicker(a, 'position');
         expect(isPositionPickerActive(a, 'position')).toBe(true);
 
@@ -265,7 +266,7 @@ describe('position picker', () => {
     });
 
     it('does not treat a draft picker as active on a real artefact sharing its data object', () => {
-        const a = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'a' }, 'root');
+        const a = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'a' }, 'root');
         ui.draftArtefact = { sortName: 'Vertex', dependencies: {}, data: a.data, layerId: 'root' };
         startPositionPicker({ kind: 'draft', attrName: 'position' });
 
@@ -274,21 +275,21 @@ describe('position picker', () => {
     });
 
     it('clears inspection and the picker when the picked artefact is removed as a transitive dependent', () => {
-        const v = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v' }, 'root');
-        const e = drawing.newArtefact('Edge', { source: v, target: v }, { width: 2, bend: 0, label: 'e' }, 'root');
+        const v = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'v' }, 'root');
+        const e = getDrawing().newArtefact('Edge', { source: v, target: v }, { width: 2, bend: 0, label: 'e' }, 'root');
         selectArtefactToInspect(e);
         togglePositionPicker(e, 'bend');
         expect(ui.inspectedArtefact).toBe(e);
 
         removeArtefactNode(v);
 
-        expect(drawing.getArtefactById(e.id)).toBeUndefined();
+        expect(getDrawing().getArtefactById(e.id)).toBeUndefined();
         expect(ui.inspectedArtefact).toBeNull();
         expect(ui.positionPicker).toBeNull();
     });
 
     it('clears inspection and the picker when the picked artefact is removed directly', () => {
-        const a = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'a' }, 'root');
+        const a = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'a' }, 'root');
         selectArtefactToInspect(a);
         togglePositionPicker(a, 'position');
         expect(ui.inspectedArtefact).toBe(a);

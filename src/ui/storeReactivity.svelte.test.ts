@@ -2,17 +2,17 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { DrawingStore } from '../index.svelte.ts';
 import { buildComposableEdgesRule } from '../demo/helpers';
 
-describe('drawing-store reactivity (saved-drawing field updates)', () => {
+describe('drawing-store reactivity (live-drawing field updates)', () => {
     let store: DrawingStore;
 
     beforeEach(() => {
         store = new DrawingStore();
     });
 
-    it('markAsRule propagates to a $derived reading the saved drawing', () => {
+    it('markAsRule propagates to a $derived reading the stored drawing', () => {
         const { rule } = buildComposableEdgesRule();
-        store.saveDrawing('R', rule);
-        let isRule = $derived(store.getDrawing('R')?.isRule);
+        store.addDrawing('R', rule);
+        let isRule = $derived(store.getDrawing('R')?.drawing.isRule);
         const read = () => isRule;
         expect(read()).toBe(true);
 
@@ -23,9 +23,9 @@ describe('drawing-store reactivity (saved-drawing field updates)', () => {
         expect(read()).toBe(true);
     });
 
-    it('setDrawingProved propagates to a $derived reading the saved drawing', () => {
+    it('setDrawingProved propagates to a $derived reading the stored drawing', () => {
         const { rule } = buildComposableEdgesRule();
-        store.saveDrawing('D', rule);
+        store.addDrawing('D', rule);
         let proved = $derived(store.getDrawing('D')?.proved);
         const read = () => proved;
         expect(read()).toBe(false);
@@ -37,9 +37,9 @@ describe('drawing-store reactivity (saved-drawing field updates)', () => {
         expect(read()).toBe(false);
     });
 
-    it('setDrawingParent propagates to a $derived reading the saved drawing', () => {
+    it('setDrawingParent propagates to a $derived reading the stored drawing', () => {
         const { rule } = buildComposableEdgesRule();
-        store.saveDrawing('C', rule);
+        store.addDrawing('C', rule);
         let parentName = $derived(store.getDrawing('C')?.parentName);
         const read = () => parentName;
         expect(read()).toBeUndefined();
@@ -49,9 +49,10 @@ describe('drawing-store reactivity (saved-drawing field updates)', () => {
     });
 
     it('renameDrawing propagates the updated parentName to children in a $derived', () => {
-        const { rule } = buildComposableEdgesRule();
-        store.saveDrawing('ParentDrawing', rule);
-        store.saveDrawing('ChildDrawing', rule);
+        const parentDraw = buildComposableEdgesRule().rule;
+        const childDraw = buildComposableEdgesRule().rule;
+        store.addDrawing('ParentDrawing', parentDraw);
+        store.addDrawing('ChildDrawing', childDraw);
         store.setDrawingParent('ChildDrawing', 'ParentDrawing');
 
         let parentName = $derived(store.getDrawing('ChildDrawing')?.parentName);

@@ -2,7 +2,7 @@
     import type { Artefact } from '../index.svelte.ts';
     import { getAttributeType, getRelativePositionMeta } from '../index.svelte.ts';
     import DataAttributeFields from './DataAttributeFields.svelte';
-    import { drawing, sortStore, allLayers, ui } from './store.svelte.ts';
+    import { getDrawing, sortStore, allLayers, ui } from './store.svelte.ts';
     import {
         ruleTag
     } from './store.svelte.ts';
@@ -31,15 +31,15 @@
     let provablyEqualCandidates = $derived.by(() => {
         const first = ui.mergeFirstArtefact;
         if (!first) return [];
-        return drawing.getArtefacts().filter(art =>
-            art !== first && drawing.areDependenciesEqual(first, art) && drawing.areProvablyEqual(first, art)
+        return getDrawing().getArtefacts().filter(art =>
+            art !== first && getDrawing().areDependenciesEqual(first, art) && getDrawing().areProvablyEqual(first, art)
         );
     });
     let otherCandidates = $derived.by(() => {
         const first = ui.mergeFirstArtefact;
         if (!first) return [];
-        return drawing.getArtefacts().filter(art =>
-            art !== first && drawing.areDependenciesEqual(first, art) && !drawing.areProvablyEqual(first, art)
+        return getDrawing().getArtefacts().filter(art =>
+            art !== first && getDrawing().areDependenciesEqual(first, art) && !getDrawing().areProvablyEqual(first, art)
         );
     });
     let orderedCandidates = $derived([...provablyEqualCandidates, ...otherCandidates]);
@@ -67,7 +67,7 @@
 
     let canMerge = $derived(!!(ui.mergeFirstArtefact && ui.mergeSecondArtefact
         && ui.mergeFirstArtefact !== ui.mergeSecondArtefact
-        && drawing.areDependenciesEqual(ui.mergeFirstArtefact, ui.mergeSecondArtefact)));
+        && getDrawing().areDependenciesEqual(ui.mergeFirstArtefact, ui.mergeSecondArtefact)));
 
     function toggleMergeFirst(): void {
         ui.mergePickingFor = ui.mergePickingFor === 'first' ? null : 'first';
@@ -88,7 +88,7 @@
     }
 
     function candidateOptionText(cand: Artefact): string {
-        const layerObj = drawing.getLayer(cand.layerId);
+        const layerObj = getDrawing().getLayer(cand.layerId);
         return `${cand.data.label || '(unnamed)'} (${cand.sortName} in '${layerObj ? layerObj.name : cand.layerId}')`;
     }
 

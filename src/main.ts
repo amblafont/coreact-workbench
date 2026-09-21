@@ -1,13 +1,12 @@
 import { mount } from 'svelte';
 import './demo';
-import { ui, drawing, drawingStore } from './ui/store.svelte.ts';
+import { setActiveDrawing } from './ui/store.svelte.ts';
 import App from './ui/App.svelte';
 import './ui/app.css';
 
-// Load the simple mono drawing as the active drawing (it was saved during the
+// Open the simple mono drawing as the active drawing (it was added during the
 // demo initialization in demo.ts) so the canvas starts with its content.
-drawingStore.loadDrawing('SimpleMono', drawing);
-ui.activeDrawingName = 'SimpleMono';
+setActiveDrawing('SimpleMono');
 
 const target = document.getElementById('app')!;
 target.innerHTML = '';

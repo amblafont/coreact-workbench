@@ -1,6 +1,6 @@
 <script lang="ts">
     import type { Layer } from '../index.svelte.ts';
-    import { drawing, allLayers, ui } from './store.svelte.ts';
+    import { getDrawing, allLayers, ui } from './store.svelte.ts';
     import {
         toggleLayerVisibility,
         toggleLayerFocus,
@@ -16,7 +16,7 @@
     let { layer }: { layer: Layer } = $props();
 
     let childLayers = $derived(allLayers().filter(l => l.parentId === layer.id));
-    let isEffectivelyVisible = $derived(drawing.isLayerVisible(layer.id));
+    let isEffectivelyVisible = $derived(getDrawing().isLayerVisible(layer.id));
     let provableResult = $derived(ui.layerProvability.get(layer.id));
 </script>
 

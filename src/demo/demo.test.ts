@@ -75,15 +75,16 @@ describe('demo drawing store', () => {
         const comp = drawingStore.getDrawing('ComposableEdges')!;
         const soComp = drawingStore.getDrawing('SecondOrderComp')!;
 
-        expect(initial.isRule).toBe(false);
-        expect(demo.isRule).toBe(false);
-        expect(comp.isRule).toBe(true);
-        expect(comp.isFirstOrder).toBe(true);
-        expect(soComp.isRule).toBe(true);
-        expect(soComp.isFirstOrder).toBe(false);
+        expect(initial.drawing.isRule).toBe(false);
+        expect(demo.drawing.isRule).toBe(false);
+        expect(comp.drawing.isRule).toBe(true);
+        expect(drawingStore.checkIsFirstOrder(comp.drawing)).toBe(true);
+        expect(soComp.drawing.isRule).toBe(true);
+        expect(drawingStore.checkIsFirstOrder(soComp.drawing)).toBe(false);
 
-        // buildDemo ends by loading 'Rule Drawing Demo' back into the canvas drawing
+        // buildDemo stores a clone of the canvas drawing as 'Rule Drawing Demo'
+        // while the canvas drawing itself keeps its content
         expect(drawing.isRule).toBe(false);
-        expect(drawing.getArtefacts().length).toBe(demo.artefacts.length);
+        expect(drawing.getArtefacts().length).toBe(demo.drawing.getArtefacts().length);
     });
 });

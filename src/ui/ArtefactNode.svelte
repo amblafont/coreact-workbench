@@ -1,6 +1,6 @@
 <script lang="ts">
     import type { Artefact } from '../index.svelte.ts';
-    import { drawing, ui } from './store.svelte.ts';
+    import { getDrawing, ui } from './store.svelte.ts';
     import {
         getArtefactLabel,
         equalityChildren,
@@ -34,8 +34,8 @@
     let baseLabel = $derived(getArtefactLabel(artefact));
     let equalitySuffix = $derived(artefact.sortName === 'Equality' && children.length > 0 ? ` [${children[0].sortName}]` : '');
     let prefix = $derived(dependencyKey ? `${dependencyKey}: ` : '');
-    let layerObj = $derived(drawing.getLayer(artefact.layerId));
-    let isLayerVis = $derived(layerObj ? drawing.isLayerVisible(layerObj.id) : true);
+    let layerObj = $derived(getDrawing().getLayer(artefact.layerId));
+    let isLayerVis = $derived(layerObj ? getDrawing().isLayerVisible(layerObj.id) : true);
     let layerBadgeText = $derived(layerObj ? layerObj.name + (isLayerVis ? '' : ' (hidden)') : artefact.layerId);
     let provablyEqualCandidate = $derived(isProvablyEqualCandidate(artefact));
     let inspectedNode = $derived(

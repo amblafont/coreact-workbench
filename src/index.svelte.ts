@@ -1311,6 +1311,12 @@ export class Drawing {
             this.addLayer("root", "Root Layer", null, "#3498db", false);
         }
     }
+
+    public forgetSvgRefs(): void {
+        for (const art of this.artefacts) {
+            art.svgElement = null;
+        }
+    }
 }
 
 export interface LayerData {
@@ -1340,8 +1346,17 @@ export interface SavedDrawing {
     proved?: boolean;
 }
 
+export interface DrawingStoreEntry {
+    name: string;
+    drawing: Drawing;
+    parentName?: string;
+    proved: boolean;
+}
+
 export class DrawingStore {
-    private drawings = new SvelteMap<string, SavedDrawing>();
+    private drawings = new SvelteMap<string, Drawing>();
+    private meta = new SvelteMap<string, { parentName?: string }>();
+    private proved = new SvelteMap<string, boolean>();
 
     public checkIsRule(drawing: Drawing): { isRule: boolean; reason?: string } {
         return drawing.checkRuleConditions();
@@ -1367,30 +1382,37 @@ export class DrawingStore {
         return DrawingStore.firstOrderFromLayers(drawing.getAllLayers());
     }
 
-    public markAsRule(name: string, isRule: boolean): SavedDrawing {
-        const saved = this.drawings.get(name);
-        if (!saved) {
-            throw new Error(`Consistency Check Failed: Drawing '${name}' does not exist.`);
+    public addDrawing(name: string, drawing: Drawing): Drawing {
+        if (!name || !name.trim()) {
+            throw new Error("Consistency Check Failed: Drawing name cannot be empty.");
         }
-        if (isRule) {
-            const check = checkRuleStructure(saved.layers);
-            if (!check.isRule) {
-                throw new Error(`Consistency Check Failed: Drawing '${name}' cannot be marked as a rule: ${check.reason}`);
+        const trimmedName = name.trim();
+        if (this.drawings.has(trimmedName)) {
+            throw new Error(`Consistency Check Failed: A drawing named '${trimmedName}' already exists.`);
+        }
+        if (drawing.isRule) {
+            const ruleCheck = this.checkIsRule(drawing);
+            if (!ruleCheck.isRule) {
+                throw new Error(`Consistency Check Failed: Drawing '${trimmedName}' is marked as a rule but does not satisfy rule conditions: ${ruleCheck.reason}`);
             }
         }
-        const updated = { ...saved, isRule, isFirstOrder: isRule && DrawingStore.firstOrderFromLayers(saved.layers) };
-        this.drawings.set(name, updated);
-        return updated;
+        this.drawings.set(trimmedName, drawing);
+        return drawing;
     }
 
-    public setDrawingProved(name: string, proved: boolean): SavedDrawing {
-        const saved = this.drawings.get(name);
-        if (!saved) {
+    public markAsRule(name: string, isRule: boolean): void {
+        const drawing = this.drawings.get(name);
+        if (!drawing) {
             throw new Error(`Consistency Check Failed: Drawing '${name}' does not exist.`);
         }
-        const updated = { ...saved, proved };
-        this.drawings.set(name, updated);
-        return updated;
+        drawing.setIsRule(isRule);
+    }
+
+    public setDrawingProved(name: string, proved: boolean): void {
+        if (!this.drawings.has(name)) {
+            throw new Error(`Consistency Check Failed: Drawing '${name}' does not exist.`);
+        }
+        this.proved.set(name, proved);
     }
 
     public static drawingToSavedDrawing(name: string, drawing: Drawing): SavedDrawing {
@@ -1434,36 +1456,10 @@ export class DrawingStore {
         };
     }
 
-    public saveDrawing(name: string, drawing: Drawing): SavedDrawing {
-        if (!name || !name.trim()) {
-            throw new Error("Consistency Check Failed: Drawing name cannot be empty.");
-        }
-
-        const trimmedName = name.trim();
-        const markedAsRule = drawing.isRule;
-
-        if (markedAsRule) {
-            const ruleCheck = this.checkIsRule(drawing);
-            if (!ruleCheck.isRule) {
-                throw new Error(`Consistency Check Failed: Drawing '${trimmedName}' is marked as a rule but does not satisfy rule conditions: ${ruleCheck.reason}`);
-            }
-        }
-
-        const savedDrawing = DrawingStore.drawingToSavedDrawing(trimmedName, drawing);
-        savedDrawing.proved = computeProved(drawing);
-        this.drawings.set(trimmedName, savedDrawing);
-        return savedDrawing;
-    }
-
-    public loadDrawing(name: string, drawing: Drawing): void {
-        const savedDrawing = this.drawings.get(name);
-        if (!savedDrawing) {
-            throw new Error(`Consistency Check Failed: Drawing '${name}' does not exist.`);
-        }
-
+    public static hydrateDrawing(savedDrawing: SavedDrawing, sortStore: SortStore): Drawing {
+        const drawing = new Drawing(sortStore);
         drawing.clear(false);
 
-        // Restore layers iteratively
         const remainingLayers = [...savedDrawing.layers];
         let layerProgress = true;
         while (remainingLayers.length > 0 && layerProgress) {
@@ -1480,10 +1476,9 @@ export class DrawingStore {
         }
 
         if (remainingLayers.length > 0) {
-            throw new Error(`Consistency Check Failed: Could not restore layer hierarchy for drawing '${name}'.`);
+            throw new Error(`Consistency Check Failed: Could not restore layer hierarchy for drawing '${savedDrawing.name}'.`);
         }
 
-        // Restore artefacts iteratively
         const remainingArtefacts = [...savedDrawing.artefacts];
         const createdArtefacts = new Map<string, Artefact>();
 
@@ -1506,14 +1501,13 @@ export class DrawingStore {
                 }
 
                 if (ready) {
-                    const newArt = drawing.adoptArtefact(
+                    createdArtefacts.set(artData.id, drawing.adoptArtefact(
                         artData.id,
                         artData.sortName,
                         resolvedDeps,
                         artData.data,
                         artData.layerId
-                    );
-                    createdArtefacts.set(artData.id, newArt);
+                    ));
                     remainingArtefacts.splice(i, 1);
                     artProgress = true;
                     break;
@@ -1522,36 +1516,63 @@ export class DrawingStore {
         }
 
         if (remainingArtefacts.length > 0) {
-            throw new Error(`Consistency Check Failed: Could not resolve dependencies for drawing '${name}'.`);
+            throw new Error(`Consistency Check Failed: Could not resolve dependencies for drawing '${savedDrawing.name}'.`);
         }
 
         drawing.setIsRule(savedDrawing.isRule);
-        const isFirstOrder = this.checkIsFirstOrder(drawing);
-        if (savedDrawing.isFirstOrder !== isFirstOrder) {
-            savedDrawing.isFirstOrder = isFirstOrder;
-        }
+        return drawing;
+    }
+
+    public static cloneDrawing(source: Drawing, sortStore: SortStore): Drawing {
+        return DrawingStore.hydrateDrawing(DrawingStore.drawingToSavedDrawing("Clone", source), sortStore);
     }
 
     public exportDrawingJSON(name: string): string {
-        const savedDrawing = this.drawings.get(name);
-        if (!savedDrawing) {
+        const drawing = this.drawings.get(name);
+        if (!drawing) {
             throw new Error(`Consistency Check Failed: Drawing '${name}' does not exist.`);
         }
-        return JSON.stringify(savedDrawing, null, 2);
+        const saved = DrawingStore.drawingToSavedDrawing(name, drawing);
+        const parentName = this.meta.get(name)?.parentName;
+        if (parentName) {
+            saved.parentName = parentName;
+        }
+        if (this.proved.has(name)) {
+            saved.proved = this.proved.get(name)!;
+        }
+        return JSON.stringify(saved, null, 2);
     }
 
     public exportDrawingsJSON(names?: string[]): string {
         let drawings: SavedDrawing[];
         if (names) {
             drawings = names.map(name => {
-                const savedDrawing = this.drawings.get(name);
-                if (!savedDrawing) {
+                const drawing = this.drawings.get(name);
+                if (!drawing) {
                     throw new Error(`Consistency Check Failed: Drawing '${name}' does not exist.`);
                 }
-                return savedDrawing;
+                const saved = DrawingStore.drawingToSavedDrawing(name, drawing);
+                const parentName = this.meta.get(name)?.parentName;
+                if (parentName) {
+                    saved.parentName = parentName;
+                }
+                if (this.proved.has(name)) {
+                    saved.proved = this.proved.get(name)!;
+                }
+                return saved;
             });
         } else {
-            drawings = this.getAllDrawings();
+            drawings = Array.from(this.drawings.keys()).map(name => {
+                const saved = DrawingStore.drawingToSavedDrawing(name, this.drawings.get(name)!);
+                const parentName = this.meta.get(name)?.parentName;
+                if (parentName) {
+                    saved.parentName = parentName;
+                }
+                if (this.proved.has(name)) {
+                    saved.proved = this.proved.get(name)!;
+                }
+                return saved;
+            });
         }
         return JSON.stringify({ drawings }, null, 2);
     }
@@ -1586,14 +1607,12 @@ export class DrawingStore {
 
         const trimmedName = p.name.trim();
 
-        // Validate layer structures
         for (const layer of p.layers) {
             if (!layer || typeof layer.id !== "string" || typeof layer.name !== "string") {
                 throw new Error("Consistency Check Failed: Invalid layer structure in imported drawing.");
             }
         }
 
-        // Validate artefact structures
         for (const art of p.artefacts) {
             if (!art || typeof art.id !== "string" || typeof art.sortName !== "string" || typeof art.layerId !== "string" || !art.dependencies || typeof art.dependencies !== "object" || !art.data || typeof art.data !== "object") {
                 throw new Error("Consistency Check Failed: Invalid artefact structure in imported drawing.");
@@ -1631,55 +1650,79 @@ export class DrawingStore {
         return `${requestedName} (${i})`;
     }
 
-    private storeImportedDrawing(parsed: unknown): { drawing: SavedDrawing; requestedName: string; renamed: boolean } {
+    private storeImportedDrawing(parsed: unknown, sortStore: SortStore): { name: string; requestedName: string; renamed: boolean } {
         const built = DrawingStore.validateAndBuildDrawing(parsed);
         const requestedName = built.name;
         const actualName = this.uniqueName(requestedName);
         const renamed = actualName !== requestedName;
-        built.name = actualName;
-        this.drawings.set(actualName, built);
-        return { drawing: built, requestedName, renamed };
+        const live = DrawingStore.hydrateDrawing(built, sortStore);
+        this.drawings.set(actualName, live);
+        if (built.parentName) {
+            this.meta.set(actualName, { parentName: built.parentName });
+        }
+        if (built.proved) {
+            this.proved.set(actualName, true);
+        }
+        return { name: actualName, requestedName, renamed };
     }
 
-    public importDrawingJSON(jsonString: string): SavedDrawing {
-        return this.storeImportedDrawing(DrawingStore.parseImportJSON(jsonString)).drawing;
+    public importDrawingJSON(jsonString: string, sortStore: SortStore): { name: string; requestedName: string; renamed: boolean } {
+        return this.storeImportedDrawing(DrawingStore.parseImportJSON(jsonString), sortStore);
     }
 
-    public importDrawingsJSON(jsonString: string): { drawings: SavedDrawing[]; renames: Array<{ requested: string; actual: string }> } {
+    public importDrawingsJSON(jsonString: string, sortStore: SortStore): { names: string[]; renames: Array<{ requested: string; actual: string }> } {
         const parsed = DrawingStore.parseImportJSON(jsonString);
         const parsedRecord = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
 
         if (parsedRecord && Array.isArray(parsedRecord.drawings)) {
-            const drawings: SavedDrawing[] = [];
+            const names: string[] = [];
             const renames: Array<{ requested: string; actual: string }> = [];
             for (const item of parsedRecord.drawings) {
-                const result = this.storeImportedDrawing(item);
-                drawings.push(result.drawing);
+                const result = this.storeImportedDrawing(item, sortStore);
+                names.push(result.name);
                 if (result.renamed) {
-                    renames.push({ requested: result.requestedName, actual: result.drawing.name });
+                    renames.push({ requested: result.requestedName, actual: result.name });
                 }
             }
-            return { drawings, renames };
+            return { names, renames };
         }
 
-        const result = this.storeImportedDrawing(parsed);
+        const result = this.storeImportedDrawing(parsed, sortStore);
         return {
-            drawings: [result.drawing],
-            renames: result.renamed ? [{ requested: result.requestedName, actual: result.drawing.name }] : []
+            names: [result.name],
+            renames: result.renamed ? [{ requested: result.requestedName, actual: result.name }] : []
         };
     }
 
-    public getDrawing(name: string): SavedDrawing | undefined {
-        return this.drawings.get(name);
+    public getDrawing(name: string): DrawingStoreEntry | undefined {
+        const drawing = this.drawings.get(name);
+        if (!drawing) {
+            return undefined;
+        }
+        return {
+            name,
+            drawing,
+            parentName: this.meta.get(name)?.parentName,
+            proved: !!this.proved.get(name)
+        };
     }
 
-    public getAllDrawings(): SavedDrawing[] {
-        return Array.from(this.drawings.values());
+    public getAllDrawings(): DrawingStoreEntry[] {
+        return Array.from(this.drawings.keys()).map(name => ({
+            name,
+            drawing: this.drawings.get(name)!,
+            parentName: this.meta.get(name)?.parentName,
+            proved: !!this.proved.get(name)
+        }));
     }
 
-    public renameDrawing(oldName: string, newName: string): SavedDrawing {
-        const saved = this.drawings.get(oldName);
-        if (!saved) {
+    public getAllNames(): string[] {
+        return Array.from(this.drawings.keys());
+    }
+
+    public renameDrawing(oldName: string, newName: string): Drawing {
+        const drawing = this.drawings.get(oldName);
+        if (!drawing) {
             throw new Error(`Consistency Check Failed: Drawing '${oldName}' does not exist.`);
         }
         const trimmed = newName.trim();
@@ -1687,46 +1730,58 @@ export class DrawingStore {
             throw new Error("Consistency Check Failed: Drawing name cannot be empty.");
         }
         if (trimmed === oldName) {
-            return saved;
+            return drawing;
         }
         if (this.drawings.has(trimmed)) {
             throw new Error(`Consistency Check Failed: A drawing named '${trimmed}' already exists.`);
         }
         this.drawings.delete(oldName);
-        saved.name = trimmed;
-        this.drawings.set(trimmed, saved);
-        for (const other of Array.from(this.drawings.values())) {
-            if (other.parentName === oldName) {
-                this.drawings.set(other.name, { ...other, parentName: trimmed });
+        this.drawings.set(trimmed, drawing);
+        const m = this.meta.get(oldName);
+        if (m) {
+            this.meta.delete(oldName);
+            this.meta.set(trimmed, m);
+        }
+        if (this.proved.has(oldName)) {
+            const p = this.proved.get(oldName)!;
+            this.proved.delete(oldName);
+            this.proved.set(trimmed, p);
+        }
+        for (const [childName, child] of Array.from(this.meta.entries())) {
+            if (child.parentName === oldName) {
+                this.meta.set(childName, { parentName: trimmed });
             }
         }
-        return saved;
+        return drawing;
     }
 
     public deleteDrawing(name: string): boolean {
         const children: string[] = [];
-        for (const [childName, child] of this.drawings) {
+        for (const [childName, child] of this.meta) {
             if (child.parentName === name) {
                 children.push(childName);
             }
         }
         for (const childName of children) {
-            this.drawings.delete(childName);
+            this.deleteDrawing(childName);
         }
-        return this.drawings.delete(name);
+        const removed = this.drawings.delete(name);
+        this.meta.delete(name);
+        this.proved.delete(name);
+        return removed;
     }
 
     public setDrawingParent(name: string, parentName: string): void {
-        const saved = this.drawings.get(name);
-        if (!saved) {
+        if (!this.drawings.has(name)) {
             throw new Error(`Consistency Check Failed: Drawing '${name}' does not exist.`);
         }
-        const updated = { ...saved, parentName };
-        this.drawings.set(name, updated);
+        this.meta.set(name, { parentName });
     }
 
     public clear(): void {
         this.drawings.clear();
+        this.meta.clear();
+        this.proved.clear();
     }
 }
 

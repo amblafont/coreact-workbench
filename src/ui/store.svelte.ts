@@ -17,7 +17,7 @@ import {
     getFirstOrderStatementChildLayer,
     type SortDefinition,
     type Layer,
-    type SavedDrawing,
+    type DrawingStoreEntry,
     type RuleApplication,
     type DataAttributeValue,
     type DerivedRule,
@@ -34,7 +34,10 @@ import { exportDrawingsToRocq, drawingExportNames } from '../rocq_export';
 // ---------------------------------------------------------------------------
 
 export const sortStore = new SortStore();
-export const drawing = new Drawing(sortStore);
+let drawing = $state.raw(new Drawing(sortStore));
+export function getDrawing(): Drawing {
+    return drawing;
+}
 export const drawingStore = new DrawingStore();
 export const rocqRecorder = new RocqRecorder();
 
@@ -114,8 +117,17 @@ export function allArtefacts(): Artefact[] {
 export function allLayers(): Layer[] {
     return drawing.getAllLayers();
 }
-export function allDrawings(): SavedDrawing[] {
-    return drawingStore.getAllDrawings();
+export interface StoreDrawing extends DrawingStoreEntry {
+    isRule: boolean;
+    isFirstOrder: boolean;
+}
+
+export function allDrawings(): StoreDrawing[] {
+    return drawingStore.getAllDrawings().map(entry => ({
+        ...entry,
+        isRule: entry.drawing.isRule,
+        isFirstOrder: drawingStore.checkIsFirstOrder(entry.drawing)
+    }));
 }
 
 export type RuleTag = { kind: 'invalid'; reason: string } | { kind: 'first' } | { kind: 'second' };
@@ -582,22 +594,27 @@ export function resetInteractionState(): void {
     stopPositionPicker();
 }
 
-export function loadDrawingByName(name: string): boolean {
+export function setActiveDrawing(name: string): boolean {
     try {
-        drawingStore.loadDrawing(name, drawing);
+        const entry = drawingStore.getDrawing(name);
+        if (!entry) {
+            pushToast('error', `Drawing '${name}' does not exist.`);
+            return false;
+        }
+        drawing.forgetSvgRefs();
+        drawing = entry.drawing;
         ui.activeDrawingName = name;
         resetInteractionState();
         syncProvedStatus();
-
         return true;
     } catch (err) {
-        pushToast('error', `Error loading drawing:\n${(err as Error).message}`);
+        pushToast('error', `Error opening drawing:\n${(err as Error).message}`);
         return false;
     }
 }
 
 export function getSelectedDrawingNames(): string[] {
-    const existing = new Set(drawingStore.getAllDrawings().map(d => d.name));
+    const existing = new Set(drawingStore.getAllNames());
     return Array.from(ui.exportSelection).filter(name => existing.has(name));
 }
 
@@ -620,15 +637,15 @@ export function downloadDrawingsJson(names: string[]): void {
 
 export function copyRocqExport(names: string[]): void {
     try {
-        const drawings: SavedDrawing[] = names
+        const drawings: DrawingStoreEntry[] = names
             .map(name => drawingStore.getDrawing(name))
-            .filter((d): d is SavedDrawing => !!d);
+            .filter((d): d is DrawingStoreEntry => !!d);
         if (drawings.length === 0) {
             pushToast('error', 'Error exporting drawings:\nNo drawings found in the store.');
             return;
         }
         const code = exportDrawingsToRocq(drawings, sortStore);
-        const ruleCount = drawings.filter(d => d.isRule).length;
+        const ruleCount = drawings.filter(d => d.drawing.isRule).length;
         navigator.clipboard
             .writeText(code)
             .then(() => {
@@ -672,8 +689,7 @@ export function setInspectedLabel(art: Artefact, rawLabel: string): void {
     const isRootLayer = art.layerId === 'root' || drawing.getLayer(art.layerId)?.parentId === null;
     let oldFieldName: string | null = null;
     if (rocqRecorder.isActive() && isRootLayer) {
-        const savedOld = DrawingStore.drawingToSavedDrawing(activeName, drawing);
-        const oldExport = drawingExportNames(savedOld, sortStore);
+        const oldExport = drawingExportNames(drawing, activeName, sortStore);
         oldFieldName = oldExport.fieldNames.get(art.id) ?? null;
     }
     if (target === '') {
@@ -682,8 +698,7 @@ export function setInspectedLabel(art: Artefact, rawLabel: string): void {
         art.data.label = target;
     }
     if (rocqRecorder.isActive() && isRootLayer && oldFieldName) {
-        const savedNew = DrawingStore.drawingToSavedDrawing(activeName, drawing);
-        const newExport = drawingExportNames(savedNew, sortStore);
+        const newExport = drawingExportNames(drawing, activeName, sortStore);
         const newFieldName = newExport.fieldNames.get(art.id);
         if (newFieldName && newFieldName !== oldFieldName) {
             rocqRecorder.recordRename(oldFieldName, newFieldName, activeName);
@@ -880,22 +895,6 @@ export function setCurrentDrawingRule(checked: boolean): void {
     }
 }
 
-export function saveActiveDrawing(): void {
-    let name = ui.activeDrawingName;
-    if (!name) {
-        const input = prompt('Enter a name for the drawing:');
-        if (!input || !input.trim()) return;
-        name = input.trim();
-    }
-    try {
-        drawingStore.saveDrawing(name, drawing);
-        ui.activeDrawingName = name;
-
-    } catch (err) {
-        pushToast('error', `Error saving drawing:\n${(err as Error).message}`);
-    }
-}
-
 export function duplicateCurrentDrawing(): void {
     const activeName = ui.activeDrawingName;
     const suggested = activeName ? `${activeName} copy` : 'Drawing copy';
@@ -907,9 +906,12 @@ export function duplicateCurrentDrawing(): void {
         return;
     }
     try {
-        drawingStore.saveDrawing(name, drawing);
+        const copy = DrawingStore.cloneDrawing(drawing, sortStore);
+        drawing.forgetSvgRefs();
+        drawingStore.addDrawing(name, copy);
+        drawing = copy;
         ui.activeDrawingName = name;
-
+        resetInteractionState();
         pushToast('info', `Duplicated drawing as '${name}'.`);
     } catch (err) {
         pushToast('error', (err as Error).message);
@@ -917,10 +919,6 @@ export function duplicateCurrentDrawing(): void {
 }
 
 export function newDrawing(): void {
-    const hasContent = drawing.getArtefacts().length > 0 || drawing.getAllLayers().length > 1;
-    if (hasContent && !confirm('Start a new drawing? Current canvas content will be discarded.')) {
-        return;
-    }
     const input = prompt('Enter a name for the new drawing:');
     if (!input || !input.trim()) return;
     const name = input.trim();
@@ -928,12 +926,13 @@ export function newDrawing(): void {
         pushToast('error', `A drawing named '${name}' already exists.`);
         return;
     }
-    drawing.clear();
-    resetInteractionState();
+    const fresh = new Drawing(sortStore);
     try {
-        drawingStore.saveDrawing(name, drawing);
+        drawingStore.addDrawing(name, fresh);
+        drawing.forgetSvgRefs();
+        drawing = fresh;
         ui.activeDrawingName = name;
-
+        resetInteractionState();
     } catch (err) {
         pushToast('error', (err as Error).message);
     }
@@ -942,8 +941,8 @@ export function newDrawing(): void {
 export async function importDrawingsFile(file: File): Promise<void> {
     const text = await file.text();
     try {
-        const { drawings, renames } = drawingStore.importDrawingsJSON(text);
-        let summary = `Imported ${drawings.length} drawing(s): ${drawings.map(d => `'${d.name}'`).join(', ')}.`;
+        const { names, renames } = drawingStore.importDrawingsJSON(text, sortStore);
+        let summary = `Imported ${names.length} drawing(s): ${names.map(n => `'${n}'`).join(', ')}.`;
         if (renames.length > 0) {
             summary += `\nRenamed on collision: ${renames.map(r => `'${r.requested}' -> '${r.actual}'`).join(', ')}.`;
         }
@@ -965,7 +964,10 @@ export function deleteSelectedDrawings(names: string[]): void {
     const deleted = new Set(names);
     for (const name of names) {
         if (name === ui.activeDrawingName) {
+            drawing.forgetSvgRefs();
+            drawing = new Drawing(sortStore);
             ui.activeDrawingName = null;
+            resetInteractionState();
         }
         drawingStore.deleteDrawing(name);
     }
@@ -993,9 +995,6 @@ export function renameDrawingName(oldName: string, newName: string): void {
 
 export function markDrawingAsRule(name: string, isRule: boolean): void {
     try {
-        if (name === ui.activeDrawingName) {
-            drawing.setIsRule(isRule);
-        }
         drawingStore.markAsRule(name, isRule);
 
     } catch (err) {
@@ -1041,16 +1040,14 @@ export function toggleExportSelection(name: string): void {
 }
 
 export function setExportSelectionAll(checked: boolean): void {
-    ui.exportSelection = checked ? new SvelteSet(drawingStore.getAllDrawings().map(d => d.name)) : new SvelteSet();
+    ui.exportSelection = checked ? new SvelteSet(drawingStore.getAllNames()) : new SvelteSet();
 }
 
 export function clearAll(): void {
-    if (!confirm('Are you sure you want to clear all artefacts and layers?')) {
+    if (!confirm('Are you sure you want to clear all artefacts and layers of the current drawing?')) {
         return;
     }
     drawing.clear();
-    ui.focusedLayerId = null;
-    ui.activeDrawingName = null;
     resetInteractionState();
 
 }
@@ -1201,8 +1198,9 @@ export function solvesGoalFilterApplicable(): boolean {
 // ---------------------------------------------------------------------------
 
 export interface RuleAppEntry {
-    savedRule: SavedDrawing;
-    ruleDrawing: Drawing;
+    name: string;
+    drawing: Drawing;
+    isFirstOrder: boolean;
     applications: RuleApplication[];
     hiddenRedundant: number;
     hiddenNoProgress: number;
@@ -1224,33 +1222,28 @@ export function computeRuleMatches(): RuleAppEntry[] {
     void drawing.getAllLayers();
 
     const entries: RuleAppEntry[] = [];
-    for (const savedRule of drawingStore.getAllDrawings()) {
-        if (!savedRule.isRule) continue;
-        let ruleDrawing: Drawing;
-        try {
-            ruleDrawing = new Drawing(sortStore);
-            drawingStore.loadDrawing(savedRule.name, ruleDrawing);
-        } catch {
-            continue;
-        }
+    for (const entry of drawingStore.getAllDrawings()) {
+        const ruleDrawing = entry.drawing;
+        if (!ruleDrawing.isRule) continue;
         let applications: RuleApplication[];
         const strict = ui.filterStrictMatches;
+        const isFirstOrder = drawingStore.checkIsFirstOrder(ruleDrawing);
         try {
-            applications = untrack(() => savedRule.isFirstOrder
+            applications = untrack(() => isFirstOrder
                 ? findFirstOrderRuleApplications(ruleDrawing, drawing, strict)
                 : findSecondOrderRuleApplications(ruleDrawing, drawing, strict));
         } catch {
             continue;
         }
 
-        entries.push({ savedRule, ruleDrawing, applications, hiddenRedundant: 0, hiddenNoProgress: 0, hiddenSolvesGoal: 0 });
+        entries.push({ name: entry.name, drawing: ruleDrawing, isFirstOrder, applications, hiddenRedundant: 0, hiddenNoProgress: 0, hiddenSolvesGoal: 0 });
     }
     return entries;
 }
 
 export function applyRuleFilters(entries: RuleAppEntry[]): RuleAppEntry[] {
     return entries.map(entry => {
-        const { savedRule, ruleDrawing } = entry;
+        const { name, drawing: ruleDrawing } = entry;
         let applications = entry.applications;
 
         let hiddenRedundant = 0;
@@ -1274,7 +1267,7 @@ export function applyRuleFilters(entries: RuleAppEntry[]): RuleAppEntry[] {
             hiddenSolvesGoal = total - applications.length;
         }
 
-        return { savedRule, ruleDrawing, applications, hiddenRedundant, hiddenNoProgress, hiddenSolvesGoal };
+        return { name, drawing: ruleDrawing, isFirstOrder: entry.isFirstOrder, applications, hiddenRedundant, hiddenNoProgress, hiddenSolvesGoal };
     });
 }
 
@@ -1283,69 +1276,59 @@ export function computeRuleApplications(): RuleAppEntry[] {
 }
 
 export function applyRuleAt(savedRuleName: string, appIndex: number): void {
-    const entry = computeRuleApplications().find(e => e.savedRule.name === savedRuleName);
+    const entry = computeRuleApplications().find(e => e.name === savedRuleName);
     if (!entry || !entry.applications[appIndex]) return;
-    const { savedRule, ruleDrawing, applications } = entry;
+    const { name, drawing: ruleDrawing, applications } = entry;
     const app = applications[appIndex];
     const activeName = ui.activeDrawingName ?? 'Unsaved Drawing';
     let applicationResult: { artefacts: Artefact[]; created: Map<Artefact, Artefact>; derivedNames?: string[]; derived?: DerivedRule[] } | null = null;
     try {
-        if (savedRule.isFirstOrder) {
+        if (entry.isFirstOrder) {
             const result = applyFirstOrderRule(ruleDrawing, drawing, app);
             applicationResult = result;
-            console.log(`Applied '${savedRule.name}': added ${result.artefacts.length} artefact(s).`);
+            console.log(`Applied '${name}': added ${result.artefacts.length} artefact(s).`);
         } else {
-            const result = applySecondOrderRule(ruleDrawing, drawing, app, { hostName: activeName, ruleName: savedRule.name });
+            const result = applySecondOrderRule(ruleDrawing, drawing, app, { hostName: activeName, ruleName: name });
             applicationResult = { artefacts: result.hostArtefacts, created: result.hostCreated, derived: result.derivedRules };
-            console.log(`Applied '${savedRule.name}': added ${result.hostArtefacts.length} artefact(s), derived ${result.derivedRules.length} drawing(s).`);
+            console.log(`Applied '${name}': added ${result.hostArtefacts.length} artefact(s), derived ${result.derivedRules.length} drawing(s).`);
             const createdNames: string[] = [];
             for (const derived of result.derivedRules) {
-                let name = derived.name;
+                let derivedName = derived.name;
                 let suffix = 2;
-                while (drawingStore.getDrawing(name)) {
-                    name = `${derived.name} (${suffix})`;
+                while (drawingStore.getDrawing(derivedName)) {
+                    derivedName = `${derived.name} (${suffix})`;
                     suffix++;
                 }
-                drawingStore.saveDrawing(name, derived.drawing);
-                drawingStore.setDrawingParent(name, activeName);
-                createdNames.push(name);
-                console.log(`Saved derived drawing '${name}': isRule=${derived.drawing.isRule}, artefacts=${derived.drawing.getArtefacts().length}.`);
+                drawingStore.addDrawing(derivedName, derived.drawing);
+                drawingStore.setDrawingParent(derivedName, activeName);
+                createdNames.push(derivedName);
+                console.log(`Saved derived drawing '${derivedName}': isRule=${derived.drawing.isRule}, artefacts=${derived.drawing.getArtefacts().length}.`);
             }
             applicationResult.derivedNames = createdNames;
-            pushToast('info', `Applied rule '${savedRule.name}': added ${result.hostArtefacts.length} artefact(s) and created ${createdNames.length} derived drawing(s):\n- ${createdNames.join('\n- ')}`);
+            pushToast('info', `Applied rule '${name}': added ${result.hostArtefacts.length} artefact(s) and created ${createdNames.length} derived drawing(s):\n- ${createdNames.join('\n- ')}`);
         }
         if (applicationResult) {
-            rocqRecorder.recordRuleApply(ruleDrawing, savedRule.name, app, drawing, applicationResult, activeName, sortStore);
+            rocqRecorder.recordRuleApply(ruleDrawing, name, app, drawing, applicationResult, activeName, sortStore);
         }
         syncProvedStatus();
-        const currentActiveName = ui.activeDrawingName;
-        if (currentActiveName) {
-            const existing = drawingStore.getDrawing(currentActiveName);
-            drawingStore.saveDrawing(currentActiveName, drawing);
-            if (existing?.parentName) {
-                drawingStore.setDrawingParent(currentActiveName, existing.parentName);
-            }
-        }
 
     } catch (err) {
-        pushToast('error', `Error applying rule '${savedRule.name}':\n${(err as Error).message}`);
+        pushToast('error', `Error applying rule '${name}':\n${(err as Error).message}`);
     }
 }
 
 export function generateReverseRulesFor(savedRuleName: string): void {
-    const savedRule = drawingStore.getDrawing(savedRuleName);
-    if (!savedRule) {
+    const entry = drawingStore.getDrawing(savedRuleName);
+    if (!entry) {
         pushToast('error', `Drawing '${savedRuleName}' does not exist.`);
         return;
     }
-    if (!savedRule.isRule || savedRule.isFirstOrder) {
+    if (!entry.drawing.isRule || drawingStore.checkIsFirstOrder(entry.drawing)) {
         pushToast('error', `Drawing '${savedRuleName}' is not a second-order rule.`);
         return;
     }
     try {
-        const ruleDrawing = new Drawing(sortStore);
-        drawingStore.loadDrawing(savedRuleName, ruleDrawing);
-        const results = generateFirstOrderReverseRules(ruleDrawing);
+        const results = generateFirstOrderReverseRules(entry.drawing);
         if (results.length === 0) {
             pushToast('info', `Second-order rule '${savedRuleName}' has no premise layers; nothing generated.`);
             return;
@@ -1358,7 +1341,7 @@ export function generateReverseRulesFor(savedRuleName: string): void {
                 name = `${savedRuleName} > ${result.premiseName} (reverse) (${suffix})`;
                 suffix++;
             }
-            drawingStore.saveDrawing(name, result.drawing);
+            drawingStore.addDrawing(name, result.drawing);
             drawingStore.setDrawingParent(name, savedRuleName);
             createdNames.push(name);
             console.log(`Generated reverse rule '${name}': isRule=${result.drawing.isRule}, artefacts=${result.drawing.getArtefacts().length}.`);

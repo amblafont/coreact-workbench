@@ -40,8 +40,8 @@ interface BuiltScenario {
 
 function recordScenario(sortStore: SortStore, scenario: BuiltScenario): string {
     const store = new DrawingStore();
-    store.saveDrawing('Main', scenario.host);
-    store.saveDrawing(scenario.ruleName, scenario.rule);
+    store.addDrawing('Main', scenario.host);
+    store.addDrawing(scenario.ruleName, scenario.rule);
     const recorder = new RocqRecorder();
     recorder.start(scenario.host, 'Main', sortStore);
     let applyResult: ApplyResult;
@@ -205,7 +205,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         const host = new Drawing(sortStore);
         makeVertex(host, 'a');
         makeVertex(host, 'b');
-        store.saveDrawing('Main', host);
+        store.addDrawing('Main', host);
 
         const rule = new Drawing(sortStore);
         const rx = makeVertex(rule, 'x');
@@ -217,7 +217,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         rule.addLayer('conclusion', 'Conclusion', 'root');
         makeEdge(rule, 'ce', rx, ry, 'conclusion');
         rule.setIsRule(true);
-        store.saveDrawing('SecondOrderRule', rule);
+        store.addDrawing('SecondOrderRule', rule);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'Main', sortStore);
@@ -263,7 +263,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         const ha = makeVertex(host, 'a');
         const hb = makeVertex(host, 'b');
         makeVertex(host, 'c');
-        store.saveDrawing('Main', host);
+        store.addDrawing('Main', host);
 
         const rule = new Drawing(sortStore);
         const rx = makeVertex(rule, 'x');
@@ -275,7 +275,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         rule.addLayer('conclusion', 'Conclusion', 'root');
         makeEdge(rule, 'ce', rx, ry, 'conclusion');
         rule.setIsRule(true);
-        store.saveDrawing('SecondOrderRule', rule);
+        store.addDrawing('SecondOrderRule', rule);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'Main', sortStore);
@@ -323,7 +323,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         const result = host.checkLayerProvable('child');
         expect(result.provable).toBe(true);
 
-        store.saveDrawing('Main', host);
+        store.addDrawing('Main', host);
         const recorder = new RocqRecorder();
         recorder.start(host, 'Main', sortStore);
         recorder.recordProveSuccess(host, 'child', result.match ?? null, 'Main');
@@ -343,7 +343,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         const mf = host.newArtefact('Edge', { source: ma, target: mb }, { width: 2, bend: 0, label: 'mf' }, 'root');
         host.newArtefact('isMono', { arrow: mf }, {}, 'root');
         host.newEqualityArtefact([ma, mb], 'root');
-        store.saveDrawing('Main', host);
+        store.addDrawing('Main', host);
 
         const foo = new Drawing(sortStore);
         const fx = makeVertex(foo, 'x');
@@ -351,7 +351,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         foo.addLayer('conclusion', 'Conclusion', 'root');
         foo.newArtefact('Edge', { source: fx, target: fy }, { width: 2, bend: 0, label: 'f' }, 'conclusion');
         foo.setIsRule(true);
-        store.saveDrawing('Foo', foo);
+        store.addDrawing('Foo', foo);
 
         const secondOrderRule = new Drawing(sortStore);
         const sx = makeVertex(secondOrderRule, 'x');
@@ -363,7 +363,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         secondOrderRule.addLayer('conclusion', 'Conclusion Layer', 'root');
         makeEdge(secondOrderRule, 'ce', sx, sy, 'conclusion');
         secondOrderRule.setIsRule(true);
-        store.saveDrawing('SecondOrderRule', secondOrderRule);
+        store.addDrawing('SecondOrderRule', secondOrderRule);
 
         const monoRule = new Drawing(sortStore);
         const mx = makeVertex(monoRule, 'x');
@@ -373,7 +373,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         monoRule.addLayer('conclusion', 'Conclusion Layer', 'root');
         makeEdge(monoRule, 'g', mx, my, 'conclusion');
         monoRule.setIsRule(true);
-        store.saveDrawing('MonoRule', monoRule);
+        store.addDrawing('MonoRule', monoRule);
 
         const eqRule = new Drawing(sortStore);
         const ex = makeVertex(eqRule, 'x');
@@ -382,7 +382,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         eqRule.addLayer('conclusion', 'Conclusion Layer', 'root');
         makeEdge(eqRule, 'g', ex, ey, 'conclusion');
         eqRule.setIsRule(true);
-        store.saveDrawing('EqRule', eqRule);
+        store.addDrawing('EqRule', eqRule);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'Main', sortStore);
@@ -437,7 +437,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         const a = makeVertex(host, 'a');
         const b = makeVertex(host, 'b');
         const f = makeEdge(host, 'f', a, b);
-        store.saveDrawing('Main', host);
+        store.addDrawing('Main', host);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'Main', sortStore);
@@ -454,7 +454,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         const sortStore = newSortStore();
         const store = new DrawingStore();
         const host = buildProvableChild(sortStore);
-        store.saveDrawing('Main', host);
+        store.addDrawing('Main', host);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'Main', sortStore);
@@ -472,7 +472,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         const host = new Drawing(sortStore);
         makeVertex(host, 'a');
         makeVertex(host, 'b');
-        store.saveDrawing('Main', host);
+        store.addDrawing('Main', host);
 
         const rule = new Drawing(sortStore);
         const rx = makeVertex(rule, 'x');
@@ -484,7 +484,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         rule.addLayer('conclusion', 'Conclusion', 'root');
         makeEdge(rule, 'ce', rx, ry, 'conclusion');
         rule.setIsRule(true);
-        store.saveDrawing('SecondOrderRule', rule);
+        store.addDrawing('SecondOrderRule', rule);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'Main', sortStore);
@@ -529,7 +529,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         const host = new Drawing(sortStore);
         makeVertex(host, 'a');
         makeVertex(host, 'b');
-        store.saveDrawing('Main', host);
+        store.addDrawing('Main', host);
 
         const rule = new Drawing(sortStore);
         const rx = makeVertex(rule, 'x');
@@ -541,7 +541,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         rule.addLayer('conclusion', 'Conclusion', 'root');
         makeEdge(rule, 'ce', rx, ry, 'conclusion');
         rule.setIsRule(true);
-        store.saveDrawing('SecondOrderRule', rule);
+        store.addDrawing('SecondOrderRule', rule);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'Main', sortStore);
@@ -552,7 +552,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         }
         const result1 = applySecondOrderRule(rule, host, apps1[0], { hostName: 'Main', ruleName: 'SecondOrderRule' });
         const s1 = result1.derivedRules[0];
-        store.saveDrawing(s1.name, s1.drawing);
+        store.addDrawing(s1.name, s1.drawing);
         recorder.recordRuleApply(
             rule,
             'SecondOrderRule',
@@ -569,7 +569,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         }
         const result2 = applySecondOrderRule(rule, s1.drawing, apps2[0], { hostName: s1.name, ruleName: 'SecondOrderRule' });
         const s1sub = result2.derivedRules[0];
-        store.saveDrawing(s1sub.name, s1sub.drawing);
+        store.addDrawing(s1sub.name, s1sub.drawing);
         recorder.recordRuleApply(
             rule,
             'SecondOrderRule',
@@ -595,7 +595,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         const host = new Drawing(sortStore);
         makeVertex(host, 'a');
         makeVertex(host, 'b');
-        store.saveDrawing('Main', host);
+        store.addDrawing('Main', host);
 
         const rule = new Drawing(sortStore);
         const rx = makeVertex(rule, 'x');
@@ -611,7 +611,7 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         rule.addLayer('conclusion', 'Conclusion', 'root');
         makeEdge(rule, 'ce', rx, ry, 'conclusion');
         rule.setIsRule(true);
-        store.saveDrawing('MultiPremiseRule', rule);
+        store.addDrawing('MultiPremiseRule', rule);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'Main', sortStore);
@@ -625,8 +625,8 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
 
         const sub1 = result.derivedRules[0];
         const sub2 = result.derivedRules[1];
-        store.saveDrawing(sub1.name, sub1.drawing);
-        store.saveDrawing(sub2.name, sub2.drawing);
+        store.addDrawing(sub1.name, sub1.drawing);
+        store.addDrawing(sub2.name, sub2.drawing);
 
         const childLayer1 = getFirstOrderStatementChildLayer(sub1.drawing);
         if (!childLayer1) {

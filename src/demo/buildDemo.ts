@@ -94,14 +94,12 @@ export function buildDemo(ctx: DemoContext): DemoContext {
     drawing.newEqualityArtefact([v2, sq_v0], 'layer-1');
 
     // Drawing Store & Rule Validation
-    drawingStore.saveDrawing('Initial Drawing', drawing);
+    drawingStore.addDrawing('Initial Drawing', DrawingStore.cloneDrawing(drawing, sortStore));
 
     // Add a leaf child layer to root to satisfy the rule condition
     drawing.addLayer('leaf-layer', 'Leaf Layer', 'root', '#f39c12', true);
 
-    // Save drawing as a regular (non-rule) drawing, then load it back into the canvas
-    drawingStore.saveDrawing('Rule Drawing Demo', drawing);
-    drawingStore.loadDrawing('Rule Drawing Demo', drawing);
+    drawingStore.addDrawing('Rule Drawing Demo', DrawingStore.cloneDrawing(drawing, sortStore));
 
     // Build a small rule: two composable edges in the root layer
     const ruleDrawing = new Drawing(sortStore);
@@ -113,7 +111,7 @@ export function buildDemo(ctx: DemoContext): DemoContext {
     ruleDrawing.addLayer('rule-pattern', 'Rule Pattern', 'root');
     ruleDrawing.newArtefact('Edge', { source: rv0, target: rv2 }, { width: 2, bend: 0, label: 're3' }, 'rule-pattern');
     ruleDrawing.setIsRule(true);
-    drawingStore.saveDrawing('ComposableEdges', ruleDrawing);
+    drawingStore.addDrawing('ComposableEdges', ruleDrawing);
 
     // Rule whose isMono artefact leaves from a child layer: matching must NOT require it in the host
     const ruleIsMonoInChildLayer = new Drawing(sortStore);
@@ -126,7 +124,7 @@ export function buildDemo(ctx: DemoContext): DemoContext {
     ruleIsMonoInChildLayer.newArtefact('Edge', { source: fv0, target: fv2 }, { width: 2, bend: 0, label: 'fe3' }, 'isMono-conclusion');
     ruleIsMonoInChildLayer.newArtefact('isMono', { arrow: ffe2 }, {}, 'isMono-conclusion');
     ruleIsMonoInChildLayer.setIsRule(true);
-    drawingStore.saveDrawing('IsMonoInChildLayer', ruleIsMonoInChildLayer);
+    drawingStore.addDrawing('IsMonoInChildLayer', ruleIsMonoInChildLayer);
 
     // Control: an isMono artefact in the root layer IS required for matching
     const ruleIsMonoInRoot = new Drawing(sortStore);
@@ -139,7 +137,7 @@ export function buildDemo(ctx: DemoContext): DemoContext {
     ruleIsMonoInRoot.addLayer('isMono-root-conclusion', 'Root IsMono Conclusion', 'root');
     ruleIsMonoInRoot.newArtefact('Edge', { source: rfv0, target: rfv2 }, { width: 2, bend: 0, label: 'rfe3' }, 'isMono-root-conclusion');
     ruleIsMonoInRoot.setIsRule(true);
-    drawingStore.saveDrawing('IsMonoInRoot', ruleIsMonoInRoot);
+    drawingStore.addDrawing('IsMonoInRoot', ruleIsMonoInRoot);
 
     // Rule whose child layer contains an equality: matching must ignore it
     const ruleWithChildEq = new Drawing(sortStore);
@@ -152,7 +150,7 @@ export function buildDemo(ctx: DemoContext): DemoContext {
     ruleWithChildEq.newArtefact('Edge', { source: cev0, target: cev2 }, { width: 2, bend: 0, label: 'ce3' }, 'rule-pattern-eq');
     ruleWithChildEq.newEqualityArtefact([cev0, cev1], 'rule-pattern-eq');
     ruleWithChildEq.setIsRule(true);
-    drawingStore.saveDrawing('ComposableEdgesChildEq', ruleWithChildEq);
+    drawingStore.addDrawing('ComposableEdgesChildEq', ruleWithChildEq);
 
     // Rule whose child-layer equality is not provably equal in the host: still applyable, equality is added
     const ruleChildEqApply = new Drawing(sortStore);
@@ -166,7 +164,7 @@ export function buildDemo(ctx: DemoContext): DemoContext {
     ruleChildEqApply.newEqualityArtefact([qv0, qv1, qv2], 'conclusion');
     ruleChildEqApply.newEqualityArtefact([qe1, qe2], 'conclusion');
     ruleChildEqApply.setIsRule(true);
-    drawingStore.saveDrawing('ChildEqApply', ruleChildEqApply);
+    drawingStore.addDrawing('ChildEqApply', ruleChildEqApply);
 
     // Build a second-order rule: the root layer holds two composable edges, the
     // conclusion layer (leaf child of root) holds the composed edge, and a premise
@@ -190,7 +188,7 @@ export function buildDemo(ctx: DemoContext): DemoContext {
     secondOrderRule.newArtefact('Edge', { source: sdv, target: sv1 }, { width: 2, bend: 0, label: 'sb' }, 'premise-b');
 
     secondOrderRule.setIsRule(true);
-    drawingStore.saveDrawing('SecondOrderComp', secondOrderRule);
+    drawingStore.addDrawing('SecondOrderComp', secondOrderRule);
 
     // Rule matching up to host equalities: two triangles sharing one edge may match
     // host triangles whose edges are distinct but provably equal
@@ -227,7 +225,7 @@ export function buildDemo(ctx: DemoContext): DemoContext {
     buildTrianglePairHost(eqMatchRule, 'shared');
     eqMatchRule.addLayer('rule-pattern', 'Rule Pattern', 'root');
     eqMatchRule.setIsRule(true);
-    drawingStore.saveDrawing('SharedEdgeTriangles', eqMatchRule);
+    drawingStore.addDrawing('SharedEdgeTriangles', eqMatchRule);
 
     // Simple startup drawing: two vertices, one edge between them, one isMono on that edge
     const simpleMono = new Drawing(sortStore);
@@ -235,7 +233,7 @@ export function buildDemo(ctx: DemoContext): DemoContext {
     const smv1 = simpleMono.newArtefact('Vertex', {}, { position: [600, 300], label: 'smv1' }, 'root');
     const sme0 = simpleMono.newArtefact('Edge', { source: smv0, target: smv1 }, { width: 4, bend: 0, label: 'sme0' }, 'root');
     simpleMono.newArtefact('isMono', { arrow: sme0 }, {}, 'root');
-    drawingStore.saveDrawing('SimpleMono', simpleMono);
+    drawingStore.addDrawing('SimpleMono', simpleMono);
 
     return ctx;
 }

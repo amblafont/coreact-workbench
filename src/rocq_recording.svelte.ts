@@ -1,5 +1,5 @@
 import { SvelteMap } from 'svelte/reactivity';
-import { Artefact, Drawing, DrawingStore, SortStore } from "./index.svelte.ts";
+import { Artefact, Drawing, SortStore } from "./index.svelte.ts";
 import type { DerivedRule } from "./index.svelte.ts";
 import { drawingExportNames, ruleTypeInfo, newExportRegistry, renderExactTerm, renderForallChain, renderSigma, sanitizeIdent } from "./rocq_export";
 import type { LayerElement, RuleTypeInfo } from "./rocq_export";
@@ -117,17 +117,16 @@ export class RocqRecorder {
         this.sortStore = sortStore;
         this.statements.clear();
 
-        const savedDrawing = DrawingStore.drawingToSavedDrawing(activeDrawingName, drawing);
-        const exportNames = drawingExportNames(savedDrawing, sortStore);
+        const exportNames = drawingExportNames(drawing, activeDrawingName, sortStore);
         const moduleName = exportNames.moduleName;
 
-        const rootLayers = savedDrawing.layers.filter(l => l.parentId === null);
+        const rootLayers = drawing.getAllLayers().filter(l => l.parentId === null);
         if (rootLayers.length === 0) {
             throw new Error(`Consistency Check Failed: Recorded drawing '${activeDrawingName}' has no root layer.`);
         }
 
         const registry = newExportRegistry(sortStore);
-        const info = ruleTypeInfo(savedDrawing, sortStore, registry, { reserveParam: false, includePremises: false });
+        const info = ruleTypeInfo(drawing, activeDrawingName, sortStore, registry, { reserveParam: false, includePremises: false });
         const lemmaName = `${moduleName}_rule`;
 
         this.statements.set(activeDrawingName, new RecordedStatement({
@@ -202,16 +201,14 @@ export class RocqRecorder {
         }
         this.revertProof(stmt);
 
-        const savedRule = DrawingStore.drawingToSavedDrawing(savedRuleName, ruleDrawing);
-        const ruleNames = drawingExportNames(savedRule, sortStore);
+        const ruleNames = drawingExportNames(ruleDrawing, savedRuleName, sortStore);
 
-        const ruleRoot = savedRule.layers.find(l => l.parentId === null);
+        const ruleRoot = ruleDrawing.getAllLayers().find(l => l.parentId === null);
         if (!ruleRoot) {
             throw new Error(`Consistency Check Failed: Applied rule '${savedRuleName}' has no root layer.`);
         }
 
-        const savedHost = DrawingStore.drawingToSavedDrawing(hostActiveName, hostDrawing);
-        const hostNames = drawingExportNames(savedHost, sortStore);
+        const hostNames = drawingExportNames(hostDrawing, hostActiveName, sortStore);
 
         // Map pattern artefact ID -> matched host artefact ID
         const matchMap = new Map<string, string>();
@@ -223,12 +220,12 @@ export class RocqRecorder {
 
         // The rule's own structure: root elements give the canonical
         // (dependency-ordered) argument order of the exported rule parameter.
-        const rootChildren = savedRule.layers.filter(l => l.parentId === ruleRoot.id);
+        const rootChildren = ruleDrawing.getAllLayers().filter(l => l.parentId === ruleRoot.id);
         const hasConclusion = rootChildren.some(child => {
-            const childrenOfChild = savedRule.layers.filter(l => l.parentId === child.id);
+            const childrenOfChild = ruleDrawing.getAllLayers().filter(l => l.parentId === child.id);
             return childrenOfChild.length === 0;
         });
-        const ruleInfo = ruleTypeInfo(savedRule, sortStore, newExportRegistry(sortStore), {
+        const ruleInfo = ruleTypeInfo(ruleDrawing, savedRuleName, sortStore, newExportRegistry(sortStore), {
             reserveParam: true,
             includePremises: hasConclusion
         });
@@ -306,7 +303,7 @@ export class RocqRecorder {
         // The premise layers in the same order as ruleInfo.premiseLayers: the
         // root's children that have a child layer of their own.
         const premiseLayerDefs = rootChildren.filter(child => {
-            const childrenOfChild = savedRule.layers.filter(l => l.parentId === child.id);
+            const childrenOfChild = ruleDrawing.getAllLayers().filter(l => l.parentId === child.id);
             return childrenOfChild.length > 0;
         });
         if (premiseLayerDefs.length !== ruleInfo.premiseLayers.length) {
@@ -325,14 +322,13 @@ export class RocqRecorder {
             let premiseType: string;
             let lemmaType: string;
             if (derivedDrawing) {
-                const derivedSaved = DrawingStore.drawingToSavedDrawing(derivedDrawingName, derivedDrawing.drawing);
-                lemmaType = ruleTypeInfo(derivedSaved, sortStore, newExportRegistry(sortStore), {
+                lemmaType = ruleTypeInfo(derivedDrawing.drawing, derivedDrawingName, sortStore, newExportRegistry(sortStore), {
                     reserveParam: false,
                     includePremises: false
                 }).type;
 
                 if (derivedDrawing.created) {
-                    const derivedExport = drawingExportNames(derivedSaved, sortStore);
+                    const derivedExport = drawingExportNames(derivedDrawing.drawing, derivedDrawingName, sortStore);
                     const effectiveNameMap = new Map<string, string>(rootNameToHost);
 
                     for (const el of [...premise.premiseElements, ...premise.childElements]) {
@@ -416,8 +412,7 @@ export class RocqRecorder {
         }
         this.revertProof(stmt);
 
-        const savedHost = DrawingStore.drawingToSavedDrawing(hostActiveName, hostDrawing);
-        const hostNames = drawingExportNames(savedHost, sortStore);
+        const hostNames = drawingExportNames(hostDrawing, hostActiveName, sortStore);
 
         const originalId = original.id;
         const originalField = hostNames.fieldNames.get(originalId);
@@ -470,8 +465,7 @@ export class RocqRecorder {
             if (!this.sortStore) {
                 throw new Error("Consistency Check Failed: No sort store available; start a recording before proving a layer.");
             }
-            const savedHost = DrawingStore.drawingToSavedDrawing(hostActiveName, hostDrawing);
-            const info = ruleTypeInfo(savedHost, this.sortStore, newExportRegistry(this.sortStore), {
+            const info = ruleTypeInfo(hostDrawing, hostActiveName, this.sortStore, newExportRegistry(this.sortStore), {
                 reserveParam: false,
                 includePremises: false
             });
@@ -494,7 +488,7 @@ export class RocqRecorder {
         }
 
         const info = stmt.ruleInfo;
-        const hostNames = drawingExportNames(DrawingStore.drawingToSavedDrawing(hostActiveName, hostDrawing), this.sortStore!);
+        const hostNames = drawingExportNames(hostDrawing, hostActiveName, this.sortStore!);
 
         const idToLiveArt = new Map<string, Artefact>();
         for (const art of hostDrawing.getArtefacts()) {

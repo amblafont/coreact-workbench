@@ -100,15 +100,14 @@ describe('core reactivity ($state)', () => {
         expect(read()).toBe(false);
     });
 
-    it('saveDrawing/deleteDrawing recompute getAllDrawings', () => {
+    it('addDrawing/deleteDrawing recompute getAllDrawings', () => {
         const store = new DrawingStore();
-        const drawing = makeDrawing();
         let count = $derived(store.getAllDrawings().length);
         const read = () => count;
         expect(read()).toBe(0);
-        store.saveDrawing('A', drawing);
+        store.addDrawing('A', makeDrawing());
         expect(read()).toBe(1);
-        store.saveDrawing('B', drawing);
+        store.addDrawing('B', makeDrawing());
         expect(read()).toBe(2);
         store.deleteDrawing('A');
         expect(read()).toBe(1);

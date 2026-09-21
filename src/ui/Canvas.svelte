@@ -4,7 +4,7 @@
     import { Artefact } from '../index.svelte.ts';
     import type { D3Context } from '../types';
     import {
-        drawing,
+        getDrawing,
         sortStore,
         ui,
         applyPickedPosition,
@@ -65,7 +65,7 @@
 
     function applyOverlays(): void {
         if (!svgContext) return;
-        for (const art of drawing.getArtefacts()) {
+        for (const art of getDrawing().getArtefacts()) {
             if (!art.svgElement) continue;
             const opacity = canvasOpacity(art);
             if (opacity !== null) {
@@ -116,7 +116,7 @@
     function redraw(): void {
         if (!svgContext) return;
         svgContext.selectAll('*').remove();
-        drawing.draw(svgContext as unknown as D3Context);
+        getDrawing().draw(svgContext as unknown as D3Context);
         drawDraftPreview();
     }
 

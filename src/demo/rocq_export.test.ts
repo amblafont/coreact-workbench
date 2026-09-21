@@ -13,7 +13,7 @@ describe('rocq export', () => {
         makeEdge(drawing, 'f', v0, v1);
 
         const store = new DrawingStore();
-        store.saveDrawing('MainDrawing', drawing);
+        store.addDrawing('MainDrawing', drawing);
 
         const code = exportDrawingsToRocq(store.getAllDrawings(), sortStore);
         expect(code.startsWith('Require Import Ltac2.Ltac2.')).toBe(true);
@@ -34,7 +34,7 @@ describe('rocq export', () => {
         const mb = makeVertex(host, 'b');
         makeEdge(host, 'g', ma, mb);
         host.newEqualityArtefact([ma, mb], 'root');
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         const rule = new Drawing(sortStore);
         const rx = makeVertex(rule, 'x');
@@ -42,7 +42,7 @@ describe('rocq export', () => {
         rule.addLayer('conclusion', 'Conclusion', 'root');
         rule.newArtefact('Edge', { source: rx, target: ry }, { width: 2, bend: 0, label: 'f' }, 'conclusion');
         rule.setIsRule(true);
-        store.saveDrawing('Foo', rule);
+        store.addDrawing('Foo', rule);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);
@@ -74,7 +74,7 @@ describe('rocq export', () => {
         const host = new Drawing(sortStore);
         makeVertex(host, 'a');
         makeVertex(host, 'b');
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);
@@ -92,7 +92,7 @@ describe('rocq export', () => {
         const mb = makeVertex(host, 'b');
         makeEdge(host, 'g', ma, mb);
         host.newEqualityArtefact([ma, mb], 'root');
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         const rule = new Drawing(sortStore);
         const rx = makeVertex(rule, 'x');
@@ -101,7 +101,7 @@ describe('rocq export', () => {
         rule.newArtefact('Edge', { source: rx, target: ry }, { width: 2, bend: 0, label: 'f' }, 'conclusion');
         rule.newEqualityArtefact([rx, ry], 'conclusion');
         rule.setIsRule(true);
-        store.saveDrawing('FooEq', rule);
+        store.addDrawing('FooEq', rule);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);
@@ -121,7 +121,7 @@ describe('rocq export', () => {
         const host = new Drawing(sortStore);
         makeVertex(host, 'a');
         makeVertex(host, 'b');
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         const rule = new Drawing(sortStore);
         const rx = makeVertex(rule, 'x');
@@ -129,7 +129,7 @@ describe('rocq export', () => {
         rule.addLayer('conclusion', 'Conclusion', 'root');
         rule.newEqualityArtefact([rx, ry], 'conclusion');
         rule.setIsRule(true);
-        store.saveDrawing('EqConclusionRule', rule);
+        store.addDrawing('EqConclusionRule', rule);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);
@@ -150,7 +150,7 @@ describe('rocq export', () => {
         const host = new Drawing(sortStore);
         makeVertex(host, 'a');
         makeVertex(host, 'b');
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         const rule = new Drawing(sortStore);
         const rx = makeVertex(rule, 'x');
@@ -162,7 +162,7 @@ describe('rocq export', () => {
         rule.addLayer('conclusion', 'Conclusion', 'root');
         makeEdge(rule, 'ce', rx, ry, 'conclusion');
         rule.setIsRule(true);
-        store.saveDrawing('SecondOrderRule', rule);
+        store.addDrawing('SecondOrderRule', rule);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);
@@ -194,7 +194,7 @@ describe('rocq export', () => {
         const host = new Drawing(sortStore);
         makeVertex(host, 'a');
         makeVertex(host, 'b');
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         const rule = new Drawing(sortStore);
         const rx = makeVertex(rule, 'x');
@@ -206,7 +206,7 @@ describe('rocq export', () => {
         rule.addLayer('conclusion', 'Conclusion', 'root');
         makeEdge(rule, 'ce', rx, ry, 'conclusion');
         rule.setIsRule(true);
-        store.saveDrawing('SecondOrderRule', rule);
+        store.addDrawing('SecondOrderRule', rule);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);
@@ -245,7 +245,7 @@ describe('rocq export', () => {
         const ha = makeVertex(host, 'a');
         const hb = makeVertex(host, 'b');
         makeVertex(host, 'c');
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         const rule = new Drawing(sortStore);
         const rx = makeVertex(rule, 'x');
@@ -257,7 +257,7 @@ describe('rocq export', () => {
         rule.addLayer('conclusion', 'Conclusion', 'root');
         makeEdge(rule, 'ce', rx, ry, 'conclusion');
         rule.setIsRule(true);
-        store.saveDrawing('SecondOrderRule', rule);
+        store.addDrawing('SecondOrderRule', rule);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);
@@ -266,7 +266,7 @@ describe('rocq export', () => {
         const app = apps.find(a => a.matchedArtefacts.get(rx) === ha && a.matchedArtefacts.get(ry) === hb) ?? apps[0];
         const result = applySecondOrderRule(rule, host, app, { hostName: 'MainDrawing', ruleName: 'SecondOrderRule' });
         const derived = result.derivedRules[0];
-        store.saveDrawing(derived.name, derived.drawing);
+        store.addDrawing(derived.name, derived.drawing);
         recorder.recordRuleApply(
             rule,
             'SecondOrderRule',
@@ -297,7 +297,7 @@ describe('rocq export', () => {
         host.newEqualityArtefact([ha, hb], 'root');
         const hmw = host.newArtefact('Edge', { source: ha, target: hc }, { width: 2, bend: 0, label: 'mw' }, 'root');
         host.newArtefact('isMono', { arrow: hmw }, {}, 'root');
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         const rule = new Drawing(sortStore);
         const rx = makeVertex(rule, 'x');
@@ -309,7 +309,7 @@ describe('rocq export', () => {
         rule.addLayer('conclusion', 'Conclusion', 'root');
         rule.newArtefact('Edge', { source: rx, target: ry }, { width: 2, bend: 0, label: 'f' }, 'conclusion');
         rule.setIsRule(true);
-        store.saveDrawing('ArgOrderRule', rule);
+        store.addDrawing('ArgOrderRule', rule);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);
@@ -329,10 +329,10 @@ describe('rocq export', () => {
         const store = new DrawingStore();
 
         const host = buildComposableHost().host;
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         const rule = buildIsMonoInChildLayerRule();
-        store.saveDrawing('IsMonoInChildLayer', rule);
+        store.addDrawing('IsMonoInChildLayer', rule);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);
@@ -352,10 +352,10 @@ describe('rocq export', () => {
         const store = new DrawingStore();
 
         const host = buildComposableHost().host;
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         const rule = buildSecondOrderRule();
-        store.saveDrawing('SecondOrderRule', rule);
+        store.addDrawing('SecondOrderRule', rule);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);
@@ -385,10 +385,10 @@ describe('rocq export', () => {
         host.addLayer('mono-layer', 'Mono Layer', 'root');
         const he2 = host.newArtefact('Edge', { source: hv1, target: hv2 }, { width: 2, bend: 0, label: 'he2' }, 'root');
         host.newArtefact('isMono', { arrow: he2 }, {}, 'mono-layer');
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         const rule = buildIsMonoOnlyConclusionRule();
-        store.saveDrawing('FlagOnlyRule', rule);
+        store.addDrawing('FlagOnlyRule', rule);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);
@@ -421,7 +421,7 @@ describe('rocq export', () => {
         rule.addLayer('conclusion', 'Conclusion', 'root');
         makeEdge(rule, 'f', rx, ry, 'conclusion');
         rule.setIsRule(true);
-        store.saveDrawing('WrappedEqRule', rule);
+        store.addDrawing('WrappedEqRule', rule);
 
         const code = exportDrawingsToRocq(store.getAllDrawings(), sortStore);
         expect(code).toContain('Parameter WrappedEqRule_rule : forall (x y : Vertex)(eq_x_y : x = y),');
@@ -439,7 +439,7 @@ describe('rocq export', () => {
         rule.newEqualityArtefact([rx, ry], 'conclusion');
         makeEdge(rule, 'f', rx, ry, 'conclusion');
         rule.setIsRule(true);
-        store.saveDrawing('SigmaEqRule', rule);
+        store.addDrawing('SigmaEqRule', rule);
 
         const code = exportDrawingsToRocq(store.getAllDrawings(), sortStore);
         expect(code).toContain('Parameter SigmaEqRule_rule : forall (x y : Vertex), Σ (eq_x_y : x = y),');
@@ -458,7 +458,7 @@ describe('rocq export', () => {
         rule.addLayer('conclusion', 'Conclusion', 'root');
         makeEdge(rule, 'f', rx, rz, 'conclusion');
         rule.setIsRule(true);
-        store.saveDrawing('TriEqRoot', rule);
+        store.addDrawing('TriEqRoot', rule);
 
         const code = exportDrawingsToRocq(store.getAllDrawings(), sortStore);
         expect(code).toContain('Parameter TriEqRoot_rule : forall (r3 r4 r2 : Vertex)(eq_r3_r4_r2 : r3 = r4)(eq_r3_r4_r2_2 : r4 = r2),');
@@ -474,7 +474,7 @@ describe('rocq export', () => {
         const hb = makeVertex(host, 'b');
         const hc = makeVertex(host, 'c');
         host.newEqualityArtefact([ha, hb, hc], 'root');
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         const rule = new Drawing(sortStore);
         const rx = makeVertex(rule, 'x');
@@ -484,7 +484,7 @@ describe('rocq export', () => {
         rule.addLayer('conclusion', 'Conclusion', 'root');
         makeEdge(rule, 'f', rx, rz, 'conclusion');
         rule.setIsRule(true);
-        store.saveDrawing('TriEqRoot', rule);
+        store.addDrawing('TriEqRoot', rule);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);
@@ -507,7 +507,7 @@ describe('rocq export', () => {
         makeEdge(host, 'g', ma, mb);
         host.addLayer('child', 'Child Layer', 'root');
         makeEdge(host, 'c', ma, mb, 'child');
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         const result = host.checkLayerProvable('child');
         expect(result.provable).toBe(true);
@@ -537,7 +537,7 @@ describe('rocq export', () => {
         host.newArtefact('isMono', { arrow: me }, {}, 'root');
         host.newArtefact('isMono', { arrow: me }, {}, 'child');
         
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);
@@ -566,7 +566,7 @@ describe('rocq export', () => {
         host.addEqualityArtefactUnchecked([ma, mb], 'child');
         makeEdge(host, 'c', ma, mb, 'child');
 
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);
@@ -595,7 +595,7 @@ describe('rocq export', () => {
         const liveIds = [ma, mb, g, eqRoot, eqChild, c].map(a => a.id);
         expect(new Set(liveIds).size).toBe(liveIds.length);
 
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         // Serialization must emit the live ids verbatim.
         const serialized = store.exportDrawingsJSON(['MainDrawing']);
@@ -605,8 +605,7 @@ describe('rocq export', () => {
 
         // Loading into a fresh drawing must adopt those ids verbatim and keep
         // getArtefactById resolving against them.
-        const reloaded = new Drawing(sortStore);
-        store.loadDrawing('MainDrawing', reloaded);
+        const reloaded = DrawingStore.hydrateDrawing(DrawingStore.drawingToSavedDrawing('MainDrawing', store.getDrawing('MainDrawing')!.drawing), sortStore);
         const reloadedIds = reloaded.getArtefacts().map(a => a.id).sort();
         expect(reloadedIds).toEqual([...liveIds].sort());
         for (const id of liveIds) {
@@ -624,7 +623,7 @@ describe('rocq export', () => {
         const f = makeEdge(host, 'f', a, b);
 
         const store = new DrawingStore();
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);
@@ -642,7 +641,7 @@ describe('rocq export', () => {
         const a = makeVertex(host, 'a');
 
         const store = new DrawingStore();
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);
@@ -673,7 +672,7 @@ describe('rocq export', () => {
         const host = new Drawing(sortStore);
         makeVertex(host, 'a');
         makeVertex(host, 'b');
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         const rule = new Drawing(sortStore);
         const rx = makeVertex(rule, 'x');
@@ -685,7 +684,7 @@ describe('rocq export', () => {
         rule.addLayer('conclusion', 'Conclusion', 'root');
         makeEdge(rule, 'ce', rx, ry, 'conclusion');
         rule.setIsRule(true);
-        store.saveDrawing('SecondOrderRule', rule);
+        store.addDrawing('SecondOrderRule', rule);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);
@@ -694,7 +693,7 @@ describe('rocq export', () => {
         expect(apps.length).toBeGreaterThan(0);
         const result = applySecondOrderRule(rule, host, apps[0], { hostName: 'MainDrawing', ruleName: 'SecondOrderRule' });
         const derived = result.derivedRules[0];
-        store.saveDrawing(derived.name, derived.drawing);
+        store.addDrawing(derived.name, derived.drawing);
 
         const childLayer = getFirstOrderStatementChildLayer(derived.drawing);
         expect(childLayer).not.toBeNull();
@@ -732,7 +731,7 @@ describe('rocq export', () => {
         const host = new Drawing(sortStore);
         makeVertex(host, 'a');
         makeVertex(host, 'b');
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         const rule = new Drawing(sortStore);
         const rx = makeVertex(rule, 'x');
@@ -744,7 +743,7 @@ describe('rocq export', () => {
         rule.addLayer('conclusion', 'Conclusion', 'root');
         makeEdge(rule, 'ce', rx, ry, 'conclusion');
         rule.setIsRule(true);
-        store.saveDrawing('SecondOrderRule', rule);
+        store.addDrawing('SecondOrderRule', rule);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);
@@ -753,7 +752,7 @@ describe('rocq export', () => {
         expect(apps1.length).toBeGreaterThan(0);
         const result1 = applySecondOrderRule(rule, host, apps1[0], { hostName: 'MainDrawing', ruleName: 'SecondOrderRule' });
         const s1 = result1.derivedRules[0];
-        store.saveDrawing(s1.name, s1.drawing);
+        store.addDrawing(s1.name, s1.drawing);
         recorder.recordRuleApply(
             rule,
             'SecondOrderRule',
@@ -768,7 +767,7 @@ describe('rocq export', () => {
         expect(apps2.length).toBeGreaterThan(0);
         const result2 = applySecondOrderRule(rule, s1.drawing, apps2[0], { hostName: s1.name, ruleName: 'SecondOrderRule' });
         const s1sub = result2.derivedRules[0];
-        store.saveDrawing(s1sub.name, s1sub.drawing);
+        store.addDrawing(s1sub.name, s1sub.drawing);
         recorder.recordRuleApply(
             rule,
             'SecondOrderRule',
@@ -811,7 +810,7 @@ describe('rocq export', () => {
         makeEdge(host, 'g', ma, mb);
         host.addLayer('child', 'Child Layer', 'root');
         makeEdge(host, 'c', ma, mb, 'child');
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         const result = host.checkLayerProvable('child');
         expect(result.provable).toBe(true);
@@ -827,7 +826,7 @@ describe('rocq export', () => {
         rule.addLayer('conclusion', 'Conclusion', 'root');
         rule.newArtefact('Edge', { source: rx, target: ry }, { width: 2, bend: 0, label: 'f' }, 'conclusion');
         rule.setIsRule(true);
-        store.saveDrawing('Foo', rule);
+        store.addDrawing('Foo', rule);
         const apps = findFirstOrderRuleApplications(rule, host);
         expect(apps.length).toBeGreaterThan(0);
         const created = applyFirstOrderRule(rule, host, apps[0]);
@@ -844,7 +843,7 @@ describe('rocq export', () => {
         const store = new DrawingStore();
 
         const host = buildIsMonoInChildLayerRule();
-        store.saveDrawing('UnfinishedMonoHost', host);
+        store.addDrawing('UnfinishedMonoHost', host);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'UnfinishedMonoHost', sortStore);
@@ -861,7 +860,7 @@ describe('rocq export', () => {
         const store = new DrawingStore();
 
         const host = buildComposableHost().host;
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);
@@ -880,7 +879,7 @@ describe('rocq export', () => {
         const host = new Drawing(sortStore);
         makeVertex(host, 'a');
         makeVertex(host, 'b');
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         const rule = new Drawing(sortStore);
         const rx = makeVertex(rule, 'x');
@@ -896,7 +895,7 @@ describe('rocq export', () => {
         rule.addLayer('conclusion', 'Conclusion', 'root');
         makeEdge(rule, 'ce', rx, ry, 'conclusion');
         rule.setIsRule(true);
-        store.saveDrawing('MultiPremiseRule', rule);
+        store.addDrawing('MultiPremiseRule', rule);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);
@@ -908,8 +907,8 @@ describe('rocq export', () => {
 
         const sub1 = result.derivedRules[0];
         const sub2 = result.derivedRules[1];
-        store.saveDrawing(sub1.name, sub1.drawing);
-        store.saveDrawing(sub2.name, sub2.drawing);
+        store.addDrawing(sub1.name, sub1.drawing);
+        store.addDrawing(sub2.name, sub2.drawing);
 
         const childLayer1 = getFirstOrderStatementChildLayer(sub1.drawing);
         expect(childLayer1).not.toBeNull();
@@ -970,7 +969,7 @@ describe('rocq export', () => {
         const host = new Drawing(sortStore);
         makeVertex(host, 'a');
         makeVertex(host, 'b');
-        store.saveDrawing('MainDrawing', host);
+        store.addDrawing('MainDrawing', host);
 
         const rule = new Drawing(sortStore);
         const rx = makeVertex(rule, 'x');
@@ -984,7 +983,7 @@ describe('rocq export', () => {
         rule.setIsRule(true);
         // "Triangle" is a defined sort, so previously drawingExportNames produced Triangle_2_rule
         // whereas exportDrawingsToRocq produced Parameter Triangle_rule : ...
-        store.saveDrawing('Triangle', rule);
+        store.addDrawing('Triangle', rule);
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);

@@ -2,10 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { flushSync } from 'svelte';
 import {
     ui,
-    drawing,
+    getDrawing,
     drawingStore,
     sortStore,
     computeRuleApplications,
+    setActiveDrawing,
     toggleFilterStrictMatches,
     toggleFilterRedundantMatches,
     toggleFilterNoProgressMatches,
@@ -18,13 +19,12 @@ describe('rule filter reactivity (ui.* state)', () => {
     it('recompute the entries $derived when a filter toggles', () => {
         registerDefaultSorts(sortStore);
         drawingStore.clear();
-        drawing.clear(true);
+        getDrawing().clear(true);
         const { rule } = buildComposableEdgesRule();
-        drawingStore.saveDrawing('Rule', rule);
+        drawingStore.addDrawing('Rule', rule);
         const { host } = buildComposableHost();
-        drawingStore.saveDrawing('Host', host);
-        ui.activeDrawingName = 'Host';
-        drawingStore.loadDrawing('Host', drawing);
+        drawingStore.addDrawing('Host', host);
+        setActiveDrawing('Host');
 
         let entries = $derived(computeRuleApplications());
         const read = () => entries;

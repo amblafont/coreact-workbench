@@ -9,7 +9,6 @@
     } from './store.svelte.ts';
     import type { RuleTag } from './store.svelte.ts';
     import {
-        saveActiveDrawing,
         duplicateCurrentDrawing,
         newDrawing,
         importDrawingsFile,
@@ -78,7 +77,6 @@
             >
                 {ui.rocqRecordingActive ? (pendingProofCount() > 0 ? `Stop recording (${pendingProofCount()} pending)` : 'Stop recording') : 'Rocq recording'}
             </button>
-            <button class="layer-btn save-btn" title="Save current drawing" onclick={saveActiveDrawing}>Save</button>
             <button class="layer-btn dup-btn" title="Duplicate the current drawing under a new name" onclick={duplicateCurrentDrawing}>Dup.</button>
             <button
                 class="layer-btn delete-btn"
