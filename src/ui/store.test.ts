@@ -6,7 +6,7 @@ import { getDrawing, drawingStore, ui, sortStore, rocqRecorder, syncProvedStatus
 } from './store.svelte.ts';
 import { Drawing } from '../index.svelte.ts';
 import { registerDefaultSorts } from '../demo/buildDemo';
-import { buildComposableEdgesRule } from '../demo/helpers';
+import { buildComposableEdgesRule, makeDrawing, makeEdge, makeVertex } from '../demo/helpers';
 
 describe('export selection bookkeeping', () => {
     beforeEach(() => {
@@ -209,6 +209,86 @@ describe('active drawing after rule application', () => {
         expect(() => applyRuleAt('CompRule', 0)).not.toThrow();
         expect(getDrawing().getArtefacts().length).toBe(6);
         expect(drawingStore.getAllDrawings().map(d => d.name)).toEqual(['CompRule']);
+    });
+});
+
+describe('goal solved toast on rule application', () => {
+    beforeEach(() => {
+        registerDefaultSorts(sortStore);
+        getDrawing().clear(true);
+        drawingStore.clear();
+        ui.activeDrawingName = null;
+        ui.toasts = [];
+    });
+
+    afterEach(() => {
+        ui.activeDrawingName = null;
+        ui.toasts = [];
+    });
+
+    it('pushes a success toast when the applied rule solves the goal', () => {
+        const rule = makeDrawing();
+        const rv0 = makeVertex(rule, 'rv0');
+        const rv1 = makeVertex(rule, 'rv1');
+        makeEdge(rule, 're1', rv0, rv1);
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        makeEdge(rule, 'rg', rv1, rv0, 'conclusion');
+        rule.setIsRule(true);
+        drawingStore.addDrawing('RevRule', rule);
+
+        getDrawing().addLayer('goal', 'Goal', 'root');
+        const hv0 = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'hv0' }, 'root');
+        const hv1 = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'hv1' }, 'root');
+        getDrawing().newArtefact('Edge', { source: hv0, target: hv1 }, { width: 2, bend: 0, label: 'he1' }, 'root');
+        getDrawing().newArtefact('Edge', { source: hv1, target: hv0 }, { width: 2, bend: 0, label: 'hg' }, 'goal');
+
+        drawingStore.addDrawing('Statement', getDrawing());
+        ui.activeDrawingName = 'Statement';
+        expect(getDrawing().checkLayerProvable('goal').provable).toBe(false);
+
+        applyRuleAt('RevRule', 0);
+
+        expect(ui.toasts.filter(t => t.kind === 'success').map(t => t.message)).toContain('Goal solved');
+    });
+
+    it('does not push a success toast when the goal was already proved', () => {
+        const { rule } = buildComposableEdgesRule();
+        drawingStore.addDrawing('CompRule', rule);
+
+        getDrawing().addLayer('goal', 'Goal', 'root');
+        const hv0 = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'hv0' }, 'root');
+        const hv1 = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'hv1' }, 'root');
+        const hv2 = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'hv2' }, 'root');
+        getDrawing().newArtefact('Edge', { source: hv0, target: hv1 }, { width: 2, bend: 0, label: 'he1' }, 'root');
+        getDrawing().newArtefact('Edge', { source: hv1, target: hv2 }, { width: 2, bend: 0, label: 'he2' }, 'root');
+        getDrawing().newArtefact('Edge', { source: hv0, target: hv2 }, { width: 2, bend: 0, label: 'he3' }, 'root');
+        getDrawing().newArtefact('Edge', { source: hv0, target: hv2 }, { width: 2, bend: 0, label: 'hg' }, 'goal');
+
+        drawingStore.addDrawing('Statement', getDrawing());
+        ui.activeDrawingName = 'Statement';
+        expect(getDrawing().checkLayerProvable('goal').provable).toBe(true);
+
+        applyRuleAt('CompRule', 0);
+
+        expect(ui.toasts.some(t => t.kind === 'success')).toBe(false);
+    });
+
+    it('does not push a success toast when the drawing has no goal', () => {
+        const { rule } = buildComposableEdgesRule();
+        drawingStore.addDrawing('CompRule', rule);
+
+        const v0 = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'v0' }, 'root');
+        const v1 = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'v1' }, 'root');
+        const v2 = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'v2' }, 'root');
+        getDrawing().newArtefact('Edge', { source: v0, target: v1 }, { width: 2, bend: 0, label: 'he1' }, 'root');
+        getDrawing().newArtefact('Edge', { source: v1, target: v2 }, { width: 2, bend: 0, label: 'he2' }, 'root');
+
+        drawingStore.addDrawing('Statement', getDrawing());
+        ui.activeDrawingName = 'Statement';
+
+        applyRuleAt('CompRule', 0);
+
+        expect(ui.toasts.some(t => t.kind === 'success')).toBe(false);
     });
 });
 

@@ -15,6 +15,7 @@ import {
     filterNoProgressRuleApplications,
     filterSolvesGoalRuleApplications,
     getFirstOrderStatementChildLayer,
+    computeProved,
     type SortDefinition,
     type Layer,
     type DrawingStoreEntry,
@@ -58,7 +59,7 @@ export type PositionPicker =
     | { kind: 'draft'; attrName: string }
     | { kind: 'artefact'; id: string; attrName: string };
 
-export type ToastKind = 'info' | 'error';
+export type ToastKind = 'info' | 'error' | 'success';
 
 export interface Toast {
     id: number;
@@ -1282,6 +1283,7 @@ export function applyRuleAt(savedRuleName: string, appIndex: number): void {
     const { name, drawing: ruleDrawing, applications } = entry;
     const app = applications[appIndex];
     const activeName = ui.activeDrawingName ?? 'Unsaved Drawing';
+    const goalWasProved = computeProved(drawing);
     let applicationResult: { artefacts: Artefact[]; created: Map<Artefact, Artefact>; derivedNames?: string[]; derived?: DerivedRule[] } | null = null;
     try {
         if (entry.isFirstOrder) {
@@ -1312,6 +1314,9 @@ export function applyRuleAt(savedRuleName: string, appIndex: number): void {
             rocqRecorder.recordRuleApply(ruleDrawing, name, app, drawing, applicationResult, activeName, sortStore);
         }
         syncProvedStatus();
+        if (!goalWasProved && computeProved(drawing)) {
+            pushToast('success', 'Goal solved');
+        }
 
     } catch (err) {
         pushToast('error', `Error applying rule '${name}':\n${(err as Error).message}`);
