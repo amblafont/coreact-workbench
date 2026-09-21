@@ -71,17 +71,28 @@
 
     <Canvas />
 
-    <div id="inspector">
-        <h2>Inspector</h2>
-        <Inspector />
-    </div>
-
-    <div id="rules-panel">
-        <div class="rules-header">
-            <h2>Applyable Rules</h2>
+    <div id="right-panel">
+        <div id="rules-panel">
+            <div class="rules-header">
+                <button
+                    class="panel-toggle-btn"
+                    class:collapsed={ui.rulesPanelCollapsed}
+                    title={ui.rulesPanelCollapsed ? 'Expand Applyable Rules panel' : 'Collapse Applyable Rules panel'}
+                    aria-label={ui.rulesPanelCollapsed ? 'Expand panel' : 'Collapse panel'}
+                    onclick={() => { ui.rulesPanelCollapsed = !ui.rulesPanelCollapsed; }}
+                ></button>
+                <h2>Applyable Rules</h2>
+            </div>
+            {#if !ui.rulesPanelCollapsed}
+                <div id="rules-content">
+                    <RuleApplications />
+                </div>
+            {/if}
         </div>
-        <div id="rules-content">
-            <RuleApplications />
+
+        <div id="inspector">
+            <h2>Inspector</h2>
+            <Inspector />
         </div>
     </div>
 

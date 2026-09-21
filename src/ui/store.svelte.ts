@@ -86,8 +86,9 @@ export const ui = $state({
     toasts: [] as Toast[],
     rocqRecordingActive: false,
     drawingsStoreCollapsed: false,
-    filterRedundantMatches: false,
-    filterNoProgressMatches: false,
+    rulesPanelCollapsed: true,
+    filterRedundantMatches: true,
+    filterNoProgressMatches: true,
     filterStrictMatches: false,
     filterSolvesGoalMatches: false
 });

@@ -21,12 +21,21 @@ body {
 #menu, #inspector, #rules-panel {
     flex-shrink: 0;
     width: 270px;
-    height: 800px;
     background-color: white;
     border: 1px solid #ccc;
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     padding: 15px;
     overflow-y: auto;
+}
+#menu {
+    height: 800px;
+}
+#right-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    flex-shrink: 0;
+    width: 270px;
 }
 #menu h2, #inspector h2, #rules-panel h2 {
     margin-top: 0;
