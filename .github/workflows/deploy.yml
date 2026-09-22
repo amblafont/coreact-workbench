@@ -26,6 +26,8 @@ jobs:
 
       - run: npm ci
 
+      - run: npm run build:sorts
+
       - run: npm run build:standalone
 
       - uses: actions/upload-pages-artifact@v3
