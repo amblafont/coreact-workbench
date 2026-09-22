@@ -487,6 +487,11 @@ body {
 .move-btn:hover {
     background-color: #e8eaed;
 }
+.move-btn.active {
+    opacity: 1;
+    background-color: #d6eaf8;
+    color: #1a5276;
+}
 .move-btn.disabled {
     opacity: 0;
     pointer-events: none;

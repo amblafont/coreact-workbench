@@ -250,7 +250,7 @@
             </div>
 
             {#if draft.sortName === 'Equality'}
-                <h4 style="margin: 10px 0 5px 0; font-size: 0.95rem; color: #444;">Equalized Artefacts (pick >= 2 of same sort)</h4>
+                <h4 style="margin: 10px 0 5px 0; font-size: 0.95rem; color: #444;">Equalized Artefacts (pick as many of the same sort as you want, at least 2)</h4>
                 {#each equalityChildren(draft) as item}
                     <div style="font-size: 0.85rem; margin: 3px 0;">• {item.data.label || item.sortName} ({item.sortName})</div>
                 {/each}

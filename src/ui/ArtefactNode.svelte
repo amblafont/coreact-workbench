@@ -13,7 +13,8 @@
         moveArtefactUp,
         moveArtefactDown,
         canMoveArtefactUp,
-        canMoveArtefactDown
+        canMoveArtefactDown,
+        toggleEqualityExtend
     } from './store.svelte.ts';
     import ArtefactNode from './ArtefactNode.svelte';
 
@@ -47,6 +48,8 @@
     let depEntries = $derived(Object.entries(artefact.dependencies) as [string, Artefact][]);
     let canUp = $derived(rootNode && !ui.dependencyPickingFor && canMoveArtefactUp(artefact));
     let canDown = $derived(rootNode && !ui.dependencyPickingFor && canMoveArtefactDown(artefact));
+    let extendMode = $derived(ui.equalityExtendTarget !== null);
+    let isEqualityExtendTarget = $derived(ui.equalityExtendTarget === artefact);
 
     let nodeOpacity = $derived.by(() => {
         if (ui.mergeMode) {
@@ -155,7 +158,7 @@
         {#if provablyEqualCandidate}
             <span class="eq-badge" title="Provably equal (via equality artefacts)">≡</span>
         {/if}
-        {#if rootNode && !ui.dependencyPickingFor}
+        {#if rootNode && !ui.dependencyPickingFor && !extendMode}
             <span
                 class="move-btn"
                 class:disabled={!canUp}
@@ -195,7 +198,7 @@
                 }}
             >↓</span>
         {/if}
-        {#if rootNode && !ui.dependencyPickingFor && artefact.sortName !== 'Equality'}
+        {#if rootNode && !ui.dependencyPickingFor && artefact.sortName !== 'Equality' && !extendMode}
             <span
                 class="move-btn"
                 role="button"
@@ -215,7 +218,7 @@
                 }}
             >⧉</span>
         {/if}
-        {#if rootNode && !ui.dependencyPickingFor && artefact.sortName !== 'Equality' && !ui.mergeMode}
+        {#if rootNode && !ui.dependencyPickingFor && artefact.sortName !== 'Equality' && !ui.mergeMode && !extendMode}
             <span
                 class="move-btn"
                 role="button"
@@ -235,24 +238,47 @@
                 }}
             >⨝</span>
         {/if}
-        <span
-            class="remove-btn"
-            role="button"
-            tabindex="0"
-            title="Remove artefact"
-            aria-label="Remove artefact"
-            onclick={(e) => {
-                e.stopPropagation();
-                onRemove();
-            }}
-            onkeydown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
+        {#if rootNode && !ui.dependencyPickingFor && !ui.mergeMode && artefact.sortName === 'Equality'}
+            <span
+                class="move-btn eq-extend-btn"
+                class:active={isEqualityExtendTarget}
+                role="button"
+                tabindex="0"
+                title={isEqualityExtendTarget ? 'Stop picking artefacts for this equality' : 'Add an artefact to this equality (pick in tree)'}
+                aria-label={isEqualityExtendTarget ? 'Stop extending equality' : 'Extend equality with a new artefact'}
+                onclick={(e) => {
+                    e.stopPropagation();
+                    toggleEqualityExtend(artefact);
+                }}
+                onkeydown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleEqualityExtend(artefact);
+                    }
+                }}
+            >⊕</span>
+        {/if}
+        {#if rootNode && !ui.dependencyPickingFor && !extendMode}
+            <span
+                class="remove-btn"
+                role="button"
+                tabindex="0"
+                title="Remove artefact"
+                aria-label="Remove artefact"
+                onclick={(e) => {
                     e.stopPropagation();
                     onRemove();
-                }
-            }}
-        >×</span>
+                }}
+                onkeydown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onRemove();
+                    }
+                }}
+            >×</span>
+        {/if}
     </div>
 
     {#if artefact && artefact.data}

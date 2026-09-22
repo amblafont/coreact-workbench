@@ -72,6 +72,7 @@ export const ui = $state({
     inspectedArtefact: null as Artefact | null,
     draftArtefact: null as DraftArtefact | null,
     dependencyPickingFor: null as string | null,
+    equalityExtendTarget: null as Artefact | null,
     positionPicker: null as PositionPicker | null,
     focusedLayerId: null as string | null,
     mergeMode: false,
@@ -332,6 +333,7 @@ export function setDraftLayer(layerId: string): void {
 
 export function startDraftForSort(sortDef: SortDefinition): void {
     ui.inspectedArtefact = null;
+    ui.equalityExtendTarget = null;
     cancelMergeMode();
 
     const initialData: Record<string, DataAttributeValue> = {};
@@ -498,6 +500,7 @@ export function isDraftComplete(draft: DraftArtefact): boolean {
 export function startMergeMode(preselectFirst: Artefact | null = null): void {
     ui.draftArtefact = null;
     ui.dependencyPickingFor = null;
+    ui.equalityExtendTarget = null;
     ui.mergeHoverArtefact = null;
     stopPositionPicker();
 
@@ -626,6 +629,7 @@ export function resetInteractionState(): void {
     drawing.setFocusedLayer(null);
     ui.draftArtefact = null;
     ui.dependencyPickingFor = null;
+    ui.equalityExtendTarget = null;
     ui.layerProvability.clear();
     ui.mergeMode = false;
     ui.mergeFirstArtefact = null;
@@ -779,7 +783,6 @@ export function pickDraftDependency(artefact: Artefact): void {
         ui.draftArtefact = { ...draft, dependencies: { ...draft.dependencies, [`${nextIdx}`]: artefact } };
 
         autoSelectLayerFromDependencies();
-        finalizeDraftIfComplete();
         return;
     }
 
@@ -819,6 +822,35 @@ export function pickDraftDependency(artefact: Artefact): void {
     }
 }
 
+export function toggleEqualityExtend(eq: Artefact): void {
+    if (eq.sortName !== 'Equality') return;
+    if (ui.equalityExtendTarget === eq) {
+        ui.equalityExtendTarget = null;
+        return;
+    }
+    ui.equalityExtendTarget = eq;
+    ui.dependencyPickingFor = null;
+}
+
+export function pickEqualityDependency(art: Artefact): void {
+    const eq = ui.equalityExtendTarget;
+    if (!eq || art === eq) return;
+    const children = equalityChildren(eq);
+    if (children.length > 0 && children[0].sortName !== art.sortName) {
+        pushToast('error', `Equality artefact requires all elements to be of sort '${children[0].sortName}', but selected '${art.sortName}'.`);
+        return;
+    }
+    try {
+        const result = drawing.newEqualityArtefact([...children, art], eq.layerId);
+        const resolved = drawing.getArtefactById(eq.id);
+        if (!resolved) {
+            ui.equalityExtendTarget = result;
+        }
+    } catch (err) {
+        pushToast('error', (err as Error).message);
+    }
+}
+
 export function removeArtefactNode(artefact: Artefact, parentArtefact: Artefact | null = null): void {
     if (parentArtefact && parentArtefact.sortName === 'Equality') {
         drawing.removeEqualityChild(parentArtefact, artefact);
@@ -838,6 +870,10 @@ function pruneStaleArtefactRefs(): void {
     const inspected = ui.inspectedArtefact;
     if (inspected && !drawing.getArtefactById(inspected.id)) {
         ui.inspectedArtefact = null;
+    }
+    const extendTarget = ui.equalityExtendTarget;
+    if (extendTarget && !drawing.getArtefactById(extendTarget.id)) {
+        ui.equalityExtendTarget = null;
     }
     const picker = ui.positionPicker;
     if (picker?.kind === 'artefact' && !drawing.getArtefactById(picker.id)) {
@@ -887,6 +923,14 @@ export function moveArtefactDown(artefact: Artefact): void {
 export function onArtefactNodeClick(art: Artefact): void {
     if (ui.mergeMode) {
         selectMergeArtefact(art);
+        return;
+    }
+    if (ui.equalityExtendTarget) {
+        if (art.sortName === 'Equality' && art !== ui.equalityExtendTarget && drawing.getArtefacts().includes(art)) {
+            toggleEqualityExtend(art);
+        } else {
+            pickEqualityDependency(art);
+        }
         return;
     }
     if (ui.dependencyPickingFor && ui.draftArtefact) {

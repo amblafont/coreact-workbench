@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SvelteSet } from 'svelte/reactivity';
 import { getDrawing, drawingStore, ui, sortStore, rocqRecorder, syncProvedStatus, getSelectedDrawingNames, deleteSelectedDrawings, renameDrawingName, pushToast, dismissToast, applyRuleAt,
     resetInteractionState, togglePositionPicker, isPositionPickerActive, isDraftPickerActive,
-    applyPickedPosition, startPositionPicker, selectArtefactToInspect, removeArtefactNode
+    applyPickedPosition, startPositionPicker, selectArtefactToInspect, removeArtefactNode,
+    toggleEqualityExtend, equalityChildren, onArtefactNodeClick, createDraftArtefact
 } from './store.svelte.ts';
 import { Drawing } from '../index.svelte.ts';
 import { registerDefaultSorts } from '../demo/buildDemo';
@@ -378,5 +379,148 @@ describe('position picker', () => {
 
         expect(ui.inspectedArtefact).toBeNull();
         expect(ui.positionPicker).toBeNull();
+    });
+});
+
+describe('equality extend picking', () => {
+    beforeEach(() => {
+        registerDefaultSorts(sortStore);
+        getDrawing().clear(true);
+        drawingStore.clear();
+        ui.activeDrawingName = null;
+        resetInteractionState();
+        vi.stubGlobal('confirm', () => true);
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        resetInteractionState();
+    });
+
+    function makeVertices(...labels: string[]): ReturnType<Drawing['newArtefact']>[] {
+        return labels.map(label => getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label }, 'root'));
+    }
+
+    it('adds a picked artefact as an additional equalized child', () => {
+        const [v0, v1, v2] = makeVertices('v0', 'v1', 'v2');
+        const eq = getDrawing().newEqualityArtefact([v0, v1], 'root');
+
+        toggleEqualityExtend(eq);
+        expect(ui.equalityExtendTarget).toBe(eq);
+
+        onArtefactNodeClick(v2);
+
+        expect(equalityChildren(eq).map(c => c.data.label)).toEqual(['v0', 'v1', 'v2']);
+        expect(ui.equalityExtendTarget).toBe(eq);
+    });
+
+    it('dedupes a child already in the equality', () => {
+        const [v0, v1, v2] = makeVertices('v0', 'v1', 'v2');
+        const eq = getDrawing().newEqualityArtefact([v0, v1, v2], 'root');
+
+        toggleEqualityExtend(eq);
+        onArtefactNodeClick(v2);
+
+        expect(equalityChildren(eq)).toHaveLength(3);
+        expect(ui.equalityExtendTarget).toBe(eq);
+    });
+
+    it('rejects an artefact of a different sort with an error toast', () => {
+        const [v0, v1] = makeVertices('v0', 'v1');
+        const e = getDrawing().newArtefact('Edge', { source: v0, target: v1 }, { width: 2, bend: 0, label: 'e' }, 'root');
+        const eq = getDrawing().newEqualityArtefact([v0, v1], 'root');
+
+        toggleEqualityExtend(eq);
+        onArtefactNodeClick(e);
+
+        expect(ui.toasts.some(t => t.kind === 'error')).toBe(true);
+        expect(equalityChildren(eq)).toHaveLength(2);
+        expect(ui.equalityExtendTarget).toBe(eq);
+    });
+
+    it('merges overlapping equalities on the same layer and keeps the extend target', () => {
+        const [v0, v1, v3] = makeVertices('v0', 'v1', 'v3');
+        const eqA = getDrawing().newEqualityArtefact([v0, v1], 'root');
+        getDrawing().newEqualityArtefact([v3, v1], 'root');
+
+        toggleEqualityExtend(eqA);
+        onArtefactNodeClick(v3);
+
+        expect(equalityChildren(eqA).map(c => c.data.label).sort()).toEqual(['v0', 'v1', 'v3']);
+        expect(getDrawing().getArtefacts().filter(a => a.sortName === 'Equality')).toHaveLength(1);
+        expect(ui.equalityExtendTarget).toBe(eqA);
+    });
+
+    it('switches the extend target when another equality row is clicked', () => {
+        const [v0, v1, v2, v3] = makeVertices('v0', 'v1', 'v2', 'v3');
+        const eqA = getDrawing().newEqualityArtefact([v0, v1], 'root');
+        const eqB = getDrawing().newEqualityArtefact([v2, v3], 'root');
+
+        toggleEqualityExtend(eqA);
+        onArtefactNodeClick(eqB);
+
+        expect(ui.equalityExtendTarget).toBe(eqB);
+
+        toggleEqualityExtend(eqB);
+        expect(ui.equalityExtendTarget).toBeNull();
+    });
+
+    it('falls back to inspection once extend picking is off', () => {
+        const [v0, v1] = makeVertices('v0', 'v1');
+        const eq = getDrawing().newEqualityArtefact([v0, v1], 'root');
+        const other = makeVertices('other')[0];
+
+        toggleEqualityExtend(eq);
+        toggleEqualityExtend(eq);
+        expect(ui.equalityExtendTarget).toBeNull();
+
+        onArtefactNodeClick(other);
+        expect(ui.inspectedArtefact).toBe(other);
+    });
+
+    it('clears the extend target when the equality is removed', () => {
+        const [v0, v1] = makeVertices('v0', 'v1');
+        const eq = getDrawing().newEqualityArtefact([v0, v1], 'root');
+
+        toggleEqualityExtend(eq);
+        removeArtefactNode(eq);
+
+        expect(ui.equalityExtendTarget).toBeNull();
+    });
+
+    it('resetInteractionState clears the extend target', () => {
+        const [v0, v1] = makeVertices('v0', 'v1');
+        const eq = getDrawing().newEqualityArtefact([v0, v1], 'root');
+
+        toggleEqualityExtend(eq);
+        expect(ui.equalityExtendTarget).toBe(eq);
+
+        resetInteractionState();
+        expect(ui.equalityExtendTarget).toBeNull();
+    });
+
+    it('keeps an equality draft open to pick more than two children until validated', () => {
+        const [v0, v1, v2] = makeVertices('v0', 'v1', 'v2');
+        ui.draftArtefact = { sortName: 'Equality', dependencies: {}, data: {}, layerId: 'root' };
+        ui.dependencyPickingFor = 'Equality';
+
+        onArtefactNodeClick(v0);
+        onArtefactNodeClick(v1);
+
+        expect(ui.draftArtefact).not.toBeNull();
+        expect(equalityChildren(ui.draftArtefact!)).toHaveLength(2);
+        expect(getDrawing().getArtefacts()).toHaveLength(3);
+
+        onArtefactNodeClick(v2);
+
+        expect(ui.draftArtefact).not.toBeNull();
+        expect(equalityChildren(ui.draftArtefact!)).toHaveLength(3);
+
+        const created = createDraftArtefact();
+
+        expect(created?.sortName).toBe('Equality');
+        expect(equalityChildren(created!)).toHaveLength(3);
+        expect(ui.draftArtefact).toBeNull();
+        expect(ui.dependencyPickingFor).toBeNull();
     });
 });
