@@ -608,10 +608,13 @@ export function isProvablyEqualCandidate(art: Artefact): boolean {
 // ---------------------------------------------------------------------------
 
 export function getArtefactLabel(art: Artefact): string {
-    if (art.data.label) return art.data.label;
     if (art.sortName === 'Equality') {
-        return equalityChildren(art).map(c => c.data.label || c.sortName).join(' = ');
+        const joined = equalityChildren(art)
+            .map(c => c.data.label || c.sortName)
+            .join(' = ');
+        if (joined) return joined;
     }
+    if (art.data.label) return art.data.label;
     return '(unnamed)';
 }
 
