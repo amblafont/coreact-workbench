@@ -119,11 +119,11 @@
                 <button
                     class="panel-toggle-btn"
                     class:collapsed={ui.rulesPanelCollapsed}
-                    title={ui.rulesPanelCollapsed ? 'Expand Applyable Rules panel' : 'Collapse Applyable Rules panel'}
+                    title={ui.rulesPanelCollapsed ? 'Expand Applicable Rules panel' : 'Collapse Applicable Rules panel'}
                     aria-label={ui.rulesPanelCollapsed ? 'Expand panel' : 'Collapse panel'}
                     onclick={() => { ui.rulesPanelCollapsed = !ui.rulesPanelCollapsed; }}
                 ></button>
-                <h2>Applyable Rules</h2>
+                <h2>Applicable Rules</h2>
             </div>
             {#if !ui.rulesPanelCollapsed}
                 <div id="rules-content">

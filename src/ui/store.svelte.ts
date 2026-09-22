@@ -1235,7 +1235,7 @@ export function solvesGoalFilterApplicable(): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Applyable rules (computed reactively by RuleApplications.svelte)
+// Applicable rules (computed reactively by RuleApplications.svelte)
 // ---------------------------------------------------------------------------
 
 export interface RuleAppEntry {

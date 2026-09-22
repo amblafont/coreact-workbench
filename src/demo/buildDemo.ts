@@ -152,7 +152,7 @@ export function buildDemo(ctx: DemoContext): DemoContext {
     ruleWithChildEq.setIsRule(true);
     drawingStore.addDrawing('ComposableEdgesChildEq', ruleWithChildEq);
 
-    // Rule whose child-layer equality is not provably equal in the host: still applyable, equality is added
+    // Rule whose child-layer equality is not provably equal in the host: still applicable, equality is added
     const ruleChildEqApply = new Drawing(sortStore);
     const qv0 = ruleChildEqApply.newArtefact('Vertex', {}, { position: [0, 0], label: 'qv0' }, 'root');
     const qv1 = ruleChildEqApply.newArtefact('Vertex', {}, { position: [100, 0], label: 'qv1' }, 'root');
