@@ -138,6 +138,90 @@ describe('equality artefacts', () => {
         const e1 = makeEdge(drawing, 'e1', v1, v2);
         expect(() => drawing.newEqualityArtefact([e1, e0], 'root')).toThrowError(/Consistency Check Failed/);
     });
+
+    it('merges unchecked equalities sharing a dependency on the same layer', () => {
+        const drawing = makeDrawing();
+        const v0 = makeVertex(drawing, 'v0');
+        const v1 = makeVertex(drawing, 'v1');
+        const v2 = makeVertex(drawing, 'v2');
+
+        const eqA = drawing.addEqualityArtefactUnchecked([v0, v1], 'root');
+        const eqB = drawing.addEqualityArtefactUnchecked([v1, v2], 'root');
+
+        const eqs = drawing.getArtefacts().filter(a => a.sortName === 'Equality') as EqualityArtefact[];
+        expect(eqs).toHaveLength(1);
+        expect(eqs[0]).toBe(eqB);
+        expect(eqB.children).toEqual([v0, v1, v2]);
+        expect(drawing.getArtefactById(eqA.id)).toBeUndefined();
+    });
+
+    it('transitively merges a chain of unchecked equalities sharing children', () => {
+        const drawing = makeDrawing();
+        const v0 = makeVertex(drawing, 'v0');
+        const v1 = makeVertex(drawing, 'v1');
+        const v2 = makeVertex(drawing, 'v2');
+        const v3 = makeVertex(drawing, 'v3');
+
+        drawing.addEqualityArtefactUnchecked([v0, v1], 'root');
+        drawing.addEqualityArtefactUnchecked([v1, v2], 'root');
+        drawing.addEqualityArtefactUnchecked([v2, v3], 'root');
+
+        const eqs = drawing.getArtefacts().filter(a => a.sortName === 'Equality') as EqualityArtefact[];
+        expect(eqs).toHaveLength(1);
+        expect(eqs[0].children).toEqual([v0, v1, v2, v3]);
+    });
+
+    it('does not merge unchecked equalities across different layers', () => {
+        const drawing = makeDrawing();
+        drawing.addLayer('layer-1', 'Child Layer 1', 'root');
+        const v0 = makeVertex(drawing, 'v0');
+        const v1 = makeVertex(drawing, 'v1');
+        const v2 = makeVertex(drawing, 'v2');
+
+        drawing.addEqualityArtefactUnchecked([v0, v1], 'root');
+        drawing.addEqualityArtefactUnchecked([v1, v2], 'layer-1');
+
+        const eqs = drawing.getArtefacts().filter(a => a.sortName === 'Equality') as EqualityArtefact[];
+        expect(eqs).toHaveLength(2);
+    });
+
+    it('removing a child updates the already-merged equality', () => {
+        const drawing = makeDrawing();
+        const v0 = makeVertex(drawing, 'v0');
+        const v1 = makeVertex(drawing, 'v1');
+        const v2 = makeVertex(drawing, 'v2');
+        const v3 = makeVertex(drawing, 'v3');
+
+        const eqA = drawing.addEqualityArtefactUnchecked([v0, v1, v2], 'root');
+        const eqB = drawing.addEqualityArtefactUnchecked([v0, v3], 'root');
+        expect(eqB).not.toBe(eqA);
+
+        drawing.removeEqualityChild(eqB, v1);
+
+        const eqs = drawing.getArtefacts().filter(a => a.sortName === 'Equality') as EqualityArtefact[];
+        expect(eqs).toHaveLength(1);
+        expect(eqs[0].children).toEqual([v0, v2, v3]);
+    });
+
+    it('merges equalities that start sharing a dependency after an artefact merge', () => {
+        const drawing = makeDrawing();
+        const v0 = makeVertex(drawing, 'v0');
+        const v1 = makeVertex(drawing, 'v1');
+        const v2 = makeVertex(drawing, 'v2');
+        const v3 = makeVertex(drawing, 'v3');
+
+        drawing.addEqualityArtefactUnchecked([v0, v1], 'root');
+        drawing.addEqualityArtefactUnchecked([v2, v3], 'root');
+        expect(drawing.getArtefacts().filter(a => a.sortName === 'Equality')).toHaveLength(2);
+
+        const merged = drawing.mergeArtefacts(v1, v3);
+
+        const eqs = drawing.getArtefacts().filter(a => a.sortName === 'Equality') as EqualityArtefact[];
+        expect(eqs).toHaveLength(1);
+        expect(eqs[0].children).toHaveLength(3);
+        expect(eqs[0].children).toEqual(expect.arrayContaining([v0, v2, merged]));
+        expect(eqs[0].children).not.toContain(v1);
+    });
 });
 
 describe('artefact merge', () => {

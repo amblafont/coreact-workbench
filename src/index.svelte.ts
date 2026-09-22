@@ -691,13 +691,13 @@ export class Drawing {
                 const combined = Array.from(combinedSet);
                 this.validateEqualityDependencies(combined, targetLayerId);
 
-                if (artefact instanceof EqualityArtefact) {
-                    artefact.setChildren(combined);
-                }
+                this.applyEqualityChildren(artefact, combined);
                 for (const ov of overlapping) {
                     this.artefacts = this.artefacts.filter(a => a !== ov);
                 }
             }
+
+            this.consolidateEqualities(targetLayerId, new Set([artefact]));
         } else {
             artefact.layerId = targetLayerId;
         }
@@ -781,6 +781,7 @@ export class Drawing {
     ): EqualityArtefact {
         const eq = new EqualityArtefact(this.mintId(), children, data, layerId);
         this.artefacts.push(eq);
+        this.consolidateEqualities(layerId, new Set([eq]));
         return eq;
     }
 
@@ -839,6 +840,7 @@ export class Drawing {
                 this.artefacts = this.artefacts.filter(a => a !== toRemove);
             }
 
+            this.consolidateEqualities(targetLayerId, new Set([resultEq]));
             return resultEq;
         } else {
             const initialChildren = Array.from(inputSet);
@@ -846,6 +848,7 @@ export class Drawing {
 
             const newEq = new EqualityArtefact(this.mintId(), initialChildren, data, targetLayerId);
             this.artefacts.push(newEq);
+            this.consolidateEqualities(targetLayerId, new Set([newEq]));
             return newEq;
         }
     }
@@ -1166,15 +1169,120 @@ export class Drawing {
         if (remaining.length < 2) {
             this.artefacts = this.artefacts.filter(art => art !== eq);
         } else {
-            if (eq instanceof EqualityArtefact) {
-                eq.setChildren(remaining);
+            this.applyEqualityChildren(eq, remaining);
+        }
+        this.consolidateEqualities(eq.layerId);
+    }
+
+    // Set the equalized children of an equality artefact, mirroring them into
+    // its numeric-string dependency keys (matching EqualityArtefact semantics).
+    private applyEqualityChildren(eq: Artefact, children: Artefact[]): void {
+        if (eq instanceof EqualityArtefact) {
+            eq.setChildren(children);
+        } else {
+            const newDeps: Record<string, Artefact> = {};
+            children.forEach((child, idx) => {
+                newDeps[`${idx}`] = child;
+            });
+            eq.dependencies = newDeps;
+        }
+    }
+
+    // Merge any equality artefacts that share at least one child, restricted to
+    // equalities living on the same layer. Each connected component collapses
+    // into a single equality whose children are the ordered union of the
+    // component's children. The surviving equality is the first member in
+    // artefact order, unless `preferredSurvivors` names a member of the
+    // component (so callers can keep a live reference to the equality they
+    // just added/moved). Components whose union fails validation are left
+    // unmerged rather than throwing.
+    public consolidateEqualities(
+        layerId?: string,
+        preferredSurvivors?: ReadonlySet<Artefact>
+    ): void {
+        const eqs = this.artefacts.filter(art => art.sortName === "Equality" && (!layerId || art.layerId === layerId));
+        if (eqs.length < 2) return;
+
+        const byLayer = new Map<string, Artefact[]>();
+        for (const eq of eqs) {
+            const list = byLayer.get(eq.layerId);
+            if (list) {
+                list.push(eq);
             } else {
-                const newDeps: Record<string, Artefact> = {};
-                remaining.forEach((child, idx) => {
-                    newDeps[`${idx}`] = child;
-                });
-                eq.dependencies = newDeps;
+                byLayer.set(eq.layerId, [eq]);
             }
+        }
+
+        const removed = new Set<Artefact>();
+
+        for (const [, list] of byLayer) {
+            const n = list.length;
+            const parent: number[] = Array.from({ length: n }, (_, i) => i);
+            const find = (i: number): number => {
+                while (parent[i] !== i) {
+                    parent[i] = parent[parent[i]];
+                    i = parent[i];
+                }
+                return i;
+            };
+            const union = (a: number, b: number): void => {
+                const ra = find(a);
+                const rb = find(b);
+                if (ra !== rb) parent[ra] = rb;
+            };
+
+            const childrenLists = list.map(eq => artefactChildren(eq));
+            for (let i = 0; i < n; i++) {
+                const setI = new Set(childrenLists[i]);
+                for (let j = i + 1; j < n; j++) {
+                    if (childrenLists[j].some(c => setI.has(c))) {
+                        union(i, j);
+                    }
+                }
+            }
+
+            const components = new Map<number, number[]>();
+            for (let i = 0; i < n; i++) {
+                const r = find(i);
+                const comp = components.get(r);
+                if (comp) {
+                    comp.push(i);
+                } else {
+                    components.set(r, [i]);
+                }
+            }
+
+            for (const [, members] of components) {
+                if (members.length < 2) continue;
+
+                const combined: Artefact[] = [];
+                const seen = new Set<Artefact>();
+                for (const mi of members) {
+                    for (const child of childrenLists[mi]) {
+                        if (!seen.has(child)) {
+                            seen.add(child);
+                            combined.push(child);
+                        }
+                    }
+                }
+                if (combined.length < 2) continue;
+
+                const survivorIdx = members.find(i => preferredSurvivors?.has(list[i])) ?? members[0];
+                try {
+                    this.validateEqualityDependencies(combined, list[survivorIdx].layerId);
+                } catch {
+                    continue;
+                }
+
+                this.applyEqualityChildren(list[survivorIdx], combined);
+                for (const mi of members) {
+                    if (mi !== survivorIdx) removed.add(list[mi]);
+                }
+            }
+        }
+
+        if (removed.size > 0) {
+            this.artefacts = this.artefacts.filter(art => !removed.has(art));
         }
     }
 
@@ -1297,6 +1405,9 @@ export class Drawing {
 
         // Remove a1 from drawing
         this.artefacts = this.artefacts.filter(art => art !== a1);
+
+        // Equalities referencing the merged artefact may now share a child
+        this.consolidateEqualities();
 
         return a2;
     }
@@ -1656,6 +1767,7 @@ export class DrawingStore {
         const actualName = this.uniqueName(requestedName);
         const renamed = actualName !== requestedName;
         const live = DrawingStore.hydrateDrawing(built, sortStore);
+        live.consolidateEqualities();
         this.drawings.set(actualName, live);
         if (built.parentName) {
             this.meta.set(actualName, { parentName: built.parentName });
