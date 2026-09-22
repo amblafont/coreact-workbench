@@ -170,10 +170,12 @@ body {
     min-width: 120px;
     box-sizing: border-box;
     display: flex;
-    align-items: flex-start;
-    justify-content: center;
+    align-items: stretch;
+    justify-content: stretch;
+    height: calc(100vh - 16px);
     max-height: calc(100vh - 16px);
-    overflow-y: auto;
+    overflow: hidden;
+    position: relative;
 }
 #canvas {
     box-sizing: border-box;
@@ -181,8 +183,43 @@ body {
     border: 1px solid #ccc;
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     width: 100%;
-    height: auto;
+    height: 100%;
     display: block;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    overflow: hidden;
+}
+#canvas:active {
+    cursor: grabbing;
+}
+#canvas.crosshair-picking,
+#canvas.crosshair-picking:active {
+    cursor: crosshair;
+}
+.canvas-toolbar {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    background-color: rgba(255, 255, 255, 0.92);
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+.canvas-zoom-level {
+    font-size: 0.78rem;
+    color: #333;
+    font-variant-numeric: tabular-nums;
+    min-width: 46px;
+    text-align: center;
+}
+.canvas-zoom-btn {
+    font-weight: bold;
 }
 
 /* Resizable column splitters */
