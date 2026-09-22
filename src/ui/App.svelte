@@ -1,14 +1,39 @@
 <script lang="ts">
+    import { onMount } from 'svelte';
     import Canvas from './Canvas.svelte';
+    import SplitHandle from './SplitHandle.svelte';
     import LayersTree from './LayersTree.svelte';
     import ArtefactMenu from './ArtefactMenu.svelte';
     import DrawingsStorePanel from './DrawingsStorePanel.svelte';
     import Inspector from './Inspector.svelte';
     import RuleApplications from './RuleApplications.svelte';
     import Toasts from './Toasts.svelte';
-    import { loadSortScript, clearAll, ui, startMergeMode, cancelMergeMode } from './store.svelte.ts';
+    import {
+        loadSortScript,
+        clearAll,
+        ui,
+        startMergeMode,
+        cancelMergeMode,
+        applyPersistedPanelWidths,
+        persistPanelWidths
+    } from './store.svelte.ts';
+
+    const LEFT_MIN = 180;
+    const LEFT_MAX = 480;
+    const RIGHT_MIN = 180;
+    const RIGHT_MAX = 640;
 
     let scriptUpload: HTMLInputElement;
+
+    onMount(() => {
+        applyPersistedPanelWidths();
+    });
+
+    $effect(() => {
+        void ui.leftPanelWidth;
+        void ui.rightPanelWidth;
+        persistPanelWidths();
+    });
 
     function onLoadScript(): void {
         scriptUpload.click();
@@ -33,7 +58,7 @@
 </script>
 
 <div id="app">
-    <div id="menu">
+    <div id="menu" style:width={`${ui.leftPanelWidth}px`}>
         <div class="menu-header">
             <h2>Layers & Artefacts</h2>
             <div class="menu-header-actions">
@@ -69,9 +94,26 @@
         <ArtefactMenu />
     </div>
 
-    <Canvas />
+    <SplitHandle
+        min={LEFT_MIN}
+        max={LEFT_MAX}
+        getStartWidth={() => ui.leftPanelWidth}
+        onWidth={(w) => { ui.leftPanelWidth = w; }}
+    />
 
-    <div id="right-panel">
+    <div id="canvas-column">
+        <Canvas />
+    </div>
+
+    <SplitHandle
+        min={RIGHT_MIN}
+        max={RIGHT_MAX}
+        reverse
+        getStartWidth={() => ui.rightPanelWidth}
+        onWidth={(w) => { ui.rightPanelWidth = w; }}
+    />
+
+    <div id="right-panel" style:width={`${ui.rightPanelWidth}px`}>
         <div id="rules-panel">
             <div class="rules-header">
                 <button

@@ -86,12 +86,50 @@ export const ui = $state({
     toasts: [] as Toast[],
     rocqRecordingActive: false,
     drawingsStoreCollapsed: false,
+    leftPanelWidth: 270,
+    rightPanelWidth: 270,
     rulesPanelCollapsed: true,
     filterRedundantMatches: true,
     filterNoProgressMatches: true,
     filterStrictMatches: false,
     filterSolvesGoalMatches: false
 });
+
+// ---------------------------------------------------------------------------
+// Panel width persistence (localStorage, guarded for non-browser/test envs)
+// ---------------------------------------------------------------------------
+
+const PANEL_WIDTH_KEY = 'coreact.panelWidths';
+
+const PANEL_MIN = 180;
+const PANEL_MAX = 640;
+
+function clampPanelWidth(value: number | null, fallback: number): number {
+    if (value === null || Number.isNaN(value)) return fallback;
+    return Math.min(PANEL_MAX, Math.max(PANEL_MIN, Math.round(value)));
+}
+
+export function applyPersistedPanelWidths(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+        const raw = localStorage.getItem(PANEL_WIDTH_KEY);
+        if (!raw) return;
+        const widths = JSON.parse(raw) as Partial<{ left: number; right: number }>;
+        if (typeof widths.left === 'number') ui.leftPanelWidth = clampPanelWidth(widths.left, 270);
+        if (typeof widths.right === 'number') ui.rightPanelWidth = clampPanelWidth(widths.right, 270);
+    } catch {
+        // Ignore corrupt persisted widths; keep defaults.
+    }
+}
+
+export function persistPanelWidths(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+        localStorage.setItem(PANEL_WIDTH_KEY, JSON.stringify({ left: ui.leftPanelWidth, right: ui.rightPanelWidth }));
+    } catch {
+        // Ignore storage quota/security failures.
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Toasts (non-blocking replacement for alert()/window.alert)

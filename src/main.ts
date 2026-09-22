@@ -8,6 +8,4 @@ import './ui/app.css';
 // demo initialization in demo.ts) so the canvas starts with its content.
 setActiveDrawing('SimpleMono');
 
-const target = document.getElementById('app')!;
-target.innerHTML = '';
-mount(App, { target });
+mount(App, { target: document.body });

@@ -135,4 +135,4 @@
     });
 </script>
 
-<svg id="canvas" width="800" height="800" bind:this={svgElement}></svg>
+<svg id="canvas" viewBox="0 0 800 800" preserveAspectRatio="xMidYMid meet" bind:this={svgElement}></svg>
