@@ -9,6 +9,7 @@
         onArtefactNodeClick,
         removeArtefactNode,
         duplicateArtefactNode,
+        startMergeMode,
         moveArtefactUp,
         moveArtefactDown,
         canMoveArtefactUp,
@@ -93,6 +94,10 @@
 
     function onDuplicate(): void {
         duplicateArtefactNode(artefact);
+    }
+
+    function onMerge(): void {
+        startMergeMode(artefact);
     }
 </script>
 
@@ -209,6 +214,26 @@
                     }
                 }}
             >⧉</span>
+        {/if}
+        {#if rootNode && !ui.dependencyPickingFor && artefact.sortName !== 'Equality' && !ui.mergeMode}
+            <span
+                class="move-btn"
+                role="button"
+                tabindex="0"
+                title="Merge with another artefact"
+                aria-label="Merge artefact with another artefact"
+                onclick={(e) => {
+                    e.stopPropagation();
+                    onMerge();
+                }}
+                onkeydown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onMerge();
+                    }
+                }}
+            >⨝</span>
         {/if}
         <span
             class="remove-btn"

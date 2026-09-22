@@ -17,8 +17,6 @@
         setArtefactLayer,
         setInspectedLabel,
         setArtefactDataField,
-        startMergeMode,
-        startDuplicateArtefact,
         togglePositionPicker,
         isPositionPickerActive,
         toggleDraftPicker,
@@ -392,20 +390,6 @@
                 onPickPosition={(attrName) => togglePositionPicker(art, attrName)}
                 isDepReady={makeIsDepReady(art.dependencies, art.sortName)}
             />
-
-            <button
-                type="button"
-                class="btn btn-merge"
-                style="margin-top: 15px; width: 100%;"
-                onclick={() => startDuplicateArtefact(art)}
-            >Duplicate this artefact...</button>
-
-            <button
-                type="button"
-                class="btn btn-merge"
-                style="margin-top: 8px; width: 100%;"
-                onclick={() => startMergeMode(art)}
-            >Merge with another artefact...</button>
         </div>
     {/if}
 {:else}
