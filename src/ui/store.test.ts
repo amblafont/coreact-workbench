@@ -4,7 +4,7 @@ import { getDrawing, drawingStore, ui, sortStore, rocqRecorder, syncProvedStatus
     resetInteractionState, togglePositionPicker, isPositionPickerActive, isDraftPickerActive,
     applyPickedPosition, startPositionPicker, selectArtefactToInspect, removeArtefactNode,
     toggleEqualityExtend, equalityChildren, onArtefactNodeClick, createDraftArtefact,
-    splitFirstOrderRecording, copyRocqProof, toggleRocqRecording
+    splitFirstOrderRecording, openProofEditor, closeProofEditor, updateDrawingRocqProof, suggestAdmittedProof, toggleRocqRecording
 } from './store.svelte.ts';
 import { Drawing, DrawingStore, getFirstOrderStatementChildLayer } from '../index.svelte.ts';
 import { registerDefaultSorts } from '../demo/buildDemo';
@@ -618,16 +618,78 @@ describe('rocq recording proof attachment', () => {
         expect(restored?.drawing.isRule).toBe(true);
     });
 
-    it('copyRocqProof writes the attached proof to the clipboard', async () => {
+    it('openProofEditor and closeProofEditor track the edited drawing in ui', () => {
         const stmt = buildStatement();
-        stmt.setRocqProof('Lemma Statement_rule : True.\\nexact I.\\nQed.\\n');
         drawingStore.addDrawing('Statement', stmt);
 
-        const writeText = vi.fn().mockResolvedValue(undefined);
-        vi.stubGlobal('navigator', { clipboard: { writeText } });
+        openProofEditor('Statement');
+        expect(ui.proofEditorName).toBe('Statement');
+        closeProofEditor();
+        expect(ui.proofEditorName).toBeNull();
+        expect(ui.proofEditorDraft).toBeNull();
+    });
 
-        copyRocqProof('Statement');
-        await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith('Lemma Statement_rule : True.\\nexact I.\\nQed.\\n'));
+    it('openProofEditor with a draft prefills the editor without attaching', () => {
+        const stmt = buildStatement();
+        stmt.setRocqProof(null);
+        drawingStore.addDrawing('Statement', stmt);
+
+        openProofEditor('Statement', 'draft script');
+        expect(ui.proofEditorName).toBe('Statement');
+        expect(ui.proofEditorDraft).toBe('draft script');
+        expect(drawingStore.getDrawing('Statement')?.drawing.rocqProof).toBeNull();
+        closeProofEditor();
+    });
+
+    it('updateDrawingRocqProof replaces the attached proof', () => {
+        const stmt = buildStatement();
+        stmt.setRocqProof('old script');
+        drawingStore.addDrawing('Statement', stmt);
+
+        updateDrawingRocqProof('Statement', 'new script');
+        expect(ui.proofEditorName).toBeNull();
+        expect(drawingStore.getDrawing('Statement')?.drawing.rocqProof).toBe('new script');
+    });
+
+    it('updateDrawingRocqProof with an empty script clears the proof', () => {
+        const stmt = buildStatement();
+        stmt.setRocqProof('some script');
+        drawingStore.addDrawing('Statement', stmt);
+
+        updateDrawingRocqProof('Statement', '   \n  ');
+        expect(drawingStore.getDrawing('Statement')?.drawing.rocqProof).toBeNull();
+    });
+
+    it('updateDrawingRocqProof reports a missing drawing', () => {
+        updateDrawingRocqProof('DoesNotExist', 'script');
+        const toast = ui.toasts[ui.toasts.length - 1];
+        expect(toast.kind).toBe('error');
+        expect(String(toast.message)).toContain('does not exist');
+        ui.toasts = [];
+    });
+
+    it('suggestAdmittedProof opens the editor with a generated admitted lemma draft without attaching it', () => {
+        const stmt = buildStatement();
+        stmt.setRocqProof(null);
+        drawingStore.addDrawing('Statement', stmt);
+
+        suggestAdmittedProof('Statement');
+
+        expect(ui.proofEditorName).toBe('Statement');
+        const draft = ui.proofEditorDraft;
+        expect(draft).toContain('Lemma Statement_rule :');
+        expect(draft).toContain('admit.');
+        expect(draft).toContain('Admitted.');
+        expect(drawingStore.getDrawing('Statement')?.drawing.rocqProof).toBeNull();
+        closeProofEditor();
+    });
+
+    it('suggestAdmittedProof reports a missing drawing', () => {
+        suggestAdmittedProof('DoesNotExist');
+        const toast = ui.toasts[ui.toasts.length - 1];
+        expect(toast.kind).toBe('error');
+        expect(String(toast.message)).toContain('does not exist');
+        ui.toasts = [];
     });
 
     it('toggleRocqRecording stop splits a recorded first-order statement into a rule with its proof', () => {

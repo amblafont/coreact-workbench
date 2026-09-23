@@ -12,7 +12,8 @@
         deleteSelectedDrawings,
         generateReverseRulesFor,
         toggleExportSelection,
-        copyRocqProof
+        openProofEditor,
+        suggestAdmittedProof
     } from './store.svelte.ts';
     import DrawingNode from './DrawingNode.svelte';
     import rocqIcon from './rocq-icon.svg';
@@ -64,9 +65,18 @@
         {#if drawing.drawing.rocqProof}
             <button
                 class="rocq-copy-btn"
-                title="Copy the attached Rocq proof of rule '{drawing.name}' to the clipboard"
-                aria-label="Copy the attached Rocq proof of '{drawing.name}'"
-                onclick={() => copyRocqProof(drawing.name)}
+                title="View and edit the attached Rocq proof of rule '{drawing.name}'"
+                aria-label="View and edit the attached Rocq proof of '{drawing.name}'"
+                onclick={() => openProofEditor(drawing.name)}
+            >
+                <img class="rocq-copy-img" src={rocqIcon} alt="" width="14" height="14" aria-hidden="true" />
+            </button>
+        {:else if drawing.isFirstOrder}
+            <button
+                class="rocq-copy-btn rocq-copy-btn-greyed"
+                title="No Rocq proof attached to first-order rule '{drawing.name}': generate an admitted Rocq lemma"
+                aria-label="Generate an admitted Rocq lemma for first-order rule '{drawing.name}'"
+                onclick={() => suggestAdmittedProof(drawing.name)}
             >
                 <img class="rocq-copy-img" src={rocqIcon} alt="" width="14" height="14" aria-hidden="true" />
             </button>

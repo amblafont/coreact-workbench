@@ -27,7 +27,7 @@ import {
     getRelativePositionMeta
 } from '../index.svelte.ts';
 import { RocqRecorder } from '../rocq_recording.svelte.ts';
-import { exportDrawingsToRocq, drawingExportNames } from '../rocq_export';
+import { exportDrawingsToRocq, drawingExportNames, ruleTypeInfo, newExportRegistry } from '../rocq_export';
 
 // ---------------------------------------------------------------------------
 // Core singletons (reactive instances backed by fine-grained $state; derived
@@ -86,6 +86,8 @@ export const ui = $state({
     exportSelection: new SvelteSet<string>(),
     toasts: [] as Toast[],
     rocqRecordingActive: false,
+    proofEditorName: null as string | null,
+    proofEditorDraft: null as string | null,
     drawingsStoreCollapsed: false,
     leftPanelWidth: 270,
     rightPanelWidth: 270,
@@ -744,21 +746,46 @@ export function splitFirstOrderRecording(name: string, snapshot: Drawing, script
     return { proofName };
 }
 
-export function copyRocqProof(name: string): void {
+export function openProofEditor(name: string, draft: string | null = null): void {
+    ui.proofEditorName = name;
+    ui.proofEditorDraft = draft;
+}
+
+export function closeProofEditor(): void {
+    ui.proofEditorName = null;
+    ui.proofEditorDraft = null;
+}
+
+export function updateDrawingRocqProof(name: string, script: string): void {
     try {
         const entry = drawingStore.getDrawing(name);
-        if (!entry || !entry.drawing.rocqProof) {
-            pushToast('error', `Drawing '${name}' has no attached Rocq proof.`);
+        if (!entry) {
+            pushToast('error', `Drawing '${name}' does not exist.`);
             return;
         }
-        navigator.clipboard
-            .writeText(entry.drawing.rocqProof)
-            .then(() => {
-                pushToast('info', `Copied the Rocq proof of '${name}' to the clipboard.`);
-            })
-            .catch(() => {
-                pushToast('error', `Error copying the Rocq proof of '${name}':\nClipboard access failed.`);
-            });
+        const trimmed = script.trim();
+        entry.drawing.setRocqProof(trimmed ? script : null);
+        pushToast('info', trimmed ? `Rocq proof of '${name}' updated.` : `Rocq proof removed from '${name}'.`);
+    } catch (err) {
+        pushToast('error', (err as Error).message);
+    }
+}
+
+export function buildAdmittedLemmaScript(drawing: Drawing, name: string, sortStore: SortStore): string {
+    const exportNames = drawingExportNames(drawing, name, sortStore);
+    const info = ruleTypeInfo(drawing, name, sortStore, newExportRegistry(sortStore), { reserveParam: false, includePremises: false });
+    return `Lemma ${exportNames.moduleName}_rule : ${info.type}.\nProof.\n  admit.\nAdmitted.`;
+}
+
+export function suggestAdmittedProof(name: string): void {
+    try {
+        const entry = drawingStore.getDrawing(name);
+        if (!entry) {
+            pushToast('error', `Drawing '${name}' does not exist.`);
+            return;
+        }
+        const script = buildAdmittedLemmaScript(entry.drawing, name, sortStore);
+        openProofEditor(name, script);
     } catch (err) {
         pushToast('error', (err as Error).message);
     }

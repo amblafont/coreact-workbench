@@ -1,5 +1,6 @@
 <script lang="ts">
     import DrawingNode from './DrawingNode.svelte';
+    import ProofEditorModal from './ProofEditorModal.svelte';
     import {
         allDrawings,
         ui,
@@ -140,4 +141,6 @@
         {/each}
     {/if}
     {/if}
+
+    <ProofEditorModal />
 </div>
