@@ -545,6 +545,30 @@ body {
     min-width: 0;
     overflow-wrap: break-word;
 }
+.rocq-copy-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 1px solid #bdc3c7;
+    border-radius: 3px;
+    background-color: #ecf0f1;
+    color: #34495e;
+    cursor: pointer;
+    flex: none;
+}
+.rocq-copy-btn .rocq-copy-img {
+    display: block;
+    width: 14px;
+    height: 14px;
+}
+.rocq-copy-btn:hover {
+    background-color: #d6dbdf;
+    border-color: #95a5a6;
+    color: #2c3e50;
+}
 .rule-badge {
     font-size: 0.7em;
     font-weight: bold;

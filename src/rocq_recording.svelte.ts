@@ -1,5 +1,5 @@
 import { SvelteMap } from 'svelte/reactivity';
-import { Artefact, Drawing, SortStore } from "./index.svelte.ts";
+import { Artefact, Drawing, DrawingStore, SortStore } from "./index.svelte.ts";
 import type { DerivedRule } from "./index.svelte.ts";
 import { drawingExportNames, ruleTypeInfo, newExportRegistry, renderExactTerm, renderForallChain, renderSigma, sanitizeIdent } from "./rocq_export";
 import type { LayerElement, RuleTypeInfo } from "./rocq_export";
@@ -103,6 +103,7 @@ export class RocqRecorder {
     private mainName = $state<string | null>(null);
     private sortStore = $state<SortStore | null>(null);
     private statements = new SvelteMap<string, RecordedStatement>();
+    private snapshot: Drawing | null = null;
 
     public isActive(): boolean {
         return this.active;
@@ -110,6 +111,12 @@ export class RocqRecorder {
 
     public getRecordedDrawingName(): string | null {
         return this.mainName;
+    }
+
+    public takeSnapshot(): Drawing | null {
+        const snapshot = this.snapshot;
+        this.snapshot = null;
+        return snapshot;
     }
 
     public start(drawing: Drawing, activeDrawingName: string, sortStore: SortStore): void {
@@ -137,6 +144,8 @@ export class RocqRecorder {
             conclusionLayerId: info.conclusionLayerId,
             ruleInfo: info
         }));
+
+        this.snapshot = DrawingStore.cloneDrawing(drawing, sortStore);
 
         this.active = true;
     }
@@ -589,6 +598,7 @@ export class RocqRecorder {
         this.statements.clear();
         this.mainName = null;
         this.sortStore = null;
+        this.snapshot = null;
         return `Lemma ${main.lemmaName} : ${main.lemmaType}.\n${script.join("\n")}\n`;
     }
 }

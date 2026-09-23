@@ -684,6 +684,11 @@ export function exportDrawingsToRocq(drawings: Array<{ name: string; drawing: Dr
         lines.push("");
     }
     for (const ref of rules) {
+        const proof = ref.drawing.rocqProof;
+        if (proof && proof.trim()) {
+            lines.push(proof.trim());
+            continue;
+        }
         const registry = newExportRegistry(sortStore);
         const info = ruleTypeInfo(ref.drawing, ref.name, sortStore, registry, { reserveParam: true, includePremises: true });
         if (!info.paramName) {

@@ -3,9 +3,10 @@ import { SvelteSet } from 'svelte/reactivity';
 import { getDrawing, drawingStore, ui, sortStore, rocqRecorder, syncProvedStatus, getSelectedDrawingNames, deleteSelectedDrawings, renameDrawingName, pushToast, dismissToast, applyRuleAt,
     resetInteractionState, togglePositionPicker, isPositionPickerActive, isDraftPickerActive,
     applyPickedPosition, startPositionPicker, selectArtefactToInspect, removeArtefactNode,
-    toggleEqualityExtend, equalityChildren, onArtefactNodeClick, createDraftArtefact
+    toggleEqualityExtend, equalityChildren, onArtefactNodeClick, createDraftArtefact,
+    splitFirstOrderRecording, copyRocqProof, toggleRocqRecording
 } from './store.svelte.ts';
-import { Drawing } from '../index.svelte.ts';
+import { Drawing, DrawingStore, getFirstOrderStatementChildLayer } from '../index.svelte.ts';
 import { registerDefaultSorts } from '../demo/buildDemo';
 import { buildComposableEdgesRule, makeDrawing, makeEdge, makeVertex } from '../demo/helpers';
 
@@ -522,5 +523,129 @@ describe('equality extend picking', () => {
         expect(equalityChildren(created!)).toHaveLength(3);
         expect(ui.draftArtefact).toBeNull();
         expect(ui.dependencyPickingFor).toBeNull();
+    });
+});
+
+describe('rocq recording proof attachment', () => {
+    beforeEach(() => {
+        registerDefaultSorts(sortStore);
+        getDrawing().clear(true);
+        drawingStore.clear();
+        ui.activeDrawingName = null;
+        vi.stubGlobal('confirm', () => true);
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        ui.activeDrawingName = null;
+        if (rocqRecorder.isActive()) {
+            rocqRecorder.stop();
+        }
+    });
+
+    function buildStatement(): Drawing {
+        const stmt = getDrawing();
+        const a = makeVertex(stmt, 'a');
+        const b = makeVertex(stmt, 'b');
+        makeEdge(stmt, 'g', a, b);
+        stmt.addLayer('conc', 'Conclusion', 'root');
+        makeEdge(stmt, 'c', a, b, 'conc');
+        return stmt;
+    }
+
+    it('renames the working drawing to "(proof)" and adds a first-order rule clone carrying the proof', () => {
+        const stmt = buildStatement();
+        drawingStore.addDrawing('Statement', stmt);
+        ui.activeDrawingName = 'Statement';
+        ui.exportSelection = new SvelteSet(['Statement']);
+
+        const snapshot = DrawingStore.cloneDrawing(stmt, sortStore);
+        const script = 'Lemma Statement_rule : Type.\\nintros_sigma ().\\nAbort.\\n';
+        const { proofName } = splitFirstOrderRecording('Statement', snapshot, script);
+
+        expect(proofName).toBe('Statement (proof)');
+        expect(drawingStore.getDrawing('Statement (proof)')?.drawing).toBe(stmt);
+        const rule = drawingStore.getDrawing('Statement');
+        expect(rule?.drawing).toBe(snapshot);
+        expect(rule!.drawing.isRule).toBe(true);
+        expect(rule!.drawing.rocqProof).toBe(script);
+        expect(getFirstOrderStatementChildLayer(rule!.drawing)).not.toBeNull();
+        expect(ui.activeDrawingName).toBe('Statement (proof)');
+        expect(ui.exportSelection.has('Statement (proof)')).toBe(true);
+        expect(ui.exportSelection.has('Statement')).toBe(false);
+    });
+
+    it('auto-uniquifies the proof working name on collision', () => {
+        const stmt = buildStatement();
+        drawingStore.addDrawing('Statement', stmt);
+        const snapshot = DrawingStore.cloneDrawing(stmt, sortStore);
+        drawingStore.addDrawing('Statement (proof)', new Drawing(sortStore));
+
+        const { proofName } = splitFirstOrderRecording('Statement', snapshot, 'Lemma Statement_rule : True.\\nexact I.\\nQed.\\n');
+        expect(proofName).toBe('Statement (proof) (2)');
+        expect(drawingStore.getDrawing('Statement')?.drawing).toBe(snapshot);
+        expect(drawingStore.getDrawing('Statement (proof) (2)')?.drawing).toBe(stmt);
+    });
+
+    it('rejects a snapshot that is not a first-order statement', () => {
+        const nonStatement = new Drawing(sortStore);
+        makeVertex(nonStatement, 'x');
+        makeVertex(nonStatement, 'y');
+        drawingStore.addDrawing('NotStatement', nonStatement);
+
+        const snapshot = DrawingStore.cloneDrawing(nonStatement, sortStore);
+        expect(() => splitFirstOrderRecording('NotStatement', snapshot, 'script')).toThrow(/not a first-order statement/);
+    });
+
+    it('rejects a recording whose drawing is no longer in the store', () => {
+        const stmt = buildStatement();
+        const snapshot = DrawingStore.cloneDrawing(stmt, sortStore);
+        expect(() => splitFirstOrderRecording('Missing', snapshot, 'script')).toThrow(/does not exist/);
+    });
+
+    it('round-trips the attached proof through drawing JSON export and import', () => {
+        const stmt = buildStatement();
+        stmt.setIsRule(true);
+        stmt.setRocqProof('Lemma Statement_rule : True.\\nexact I.\\nQed.\\n');
+        drawingStore.addDrawing('Statement', stmt);
+
+        const json = drawingStore.exportDrawingsJSON(['Statement']);
+        const freshStore = new DrawingStore();
+        freshStore.importDrawingsJSON(json, sortStore);
+
+        const restored = freshStore.getDrawing('Statement');
+        expect(restored?.drawing.rocqProof).toBe('Lemma Statement_rule : True.\\nexact I.\\nQed.\\n');
+        expect(restored?.drawing.isRule).toBe(true);
+    });
+
+    it('copyRocqProof writes the attached proof to the clipboard', async () => {
+        const stmt = buildStatement();
+        stmt.setRocqProof('Lemma Statement_rule : True.\\nexact I.\\nQed.\\n');
+        drawingStore.addDrawing('Statement', stmt);
+
+        const writeText = vi.fn().mockResolvedValue(undefined);
+        vi.stubGlobal('navigator', { clipboard: { writeText } });
+
+        copyRocqProof('Statement');
+        await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith('Lemma Statement_rule : True.\\nexact I.\\nQed.\\n'));
+    });
+
+    it('toggleRocqRecording stop splits a recorded first-order statement into a rule with its proof', () => {
+        const stmt = buildStatement();
+        drawingStore.addDrawing('Statement', stmt);
+        ui.activeDrawingName = 'Statement';
+
+        toggleRocqRecording();
+        expect(rocqRecorder.isActive()).toBe(true);
+        syncProvedStatus();
+        toggleRocqRecording();
+        expect(rocqRecorder.isActive()).toBe(false);
+
+        const rule = drawingStore.getDrawing('Statement');
+        expect(rule?.drawing.isRule).toBe(true);
+        expect(rule?.drawing.rocqProof).not.toBeNull();
+        expect(rule!.drawing.rocqProof).toContain('Lemma Statement_rule :');
+        const working = drawingStore.getDrawing('Statement (proof)');
+        expect(working?.drawing).toBe(stmt);
     });
 });

@@ -707,6 +707,63 @@ export function copyRocqExport(names: string[]): void {
     }
 }
 
+export function uniqueProofDrawingName(baseName: string): string {
+    let candidate = `${baseName} (proof)`;
+    let n = 2;
+    while (drawingStore.getDrawing(candidate)) {
+        candidate = `${baseName} (proof) (${n})`;
+        n++;
+    }
+    return candidate;
+}
+
+export function splitFirstOrderRecording(name: string, snapshot: Drawing, script: string): { proofName: string } {
+    if (getFirstOrderStatementChildLayer(snapshot) === null) {
+        throw new Error(`Consistency Check Failed: Drawing '${name}' is not a first-order statement; the recording cannot be attached as a rule proof.`);
+    }
+    const entry = drawingStore.getDrawing(name);
+    if (!entry) {
+        throw new Error(`Consistency Check Failed: Drawing '${name}' does not exist; the recording cannot be attached as a rule proof.`);
+    }
+    const parent = entry.parentName;
+    const proofName = uniqueProofDrawingName(name);
+    snapshot.setRocqProof(script);
+    snapshot.setIsRule(true);
+    drawingStore.renameDrawing(name, proofName);
+    if (ui.activeDrawingName === name) {
+        ui.activeDrawingName = proofName;
+    }
+    if (ui.exportSelection.has(name)) {
+        ui.exportSelection.delete(name);
+        ui.exportSelection.add(proofName);
+    }
+    drawingStore.addDrawing(name, snapshot);
+    if (parent) {
+        drawingStore.setDrawingParent(name, parent);
+    }
+    return { proofName };
+}
+
+export function copyRocqProof(name: string): void {
+    try {
+        const entry = drawingStore.getDrawing(name);
+        if (!entry || !entry.drawing.rocqProof) {
+            pushToast('error', `Drawing '${name}' has no attached Rocq proof.`);
+            return;
+        }
+        navigator.clipboard
+            .writeText(entry.drawing.rocqProof)
+            .then(() => {
+                pushToast('info', `Copied the Rocq proof of '${name}' to the clipboard.`);
+            })
+            .catch(() => {
+                pushToast('error', `Error copying the Rocq proof of '${name}':\nClipboard access failed.`);
+            });
+    } catch (err) {
+        pushToast('error', (err as Error).message);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Artefact inspection / data editing helpers
 // ---------------------------------------------------------------------------
@@ -1094,20 +1151,35 @@ export function toggleRocqRecording(): void {
     try {
         if (rocqRecorder.isActive()) {
             const stmts = rocqRecorder.getRecordedStatements();
+            const mainName = rocqRecorder.getRecordedDrawingName();
+            const snapshot = rocqRecorder.takeSnapshot();
             const script = rocqRecorder.stop();
             ui.rocqRecordingActive = false;
-            navigator.clipboard
-                .writeText(script)
-                .then(() => {
-                    const proved = stmts.filter(s => s.proved).length;
-                    const admittedStmts = stmts.filter(s => !s.proved);
-                    const admitted = admittedStmts.length;
-                    const admittedNames = admitted > 0 ? ` (admitted: ${admittedStmts.map(s => `'${s.drawingName}'`).join(', ')})` : '';
-                    pushToast('info', `Rocq recording script copied to clipboard (${stmts.length} lemma${stmts.length === 1 ? '' : 's'}: ${proved} proved, ${admitted} admitted${admittedNames}).`);
-                })
-                .catch(() => {
-                    pushToast('error', 'Error copying recording:\nClipboard access failed.');
-                });
+
+            const entry = mainName ? drawingStore.getDrawing(mainName) : undefined;
+            const splittable = !!entry && snapshot !== null && getFirstOrderStatementChildLayer(snapshot) !== null;
+            if (!splittable) {
+                navigator.clipboard
+                    .writeText(script)
+                    .then(() => {
+                        const proved = stmts.filter(s => s.proved).length;
+                        const admittedStmts = stmts.filter(s => !s.proved);
+                        const admitted = admittedStmts.length;
+                        const admittedNames = admitted > 0 ? ` (admitted: ${admittedStmts.map(s => `'${s.drawingName}'`).join(', ')})` : '';
+                        pushToast('info', `Rocq recording script copied to clipboard (${stmts.length} lemma${stmts.length === 1 ? '' : 's'}: ${proved} proved, ${admitted} admitted${admittedNames}).`);
+                    })
+                    .catch(() => {
+                        pushToast('error', 'Error copying recording:\nClipboard access failed.');
+                    });
+                return;
+            }
+
+            try {
+                const { proofName } = splitFirstOrderRecording(mainName!, snapshot!, script);
+                pushToast('info', `Rocq recording saved: '${mainName}' is now a rule carrying its proof; the proof-working drawing is '${proofName}'.`);
+            } catch (err) {
+                pushToast('error', `Rocq Recording Error:\n${(err as Error).message}`);
+            }
         } else {
             const name = ui.activeDrawingName ?? 'Unsaved Drawing';
             rocqRecorder.start(drawing, name, sortStore);

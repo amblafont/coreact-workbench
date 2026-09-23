@@ -465,6 +465,34 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         compile('admitted_unfinished_main', exportDrawingsToRocq(store.getAllDrawings(), sortStore) + '\n' + script);
     });
 
+    it('compiles an attached rule proof exported directly from a rule drawing', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+        const stmt = buildProvableChild(sortStore);
+        store.addDrawing('Stmt', stmt);
+        stmt.setIsRule(true);
+
+        const recorder = new RocqRecorder();
+        recorder.start(stmt, 'Stmt', sortStore);
+        const childLayer = getFirstOrderStatementChildLayer(stmt);
+        if (!childLayer) {
+            throw new Error('Stmt has no first-order statement child layer');
+        }
+        const prove = stmt.checkLayerProvable(childLayer.id);
+        if (!prove.provable) {
+            throw new Error('Stmt child layer not provable: ' + (prove.reason ?? 'unknown'));
+        }
+        recorder.recordProveSuccess(stmt, childLayer.id, prove.match ?? null, 'Stmt');
+        const script = recorder.stop();
+
+        stmt.setRocqProof(script);
+
+        const code = exportDrawingsToRocq(store.getAllDrawings(), sortStore);
+        expect(code).toContain('Lemma Stmt_rule :');
+        expect(code).not.toContain('Parameter Stmt_rule :');
+        compile('attached_rule_proof', code);
+    });
+
     it('compiles a subgoal proof reverted to pending after a later recorded step', () => {
         const sortStore = newSortStore();
         const store = new DrawingStore();

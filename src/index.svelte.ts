@@ -363,6 +363,7 @@ export class Drawing {
     private layers = new SvelteMap<string, Layer>();
     private focusedLayerId = $state<string | null>(null);
     private ruleFlag = $state(false);
+    private rocqProofStr = $state<string | null>(null);
     private nextArtefactId: number = 1;
 
     constructor(sortStore: SortStore) {
@@ -382,6 +383,14 @@ export class Drawing {
             }
         }
         this.ruleFlag = isRule;
+    }
+
+    public get rocqProof(): string | null {
+        return this.rocqProofStr;
+    }
+
+    public setRocqProof(proof: string | null): void {
+        this.rocqProofStr = proof;
     }
 
     public checkRuleConditions(): { isRule: boolean; reason?: string } {
@@ -1455,6 +1464,7 @@ export interface SavedDrawing {
     isFirstOrder: boolean;
     parentName?: string;
     proved?: boolean;
+    rocqProof?: string;
 }
 
 export interface DrawingStoreEntry {
@@ -1563,7 +1573,8 @@ export class DrawingStore {
             layers: layersData,
             artefacts: artefactsData,
             isRule: markedAsRule,
-            isFirstOrder: markedAsRule && DrawingStore.firstOrderFromLayers(layersData)
+            isFirstOrder: markedAsRule && DrawingStore.firstOrderFromLayers(layersData),
+            rocqProof: drawing.rocqProof ?? undefined
         };
     }
 
@@ -1631,6 +1642,7 @@ export class DrawingStore {
         }
 
         drawing.setIsRule(savedDrawing.isRule);
+        drawing.setRocqProof(savedDrawing.rocqProof ?? null);
         return drawing;
     }
 
@@ -1746,7 +1758,8 @@ export class DrawingStore {
             isRule: markedAsRule,
             isFirstOrder: markedAsRule && DrawingStore.firstOrderFromLayers(p.layers),
             parentName: typeof p.parentName === 'string' ? p.parentName : undefined,
-            proved: p.proved === true
+            proved: p.proved === true,
+            rocqProof: typeof p.rocqProof === 'string' ? p.rocqProof : undefined
         };
     }
 

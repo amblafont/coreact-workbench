@@ -11,9 +11,11 @@
         markDrawingAsRule,
         deleteSelectedDrawings,
         generateReverseRulesFor,
-        toggleExportSelection
+        toggleExportSelection,
+        copyRocqProof
     } from './store.svelte.ts';
     import DrawingNode from './DrawingNode.svelte';
+    import rocqIcon from './rocq-icon.svg';
 
     let { drawing, isChild = false }: { drawing: StoreDrawing; isChild?: boolean } = $props();
 
@@ -59,6 +61,16 @@
             class="drawing-title"
             title="Drawing: {drawing.name} ({drawing.drawing.getAllLayers().length} layers, {drawing.drawing.getArtefacts().length} artefacts){drawing.isRule ? (drawing.isFirstOrder ? ' [First-Order Rule]' : ' [Rule]') : ''}{drawing.proved ? ' [Proved]' : ''}"
         >{drawing.name}</span>
+        {#if drawing.drawing.rocqProof}
+            <button
+                class="rocq-copy-btn"
+                title="Copy the attached Rocq proof of rule '{drawing.name}' to the clipboard"
+                aria-label="Copy the attached Rocq proof of '{drawing.name}'"
+                onclick={() => copyRocqProof(drawing.name)}
+            >
+                <img class="rocq-copy-img" src={rocqIcon} alt="" width="14" height="14" aria-hidden="true" />
+            </button>
+        {/if}
         {#if isActive}
             <span class="active-badge" title="Currently active on canvas">Editing</span>
         {/if}

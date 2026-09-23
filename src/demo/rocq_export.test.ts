@@ -999,4 +999,43 @@ describe('rocq export', () => {
         expect(script).toContain('destruct_sigma (@Triangle_rule a b Hpremise1) as ce.');
         expect(script).not.toContain('@Triangle_2_rule');
     });
+
+    it('exports a rule with an attached rocq proof as the proof instead of a Parameter', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+
+        const stmt = new Drawing(sortStore);
+        const a = makeVertex(stmt, 'a');
+        const b = makeVertex(stmt, 'b');
+        makeEdge(stmt, 'g', a, b);
+        stmt.addLayer('conc', 'Conclusion', 'root');
+        makeEdge(stmt, 'c', a, b, 'conc');
+        stmt.setIsRule(true);
+        store.addDrawing('Stmt', stmt);
+
+        const plain = new Drawing(sortStore);
+        const px = makeVertex(plain, 'x');
+        const py = makeVertex(plain, 'y');
+        plain.addLayer('conc', 'Conclusion', 'root');
+        plain.newArtefact('Edge', { source: px, target: py }, { width: 2, bend: 0, label: 'f' }, 'conc');
+        plain.setIsRule(true);
+        store.addDrawing('Plain', plain);
+
+        const recorder = new RocqRecorder();
+        recorder.start(stmt, 'Stmt', sortStore);
+        const check = stmt.checkLayerProvable('conc');
+        expect(check.provable).toBe(true);
+        recorder.recordProveSuccess(stmt, 'conc', check.match ?? null, 'Stmt');
+        const script = recorder.stop();
+
+        expect(script).toContain('Lemma Stmt_rule :');
+        expect(script).toContain('Qed.');
+        stmt.setRocqProof(script);
+
+        const code = exportDrawingsToRocq(store.getAllDrawings(), sortStore);
+        expect(code).toContain('Lemma Stmt_rule :');
+        expect(code).toContain('Qed.');
+        expect(code).not.toContain('Parameter Stmt_rule :');
+        expect(code).toContain('Parameter Plain_rule :');
+    });
 });
