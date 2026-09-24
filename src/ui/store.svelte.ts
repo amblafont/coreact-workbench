@@ -27,7 +27,9 @@ import {
     getRelativePositionMeta
 } from '../index.svelte.ts';
 import { RocqRecorder } from '../rocq_recording.svelte.ts';
+import { AbellaRecorder } from '../abella_recording.svelte.ts';
 import { exportDrawingsToRocq, drawingExportNames, ruleTypeInfo, newExportRegistry } from '../rocq_export';
+import { exportDrawingsToAbella, renderAbellaRuleType } from '../abella_export';
 
 // ---------------------------------------------------------------------------
 // Core singletons (reactive instances backed by fine-grained $state; derived
@@ -41,6 +43,51 @@ export function getDrawing(): Drawing {
 }
 export const drawingStore = new DrawingStore();
 export const rocqRecorder = new RocqRecorder();
+export const abellaRecorder = new AbellaRecorder();
+
+export type ExportTarget = 'rocq' | 'abella';
+
+export function exportTargetLabel(target: ExportTarget): string {
+    return target === 'abella' ? 'Abella' : 'Rocq';
+}
+
+export interface CodeExport {
+    names: string[];
+    ruleCount: number;
+    rocq: string;
+    abella: string;
+}
+
+// The recorder that owns the live recording: an Abella recording wins over the
+// export target, so its steps are always translated with Abella tactics.
+export function activeRecorder(): RocqRecorder | AbellaRecorder {
+    if (abellaRecorder.isActive()) {
+        return abellaRecorder;
+    }
+    return rocqRecorder;
+}
+
+function activeRecorders(): Array<RocqRecorder | AbellaRecorder> {
+    return [rocqRecorder, abellaRecorder].filter(r => r.isActive());
+}
+
+function recorderName(recorder: RocqRecorder | AbellaRecorder): string {
+    return recorder === abellaRecorder ? 'Abella' : 'Rocq';
+}
+
+// Run a recording step on every active recorder. Failures never roll the
+// recording back: the step's effect on the drawing stays applied and the other
+// provers keep recording. Each failure is reported by a compact toast that
+// names the failing prover.
+export function runRecorderStep(run: (recorder: RocqRecorder | AbellaRecorder) => void): void {
+    for (const recorder of activeRecorders()) {
+        try {
+            run(recorder);
+        } catch (err) {
+            pushToast('error', `${recorderName(recorder)} recording failed: ${(err as Error).message}`);
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Interaction state (single fine-grained $state object; components read and
@@ -85,9 +132,12 @@ export const ui = $state({
     layerProvability: new SvelteMap<string, { provable: boolean; reason: string }>(),
     exportSelection: new SvelteSet<string>(),
     toasts: [] as Toast[],
-    rocqRecordingActive: false,
+    recordingActive: false,
+    exportTarget: 'rocq' as ExportTarget,
     proofEditorName: null as string | null,
-    proofEditorDraft: null as string | null,
+    proofEditorRocqDraft: null as string | null,
+    proofEditorAbellaDraft: null as string | null,
+    codeExport: null as CodeExport | null,
     drawingsStoreCollapsed: false,
     leftPanelWidth: 270,
     rightPanelWidth: 270,
@@ -447,10 +497,10 @@ export function createDraftArtefact(): Artefact | null {
         if (draft.duplicateOf) {
             const dupResult = drawing.duplicateArtefact(draft.duplicateOf, finalDeps, draft.data, draft.layerId);
             created = dupResult.artefact;
-            if (rocqRecorder.isActive()) {
-                const activeName = ui.activeDrawingName ?? 'Unsaved Drawing';
-                rocqRecorder.recordDuplicate(drawing, draft.duplicateOf, created, activeName, sortStore);
-            }
+            const activeName = ui.activeDrawingName ?? 'Unsaved Drawing';
+            runRecorderStep(recorder => {
+                recorder.recordDuplicate(drawing, draft.duplicateOf!, created, activeName, sortStore);
+            });
         } else {
             created = drawing.newArtefact(draft.sortName, finalDeps, draft.data, draft.layerId);
         }
@@ -685,7 +735,7 @@ export function downloadDrawingsJson(names: string[]): void {
     }
 }
 
-export function copyRocqExport(names: string[]): void {
+export function openCodeExport(names: string[]): void {
     try {
         const drawings: DrawingStoreEntry[] = names
             .map(name => drawingStore.getDrawing(name))
@@ -694,18 +744,25 @@ export function copyRocqExport(names: string[]): void {
             pushToast('error', 'Error exporting drawings:\nNo drawings found in the store.');
             return;
         }
-        const code = exportDrawingsToRocq(drawings, sortStore);
+        const rocq = exportDrawingsToRocq(drawings, sortStore);
+        const abella = exportDrawingsToAbella(drawings, sortStore);
         const ruleCount = drawings.filter(d => d.drawing.isRule).length;
-        navigator.clipboard
-            .writeText(code)
-            .then(() => {
-                pushToast('info', `Exported ${ruleCount} rule${ruleCount === 1 ? '' : 's'} to Rocq.`);
-            })
-            .catch(() => {
-                pushToast('error', 'Error exporting drawings:\nClipboard access failed.');
-            });
+        ui.codeExport = { names, ruleCount, rocq, abella };
     } catch (err) {
         pushToast('error', `Error exporting drawings:\n${(err as Error).message}`);
+    }
+}
+
+export function closeCodeExport(): void {
+    ui.codeExport = null;
+}
+
+export async function copyCodeToClipboard(code: string, target: ExportTarget, ruleCount: number): Promise<void> {
+    try {
+        await navigator.clipboard.writeText(code);
+        pushToast('info', `Exported ${ruleCount} rule${ruleCount === 1 ? '' : 's'} to ${exportTargetLabel(target)}.`);
+    } catch {
+        pushToast('error', 'Error exporting drawings:\nClipboard access failed.');
     }
 }
 
@@ -719,7 +776,7 @@ export function uniqueProofDrawingName(baseName: string): string {
     return candidate;
 }
 
-export function splitFirstOrderRecording(name: string, snapshot: Drawing, script: string): { proofName: string } {
+export function splitFirstOrderRecording(name: string, snapshot: Drawing, rocqScript: string | null, abellaScript: string | null): { proofName: string } {
     if (getFirstOrderStatementChildLayer(snapshot) === null) {
         throw new Error(`Consistency Check Failed: Drawing '${name}' is not a first-order statement; the recording cannot be attached as a rule proof.`);
     }
@@ -729,7 +786,12 @@ export function splitFirstOrderRecording(name: string, snapshot: Drawing, script
     }
     const parent = entry.parentName;
     const proofName = uniqueProofDrawingName(name);
-    snapshot.setRocqProof(script);
+    if (rocqScript) {
+        snapshot.setRocqProof(rocqScript);
+    }
+    if (abellaScript) {
+        snapshot.setAbellaProof(abellaScript);
+    }
     snapshot.setIsRule(true);
     drawingStore.renameDrawing(name, proofName);
     if (ui.activeDrawingName === name) {
@@ -746,34 +808,62 @@ export function splitFirstOrderRecording(name: string, snapshot: Drawing, script
     return { proofName };
 }
 
-export function openProofEditor(name: string, draft: string | null = null): void {
+export function openProofEditor(name: string, drafts?: { rocq?: string; abella?: string }): void {
     ui.proofEditorName = name;
-    ui.proofEditorDraft = draft;
+    ui.proofEditorRocqDraft = drafts?.rocq ?? null;
+    ui.proofEditorAbellaDraft = drafts?.abella ?? null;
 }
 
 export function closeProofEditor(): void {
     ui.proofEditorName = null;
-    ui.proofEditorDraft = null;
+    ui.proofEditorRocqDraft = null;
+    ui.proofEditorAbellaDraft = null;
 }
 
-export function updateDrawingRocqProof(name: string, script: string): void {
+function setDrawingProof(name: string, target: ExportTarget, script: string): void {
+    const entry = drawingStore.getDrawing(name);
+    if (!entry) {
+        pushToast('error', `Drawing '${name}' does not exist.`);
+        return;
+    }
+    const trimmed = script.trim();
+    if (target === 'abella') {
+        entry.drawing.setAbellaProof(trimmed ? script : null);
+    } else {
+        entry.drawing.setRocqProof(trimmed ? script : null);
+    }
+    pushToast('info', trimmed ? `Proof of '${name}' updated.` : `Proof removed from '${name}'.`);
+}
+
+export function updateDrawingProof(name: string, target: ExportTarget, script: string): void {
+    try {
+        setDrawingProof(name, target, script);
+    } catch (err) {
+        pushToast('error', (err as Error).message);
+    }
+}
+
+export function removeDrawingProofs(name: string): void {
     try {
         const entry = drawingStore.getDrawing(name);
         if (!entry) {
             pushToast('error', `Drawing '${name}' does not exist.`);
             return;
         }
-        const trimmed = script.trim();
-        entry.drawing.setRocqProof(trimmed ? script : null);
-        pushToast('info', trimmed ? `Rocq proof of '${name}' updated.` : `Rocq proof removed from '${name}'.`);
+        entry.drawing.setRocqProof(null);
+        entry.drawing.setAbellaProof(null);
+        pushToast('info', `Proofs removed from '${name}'.`);
     } catch (err) {
         pushToast('error', (err as Error).message);
     }
 }
 
-export function buildAdmittedLemmaScript(drawing: Drawing, name: string, sortStore: SortStore): string {
+export function buildAdmittedProof(drawing: Drawing, name: string, sortStore: SortStore, target: ExportTarget): string {
     const exportNames = drawingExportNames(drawing, name, sortStore);
     const info = ruleTypeInfo(drawing, name, sortStore, newExportRegistry(sortStore), { reserveParam: false, includePremises: false });
+    if (target === 'abella') {
+        return `Theorem ${exportNames.moduleName}_rule : ${renderAbellaRuleType(info, sortStore)}.\nskip.`;
+    }
     return `Lemma ${exportNames.moduleName}_rule : ${info.type}.\nProof.\n  admit.\nAdmitted.`;
 }
 
@@ -784,8 +874,9 @@ export function suggestAdmittedProof(name: string): void {
             pushToast('error', `Drawing '${name}' does not exist.`);
             return;
         }
-        const script = buildAdmittedLemmaScript(entry.drawing, name, sortStore);
-        openProofEditor(name, script);
+        const rocq = buildAdmittedProof(entry.drawing, name, sortStore, 'rocq');
+        const abella = buildAdmittedProof(entry.drawing, name, sortStore, 'abella');
+        openProofEditor(name, { rocq, abella });
     } catch (err) {
         pushToast('error', (err as Error).message);
     }
@@ -820,7 +911,7 @@ export function setInspectedLabel(art: Artefact, rawLabel: string): void {
     const activeName = ui.activeDrawingName ?? 'Unsaved Drawing';
     const isRootLayer = art.layerId === 'root' || drawing.getLayer(art.layerId)?.parentId === null;
     let oldFieldName: string | null = null;
-    if (rocqRecorder.isActive() && isRootLayer) {
+    if (activeRecorders().length > 0 && isRootLayer) {
         const oldExport = drawingExportNames(drawing, activeName, sortStore);
         oldFieldName = oldExport.fieldNames.get(art.id) ?? null;
     }
@@ -829,11 +920,15 @@ export function setInspectedLabel(art: Artefact, rawLabel: string): void {
     } else {
         art.data.label = target;
     }
-    if (rocqRecorder.isActive() && isRootLayer && oldFieldName) {
+    if (activeRecorders().length > 0 && isRootLayer && oldFieldName !== null) {
         const newExport = drawingExportNames(drawing, activeName, sortStore);
         const newFieldName = newExport.fieldNames.get(art.id);
         if (newFieldName && newFieldName !== oldFieldName) {
-            rocqRecorder.recordRename(oldFieldName, newFieldName, activeName);
+            const from = oldFieldName;
+            const to = newFieldName;
+            runRecorderStep(recorder => {
+                recorder.recordRename(from, to, activeName);
+            });
         }
     }
 
@@ -1043,19 +1138,19 @@ export interface RecordedStatementInfo {
 }
 
 export function recordedStatements(): RecordedStatementInfo[] {
-    return rocqRecorder.getRecordedStatements();
+    return activeRecorder().getRecordedStatements();
 }
 
 export function recordedStatementByDrawing(): Map<string, RecordedStatementInfo> {
     const map = new Map<string, RecordedStatementInfo>();
-    for (const s of rocqRecorder.getRecordedStatements()) {
+    for (const s of activeRecorder().getRecordedStatements()) {
         map.set(s.drawingName, s);
     }
     return map;
 }
 
 export function pendingProofCount(): number {
-    return rocqRecorder.getRecordedStatements().filter(s => !s.isMain && !s.proved).length;
+    return activeRecorder().getRecordedStatements().filter(s => !s.isMain && !s.proved).length;
 }
 
 export function setCurrentDrawingRule(checked: boolean): void {
@@ -1174,18 +1269,25 @@ export function markDrawingAsRule(name: string, isRule: boolean): void {
     }
 }
 
-export function toggleRocqRecording(): void {
+export function toggleProofRecording(): void {
     try {
-        if (rocqRecorder.isActive()) {
-            const stmts = rocqRecorder.getRecordedStatements();
-            const mainName = rocqRecorder.getRecordedDrawingName();
-            const snapshot = rocqRecorder.takeSnapshot();
-            const script = rocqRecorder.stop();
-            ui.rocqRecordingActive = false;
+        const recorder = activeRecorder();
+        if (recorder.isActive()) {
+            const stmts = recorder.getRecordedStatements();
+            const mainName = recorder.getRecordedDrawingName();
+            const snapshot = recorder.takeSnapshot();
+            const rocqScript = rocqRecorder.isActive() ? rocqRecorder.stop() : null;
+            const abellaScript = abellaRecorder.isActive() ? abellaRecorder.stop() : null;
+            ui.recordingActive = false;
 
             const entry = mainName ? drawingStore.getDrawing(mainName) : undefined;
             const splittable = !!entry && snapshot !== null && getFirstOrderStatementChildLayer(snapshot) !== null;
             if (!splittable) {
+                const script = ui.exportTarget === 'abella' ? abellaScript : rocqScript;
+                if (!script) {
+                    pushToast('error', 'Proof Recording Error:\nNo recording was produced.');
+                    return;
+                }
                 navigator.clipboard
                     .writeText(script)
                     .then(() => {
@@ -1193,7 +1295,7 @@ export function toggleRocqRecording(): void {
                         const admittedStmts = stmts.filter(s => !s.proved);
                         const admitted = admittedStmts.length;
                         const admittedNames = admitted > 0 ? ` (admitted: ${admittedStmts.map(s => `'${s.drawingName}'`).join(', ')})` : '';
-                        pushToast('info', `Rocq recording script copied to clipboard (${stmts.length} lemma${stmts.length === 1 ? '' : 's'}: ${proved} proved, ${admitted} admitted${admittedNames}).`);
+                        pushToast('info', `Proof recording script copied to clipboard (${stmts.length} lemma${stmts.length === 1 ? '' : 's'}: ${proved} proved, ${admitted} admitted${admittedNames}).`);
                     })
                     .catch(() => {
                         pushToast('error', 'Error copying recording:\nClipboard access failed.');
@@ -1202,19 +1304,29 @@ export function toggleRocqRecording(): void {
             }
 
             try {
-                const { proofName } = splitFirstOrderRecording(mainName!, snapshot!, script);
-                pushToast('info', `Rocq recording saved: '${mainName}' is now a rule carrying its proof; the proof-working drawing is '${proofName}'.`);
+                const { proofName } = splitFirstOrderRecording(mainName!, snapshot!, rocqScript, abellaScript);
+                pushToast('info', `Proof recording saved: '${mainName}' is now a rule carrying its proof; the proof-working drawing is '${proofName}'.`);
+                const rule = drawingStore.getDrawing(mainName!)?.drawing;
+                const rocqDraft = rocqScript ?? (rule ? buildAdmittedProof(rule, mainName!, sortStore, 'rocq') : '');
+                const abellaDraft = abellaScript ?? (rule ? buildAdmittedProof(rule, mainName!, sortStore, 'abella') : '');
+                openProofEditor(mainName!, { rocq: rocqDraft, abella: abellaDraft });
             } catch (err) {
-                pushToast('error', `Rocq Recording Error:\n${(err as Error).message}`);
+                pushToast('error', `Proof Recording Error:\n${(err as Error).message}`);
             }
         } else {
             const name = ui.activeDrawingName ?? 'Unsaved Drawing';
             rocqRecorder.start(drawing, name, sortStore);
-            ui.rocqRecordingActive = true;
+            try {
+                abellaRecorder.start(drawing, name, sortStore);
+            } catch (err) {
+                rocqRecorder.stop();
+                throw err;
+            }
+            ui.recordingActive = true;
         }
 
     } catch (err) {
-        pushToast('error', `Rocq Recording Error:\n${(err as Error).message}`);
+        pushToast('error', `Proof Recording Error:\n${(err as Error).message}`);
     }
 }
 
@@ -1332,7 +1444,10 @@ export function checkLayerProvable(layerId: string): void {
         const result = drawing.checkLayerProvable(layerId);
         ui.layerProvability.set(layerId, { provable: result.provable, reason: result.reason ?? '' });
         if (result.provable) {
-            rocqRecorder.recordProveSuccess(drawing, layerId, result.match ?? null, ui.activeDrawingName ?? 'Unsaved Drawing');
+            const activeName = ui.activeDrawingName ?? 'Unsaved Drawing';
+            runRecorderStep(recorder => {
+                recorder.recordProveSuccess(drawing, layerId, result.match ?? null, activeName);
+            });
         }
 
     } catch (err) {
@@ -1348,7 +1463,10 @@ export function syncProvedStatus(): void {
             const result = drawing.checkLayerProvable(child.id);
             proved = result.provable;
             if (proved) {
-                rocqRecorder.recordProveSuccess(drawing, child.id, result.match ?? null, ui.activeDrawingName ?? 'Unsaved Drawing');
+                const activeName = ui.activeDrawingName ?? 'Unsaved Drawing';
+                runRecorderStep(recorder => {
+                    recorder.recordProveSuccess(drawing, child.id, result.match ?? null, activeName);
+                });
             }
         }
         const name = ui.activeDrawingName;
@@ -1496,7 +1614,10 @@ export function applyRuleAt(savedRuleName: string, appIndex: number): void {
             pushToast('info', `Applied rule '${name}': added ${result.hostArtefacts.length} artefact(s) and created ${createdNames.length} derived drawing(s):\n- ${createdNames.join('\n- ')}`);
         }
         if (applicationResult) {
-            rocqRecorder.recordRuleApply(ruleDrawing, name, app, drawing, applicationResult, activeName, sortStore);
+            const result = applicationResult;
+            runRecorderStep(recorder => {
+                recorder.recordRuleApply(ruleDrawing, name, app, drawing, result, activeName, sortStore);
+            });
         }
         syncProvedStatus();
         if (!goalWasProved && computeProved(drawing)) {

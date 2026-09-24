@@ -1,6 +1,7 @@
 <script lang="ts">
     import DrawingNode from './DrawingNode.svelte';
     import ProofEditorModal from './ProofEditorModal.svelte';
+    import ExportModal from './ExportModal.svelte';
     import {
         allDrawings,
         ui,
@@ -14,10 +15,10 @@
         newDrawing,
         importDrawingsFile,
         downloadDrawingsJson,
-        copyRocqExport,
+        openCodeExport,
         deleteSelectedDrawings,
         setCurrentDrawingRule,
-        toggleRocqRecording,
+        toggleProofRecording,
         setExportSelectionAll,
         getSelectedDrawingNames,
         pushToast
@@ -52,13 +53,13 @@
         downloadDrawingsJson(names);
     }
 
-    function onRocqExport(): void {
+    function onCodeExport(): void {
         const names = getSelectedDrawingNames();
         if (names.length === 0) {
             pushToast('info', 'Select at least one drawing to export.');
             return;
         }
-        copyRocqExport(names);
+        openCodeExport(names);
     }
 </script>
 
@@ -85,13 +86,13 @@
             <button class="layer-btn new-btn" title="Start a new blank drawing" onclick={newDrawing}>New</button>
             <button class="layer-btn import-btn" title="Import one or more drawings from a JSON file" onclick={() => importInput!.click()}>Import</button>
             <button class="layer-btn export-btn" title="Export the checked drawings to a JSON file" onclick={onExportJson}>Export</button>
-            <button class="layer-btn rocq-btn" title="Copy the checked drawings to the clipboard as Rocq code" onclick={onRocqExport}>Rocq</button>
+            <button class="layer-btn rocq-btn" title="Show the checked drawings exported as Rocq and Abella code" onclick={onCodeExport}>Export Code</button>
             <button
                 class="layer-btn rocq-rec-btn"
-                title="Start or stop Rocq recording for the active drawing"
-                onclick={toggleRocqRecording}
+                title="Start or stop proof recording for the active drawing"
+                onclick={toggleProofRecording}
             >
-                {ui.rocqRecordingActive ? (pendingProofCount() > 0 ? `Stop recording (${pendingProofCount()} pending)` : 'Stop recording') : 'Rocq recording'}
+                {ui.recordingActive ? (pendingProofCount() > 0 ? `Stop recording (${pendingProofCount()} pending)` : 'Stop recording') : 'Proof recording'}
             </button>
             <button class="layer-btn dup-btn" title="Duplicate the current drawing under a new name" onclick={duplicateCurrentDrawing}>Dup.</button>
             <button
@@ -143,4 +144,8 @@
     {/if}
 
     <ProofEditorModal />
+
+    {#if ui.codeExport}
+        <ExportModal />
+    {/if}
 </div>
