@@ -76,8 +76,11 @@ Notation "( x , .. , y , p )" :=
 
 export const SUBST_ALL_TACTIC = `Ltac subst_all1 :=
   repeat (match goal with 
-     | e : _ = _ /\\ _ |- _ =>  destruct e as [e ?]
-     | e : ?x = ?y |- _ => subst x; pose (x := y); cbn
+     | e : ?x = ?y |- _ => subst x; pose (x := y);
+     (* This cbn simplifies x (sometimes pose adds some explicit casting)
+         and also transport along e (which are now transport along eq_refl)
+          *)
+         cbn in * 
     end). `;
 
 export const SUBST_ALL_LTAC2 = `Ltac2 subst_all () := ltac1:(subst_all1).`;
@@ -98,8 +101,10 @@ Ltac2 rec destruct_sigma_tac (t : constr) (l : ident list) :=
   | x :: q =>
       let h := Fresh.in_goal @destruct in
       destruct $t as [$x $h];
-      destruct_sigma_tac (Control.hyp h) q;
-      clear $h
+      subst_all ();
+      (* try because if h was an equality, subst_all already removed it *)
+      try (destruct_sigma_tac (Control.hyp h) q;      
+        clear $h)
   end.
 
 Ltac2 Notation "destruct_sigma"
