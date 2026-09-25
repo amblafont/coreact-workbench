@@ -1,0 +1,316 @@
+{
+  "drawings": [
+    {
+      "name": "DefId",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        },
+        {
+          "id": "layer-mucood5g",
+          "name": "Conclusion",
+          "parentId": "root",
+          "color": "#0b696f",
+          "colorEnabled": true,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "a1",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              229,
+              315
+            ]
+          }
+        },
+        {
+          "id": "a2",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              382,
+              255
+            ]
+          }
+        },
+        {
+          "id": "a3",
+          "sortName": "Edge",
+          "layerId": "layer-mucood5g",
+          "dependencies": {
+            "source": "a1",
+            "target": "a2"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0
+          }
+        },
+        {
+          "id": "a4",
+          "sortName": "isId",
+          "layerId": "layer-mucood5g",
+          "dependencies": {
+            "arrow": "a3"
+          },
+          "data": {}
+        },
+        {
+          "id": "a5",
+          "sortName": "Equality",
+          "layerId": "root",
+          "dependencies": {
+            "0": "a1",
+            "1": "a2"
+          },
+          "data": {}
+        }
+      ],
+      "isRule": true,
+      "isFirstOrder": true,
+      "proved": false
+    },
+    {
+      "name": "DefId > Child of Root Layer (reverse)",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        },
+        {
+          "id": "layer-mucoqglv",
+          "name": "Child of Child of Root Layer",
+          "parentId": "root",
+          "color": "#8a41dd",
+          "colorEnabled": true,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "a1",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              229,
+              315
+            ]
+          }
+        },
+        {
+          "id": "a2",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              382,
+              255
+            ]
+          }
+        },
+        {
+          "id": "a3",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a1",
+            "target": "a2"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0
+          }
+        },
+        {
+          "id": "a4",
+          "sortName": "isId",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a3"
+          },
+          "data": {}
+        },
+        {
+          "id": "a5",
+          "sortName": "Equality",
+          "layerId": "layer-mucoqglv",
+          "dependencies": {
+            "0": "a1",
+            "1": "a2"
+          },
+          "data": {}
+        }
+      ],
+      "isRule": true,
+      "isFirstOrder": true,
+      "parentName": "DefId"
+    },
+    {
+      "name": "ReflId2",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        },
+        {
+          "id": "layer-mufno0l6",
+          "name": "Child of Root Layer",
+          "parentId": "root",
+          "color": "#02ef30",
+          "colorEnabled": true,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "a2",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              485,
+              343
+            ],
+            "label": "a1, a2"
+          }
+        },
+        {
+          "id": "a3",
+          "sortName": "Edge",
+          "layerId": "layer-mufno0l6",
+          "dependencies": {
+            "source": "a2",
+            "target": "a2"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0
+          }
+        },
+        {
+          "id": "a4",
+          "sortName": "isId",
+          "layerId": "layer-mufno0l6",
+          "dependencies": {
+            "arrow": "a3"
+          },
+          "data": {}
+        }
+      ],
+      "isRule": true,
+      "isFirstOrder": true,
+      "rocqProof": "Lemma ReflId2_rule : forall (a1__a2 : Vertex), Σ (Edge_2 : Edge a1__a2 a1__a2), isId Edge_2.\nintros_sigma ().\ndestruct_sigma (@DefId_rule a1__a2 a1__a2 eq_refl) as Edge_3 isId_3.\nexact (Edge_3, isId_3).\nQed.\n",
+      "abellaProof": "Theorem ReflId2_rule : forall a1__a2, vertex a1__a2 -> exists Edge_2 isId_2, edge a1__a2 a1__a2 Edge_2 /\\ isId Edge_2 isId_2.\nintros a1__a2.\nwitness Edge_3 isId_3.\nsplit.\nsearch.\n",
+      "proved": false
+    },
+    {
+      "name": "ReflId",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        },
+        {
+          "id": "layer-mufno0l6",
+          "name": "Child of Root Layer",
+          "parentId": "root",
+          "color": "#02ef30",
+          "colorEnabled": true,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "a1",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              224,
+              321
+            ],
+            "label": "a1"
+          }
+        },
+        {
+          "id": "a2",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              485,
+              343
+            ],
+            "label": "a2"
+          }
+        },
+        {
+          "id": "a3",
+          "sortName": "Edge",
+          "layerId": "layer-mufno0l6",
+          "dependencies": {
+            "source": "a1",
+            "target": "a2"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0
+          }
+        },
+        {
+          "id": "a4",
+          "sortName": "isId",
+          "layerId": "layer-mufno0l6",
+          "dependencies": {
+            "arrow": "a3"
+          },
+          "data": {}
+        },
+        {
+          "id": "a5",
+          "sortName": "Equality",
+          "layerId": "root",
+          "dependencies": {
+            "0": "a1",
+            "1": "a2"
+          },
+          "data": {}
+        }
+      ],
+      "isRule": true,
+      "isFirstOrder": true,
+      "rocqProof": "Lemma ReflId_rule : forall (a1 a2 : Vertex)(eq_a1_a2 : a1 = a2), ltac:(subst_all_in (Σ (Edge_2 : Edge a1 a2), isId Edge_2)).\nintros_sigma ().\ndestruct_sigma (@DefId_rule a2 a1 eq_refl) as Edge_3 isId_3.\nexact (Edge_3, isId_3).\nQed.\n",
+      "abellaProof": "Theorem ReflId_rule : forall a1 a2, vertex a1 -> vertex a2 -> a1 = a2 -> exists Edge_2 isId_2, edge a1 a2 Edge_2 /\\ isId Edge_2 isId_2.\nintros a1 a2 eq_a1_a2.\nwitness Edge_3 isId_3.\nsplit.\nsearch.\n"
+    }
+  ]
+}
