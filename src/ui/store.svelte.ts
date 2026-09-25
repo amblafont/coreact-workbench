@@ -1285,7 +1285,7 @@ export function toggleProofRecording(): void {
             const entry = mainName ? drawingStore.getDrawing(mainName) : undefined;
             const splittable = !!entry && snapshot !== null && getFirstOrderStatementChildLayer(snapshot) !== null;
             if (!splittable) {
-                const script = ui.exportTarget === 'abella' ? abellaScript : rocqScript;
+                const script = rocqScript ?? abellaScript;
                 if (!script) {
                     pushToast('error', 'Proof Recording Error:\nNo recording was produced.');
                     return;
@@ -1318,12 +1318,6 @@ export function toggleProofRecording(): void {
         } else {
             const name = ui.activeDrawingName ?? 'Unsaved Drawing';
             rocqRecorder.start(drawing, name, sortStore);
-            try {
-                abellaRecorder.start(drawing, name, sortStore);
-            } catch (err) {
-                rocqRecorder.stop();
-                throw err;
-            }
             ui.recordingActive = true;
         }
 
