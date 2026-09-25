@@ -7,7 +7,8 @@ import {
     sortStore,
     computeRuleApplications,
     setActiveDrawing,
-    toggleFilterStrictMatches,
+    toggleFilterInjectiveMatches,
+    toggleFilterFlexibleMatches,
     toggleFilterRedundantMatches,
     toggleFilterNoProgressMatches,
     toggleFilterSolvesGoalMatches
@@ -32,12 +33,16 @@ describe('rule filter reactivity (ui.* state)', () => {
         const baseline = read();
         expect(baseline.length).toBeGreaterThan(0);
 
-        toggleFilterStrictMatches();
+        toggleFilterInjectiveMatches();
         expect(read()).not.toBe(baseline);
 
-        const afterStrict = read();
+        const afterInjective = read();
+        toggleFilterFlexibleMatches();
+        expect(read()).not.toBe(afterInjective);
+
+        const afterFlexible = read();
         toggleFilterRedundantMatches();
-        expect(read()).not.toBe(afterStrict);
+        expect(read()).not.toBe(afterFlexible);
 
         const afterRedundant = read();
         toggleFilterNoProgressMatches();

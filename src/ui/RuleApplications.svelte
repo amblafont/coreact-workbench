@@ -1,6 +1,6 @@
 <script lang="ts">
     import type { Artefact } from '../index.svelte.ts';
-    import { computeRuleMatches, applyRuleFilters, applyRuleAt, ui, toggleFilterRedundantMatches, toggleFilterNoProgressMatches, toggleFilterStrictMatches, toggleFilterSolvesGoalMatches, solvesGoalFilterApplicable } from './store.svelte.ts';
+    import { computeRuleMatches, applyRuleFilters, applyRuleAt, ui, toggleFilterRedundantMatches, toggleFilterNoProgressMatches, toggleFilterInjectiveMatches, toggleFilterFlexibleMatches, toggleFilterSolvesGoalMatches, solvesGoalFilterApplicable } from './store.svelte.ts';
 
     const matches = $derived(computeRuleMatches());
     const entries = $derived(applyRuleFilters(matches));
@@ -55,8 +55,12 @@
         Filter no-progress matches
     </label>
     <label class="rule-checkbox-label">
-        <input type="checkbox" checked={ui.filterStrictMatches} onchange={toggleFilterStrictMatches} />
-        Strict matching
+        <input type="checkbox" checked={ui.filterInjectiveMatches} onchange={toggleFilterInjectiveMatches} />
+        Injective match
+    </label>
+    <label class="rule-checkbox-label">
+        <input type="checkbox" checked={ui.filterFlexibleMatches} onchange={toggleFilterFlexibleMatches} />
+        Flexible match
     </label>
     <label class="rule-checkbox-label" class:disabled={!solvesGoalFilterApplicable()} title={solvesGoalFilterApplicable() ? 'Only show matchings whose conclusion would make the child layer provable' : 'Requires a drawing with exactly one root and one child layer'}>
         <input type="checkbox" checked={ui.filterSolvesGoalMatches} disabled={!solvesGoalFilterApplicable()} onchange={toggleFilterSolvesGoalMatches} />

@@ -20,6 +20,7 @@ import {
     type Layer,
     type DrawingStoreEntry,
     type RuleApplication,
+    type MatchOptions,
     type DataAttributeValue,
     type DerivedRule,
     getAttributeType,
@@ -144,7 +145,8 @@ export const ui = $state({
     rulesPanelCollapsed: true,
     filterRedundantMatches: true,
     filterNoProgressMatches: true,
-    filterStrictMatches: false,
+    filterInjectiveMatches: true,
+    filterFlexibleMatches: false,
     filterSolvesGoalMatches: false
 });
 
@@ -1486,8 +1488,12 @@ export function toggleFilterNoProgressMatches(): void {
     ui.filterNoProgressMatches = !ui.filterNoProgressMatches;
 }
 
-export function toggleFilterStrictMatches(): void {
-    ui.filterStrictMatches = !ui.filterStrictMatches;
+export function toggleFilterInjectiveMatches(): void {
+    ui.filterInjectiveMatches = !ui.filterInjectiveMatches;
+}
+
+export function toggleFilterFlexibleMatches(): void {
+    ui.filterFlexibleMatches = !ui.filterFlexibleMatches;
 }
 
 export function toggleFilterSolvesGoalMatches(): void {
@@ -1531,12 +1537,15 @@ export function computeRuleMatches(): RuleAppEntry[] {
         const ruleDrawing = entry.drawing;
         if (!ruleDrawing.isRule) continue;
         let applications: RuleApplication[];
-        const strict = ui.filterStrictMatches;
+        const matchOptions: MatchOptions = {
+            injective: ui.filterInjectiveMatches,
+            flexible: ui.filterFlexibleMatches
+        };
         const isFirstOrder = drawingStore.checkIsFirstOrder(ruleDrawing);
         try {
             applications = untrack(() => isFirstOrder
-                ? findFirstOrderRuleApplications(ruleDrawing, drawing, strict)
-                : findSecondOrderRuleApplications(ruleDrawing, drawing, strict));
+                ? findFirstOrderRuleApplications(ruleDrawing, drawing, matchOptions)
+                : findSecondOrderRuleApplications(ruleDrawing, drawing, matchOptions));
         } catch {
             continue;
         }

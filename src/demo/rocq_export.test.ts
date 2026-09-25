@@ -46,7 +46,7 @@ describe('rocq export', () => {
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);
-        const apps = findFirstOrderRuleApplications(rule, host);
+        const apps = findFirstOrderRuleApplications(rule, host, { flexible: true });
         expect(apps.length).toBe(1);
         const created = applyFirstOrderRule(rule, host, apps[0]);
         recorder.recordRuleApply(rule, 'Foo', apps[0], host, created, 'MainDrawing', sortStore);
@@ -105,7 +105,7 @@ describe('rocq export', () => {
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);
-        const apps = findFirstOrderRuleApplications(rule, host);
+        const apps = findFirstOrderRuleApplications(rule, host, { flexible: true });
         expect(apps.length).toBe(1);
         const created = applyFirstOrderRule(rule, host, apps[0]);
         recorder.recordRuleApply(rule, 'FooEq', apps[0], host, created, 'MainDrawing', sortStore);
@@ -488,7 +488,7 @@ describe('rocq export', () => {
 
         const recorder = new RocqRecorder();
         recorder.start(host, 'MainDrawing', sortStore);
-        const apps = findFirstOrderRuleApplications(rule, host);
+        const apps = findFirstOrderRuleApplications(rule, host, { flexible: true });
         expect(apps.length).toBe(1);
         const created = applyFirstOrderRule(rule, host, apps[0]);
         recorder.recordRuleApply(rule, 'TriEqRoot', apps[0], host, created, 'MainDrawing', sortStore);

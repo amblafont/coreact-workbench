@@ -25,16 +25,27 @@ The public entry points are:
 
 | Function | Requires | Pattern used for matching |
 |---|---|---|
-| `findRuleApplications(rule, host)` | Any valid rule | All non-`Equality` artefacts of the rule |
-| `findFirstOrderRuleApplications(rule, host)` | Root has **exactly one** child layer | **Root-layer** artefacts only |
-| `findSecondOrderRuleApplications(rule, host)` | Root has **at least two** child layers | **Root-layer** artefacts only |
+| `findRuleApplications(rule, host, options?)` | Any valid rule | All non-`Equality` artefacts of the rule |
+| `findFirstOrderRuleApplications(rule, host, options?)` | Root has **exactly one** child layer | **Root-layer** artefacts only |
+| `findSecondOrderRuleApplications(rule, host, options?)` | Root has **at least two** child layers | **Root-layer** artefacts only |
 
-All three validate the rule first (`validateRuleDrawing`); they return `[]` if the layer-count preconditions are not met. They share `findRootRuleApplications(rule, host)`, which:
+All three validate the rule first (`validateRuleDrawing`); they return `[]` if the layer-count preconditions are not met. They share `findRootRuleApplications(rule, host, options)`, which:
 
 - takes the root-layer artefacts (excluding `Equality`) as the pattern, and
 - extracts equality constraints from the **root-layer** equality artefacts (`extractEqualityConstraints`).
 
 > **Important:** only the rule's **root layer** participates in matching. Child-layer artefacts and child-layer equalities are part of the rule's structure (the conclusion/premises), not of its pattern. In particular, a child-layer equality is never required to be provable in the host.
+
+### Matching options
+
+The optional `options` argument controls two independent aspects of the matcher:
+
+| Option | Default | Meaning |
+|---|---|---|
+| `injective` | `true` | Do **not** allow two different rule artefacts to be matched to the same host artefact. When `false`, distinct pattern artefacts may alias a single host artefact (e.g. a rule with two vertices matches a host with one vertex, mapping both to it). |
+| `flexible` | `false` | Allow the match to be **bigger than the rule root layer**. When `true`, a candidate's dependencies may be **provably equal** to (rather than identical with) the already-matched images, and applications whose images are provably equal are collapsed. For example, a rule root layer consisting of a looping arrow on a vertex `A` matches a host root layer with two provably equal vertices `B` and `C` and an edge between them: the edge `B → C` is a match for the loop `A → A`. |
+
+The rule-root equality constraints (§2.1) are always required regardless of `flexible`: a root-layer equality in the rule demands that its matched images be provably equal in the host.
 
 Each returned `RuleApplication` contains:
 - `matchedArtefacts`: a map from each pattern artefact to a host artefact;
@@ -50,13 +61,13 @@ Root-layer equality artefacts express that their children are provably equal in 
 2. **Topological ordering**: pattern artefacts are ordered so that every artefact appears before any artefact that depends on it (dependencies first). If the pattern cannot be fully ordered this way, matching is impossible.
 3. **Backtracking assignment** over the ordered pattern artefacts, with the following per-candidate checks:
    - the candidate's `sortName` must equal the pattern artefact's;
-   - each host artefact may be used at most once (`used` set);
+   - each host artefact may be used at most once when `injective` is `true` (the default); when it is `false`, distinct pattern artefacts may map to the same host artefact;
    - **artefact dependencies**: every dependency of a pattern artefact is a real artefact:
-     - if the dependency has already been assigned a host image, the candidate's dependency must be that image itself or provably equal to it (`host.areEqual(dep, img, cand.layerId)`);
-     - if the dependency is not part of the pattern (e.g. it lives in a lower ancestor layer), the candidate's dependency must be that same host artefact or provably equal to it;
+     - if the dependency has already been assigned a host image, the candidate's dependency must be that image itself, or — when `flexible` is `true` — provably equal to it;
+     - if the dependency is not part of the pattern (e.g. it lives in a lower ancestor layer), the candidate's dependency must be that same host artefact, or provably equal to it when `flexible`;
      - the candidate must have every dependency of the pattern artefact defined.
 4. **Final check**: once a complete assignment is found, every applicable equality constraint must hold — the assigned images must be pairwise equal via `host.areEqual`.
-5. **Deduplication**: two applications are considered equivalent when every pattern artefact maps to the same host artefact or to host artefacts that are provably equal (`applicationsEquivalent`). Only one representative of each equivalence class is returned.
+5. **Deduplication**: when `flexible` is `true`, two applications are considered equivalent when every pattern artefact maps to the same host artefact or to host artefacts that are provably equal (`applicationsEquivalent`). Only one representative of each equivalence class is returned. When `flexible` is `false`, applications collapse only if every pattern artefact maps to exactly the same host artefact.
 
 ### 2.3 Redundancy Filtering
 
@@ -142,5 +153,6 @@ The function returns `{ hostArtefacts, derivedRules }`, where `hostArtefacts` is
 - **Root-layer artefacts constrain matching; child-layer artefacts do not.** An artefact (such as `isMono`) in the rule's root layer must be matched in the host; one in a child/conclusion layer is structure and is created in the host root on application.
 - **Child-layer equalities are never required** for matching; they are re-created in the host when the rule is applied.
 - **Root-layer equalities are required**: matched images must be provably equal in the host.
+- **The `checkLayerProvable` consistency matcher always behaves as injectivity off + flexible on**: it never enforces injectivity and always allows dependencies to match up to provable equality.
 - **Applying merges the conclusion into the host root**, including conclusion-layer tag artefacts (e.g. `isMono`).
 - **Second-order application builds one derived drawing per premise** that copies the host root (minus conclusion content) plus the premise layer and its child layer, without rule marking.

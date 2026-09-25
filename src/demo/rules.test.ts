@@ -265,7 +265,7 @@ describe('rule structure restrictions', () => {
 });
 
 describe('matching up to host equalities', () => {
-    it('matches hosts with a truly shared edge and provably equal edges, but not distinct edges', () => {
+    it('matches a truly shared edge, but not distinct or only provably-equal edges, by default', () => {
         const rule = buildSharedEdgeTrianglesRule();
 
         const hostShared = makeDrawing();
@@ -278,11 +278,11 @@ describe('matching up to host equalities', () => {
         buildTrianglePairHost(hostDistinctEdges, 'distinct');
 
         expect(findRuleApplications(rule, hostShared).length).toBe(2);
-        expect(findRuleApplications(rule, hostEqualEdges).length).toBe(2);
+        expect(findRuleApplications(rule, hostEqualEdges).length).toBe(0);
         expect(findRuleApplications(rule, hostDistinctEdges).length).toBe(0);
     });
 
-    it('strict matching keeps same-object matches but filters out up-to-equality matches', () => {
+    it('flexible matching keeps same-object matches and additionally accepts up-to-equality matches', () => {
         const rule = buildSharedEdgeTrianglesRule();
 
         const hostShared = makeDrawing();
@@ -291,11 +291,42 @@ describe('matching up to host equalities', () => {
         const hostEqualEdges = makeDrawing();
         buildTrianglePairHost(hostEqualEdges, 'equal');
 
-        expect(findRuleApplications(rule, hostShared, true).length).toBe(2);
-        expect(findRuleApplications(rule, hostEqualEdges, true).length).toBe(0);
+        expect(findRuleApplications(rule, hostShared, { flexible: true }).length).toBe(2);
+        expect(findRuleApplications(rule, hostEqualEdges, { flexible: true }).length).toBe(2);
     });
 
-    it('strict matching still accepts provably equal images for rule-root equality artefacts', () => {
+    it('flexible matching accepts a bigger host structure: a loop matched by equal vertices with an edge between them', () => {
+        const rule = makeDrawing();
+        const rva = makeVertex(rule, 'rva');
+        makeEdge(rule, 'rloop', rva, rva);
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        rule.setIsRule(true);
+
+        const host = makeDrawing();
+        const hb = makeVertex(host, 'hb');
+        const hc = makeVertex(host, 'hc');
+        makeEdge(host, 'he', hb, hc);
+        host.newEqualityArtefact([hb, hc], 'root');
+
+        expect(findFirstOrderRuleApplications(rule, host).length).toBe(0);
+        expect(findFirstOrderRuleApplications(rule, host, { flexible: true }).length).toBe(1);
+    });
+
+    it('injective matching rejects distinct rule artefacts mapping to the same host artefact', () => {
+        const rule = makeDrawing();
+        makeVertex(rule, 'rva');
+        makeVertex(rule, 'rvb');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        rule.setIsRule(true);
+
+        const host = makeDrawing();
+        makeVertex(host, 'hv');
+
+        expect(findFirstOrderRuleApplications(rule, host).length).toBe(0);
+        expect(findFirstOrderRuleApplications(rule, host, { injective: false }).length).toBe(1);
+    });
+
+    it('rule-root equality artefacts still accept provably equal images even without flexible matching', () => {
         const rule = makeDrawing();
         const rv0 = makeVertex(rule, 'rv0');
         const rv1 = makeVertex(rule, 'rv1');
@@ -312,8 +343,8 @@ describe('matching up to host equalities', () => {
         const hy = makeEdge(host, 'hy', hv0, hv1);
         host.newEqualityArtefact([hx, hy], 'root');
 
-        expect(findFirstOrderRuleApplications(rule, host).length).toBe(1);
-        expect(findFirstOrderRuleApplications(rule, host, true).length).toBe(2);
+        expect(findFirstOrderRuleApplications(rule, host).length).toBe(2);
+        expect(findFirstOrderRuleApplications(rule, host, { flexible: true }).length).toBe(1);
     });
 });
 
@@ -507,7 +538,7 @@ describe('no-progress match filtering', () => {
         makeEdge(host, 'he1', hv0, hv1);
         host.newEqualityArtefact([hv0, hv1], 'root');
 
-        const apps = findFirstOrderRuleApplications(rule, host);
+        const apps = findFirstOrderRuleApplications(rule, host, { flexible: true });
         expect(apps.length).toBe(1);
 
         const filtered = filterNoProgressRuleApplications(rule, host, apps);
