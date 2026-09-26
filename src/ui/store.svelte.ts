@@ -1441,9 +1441,7 @@ export function checkLayerProvable(layerId: string): void {
         ui.layerProvability.set(layerId, { provable: result.provable, reason: result.reason ?? '' });
         if (result.provable) {
             const activeName = ui.activeDrawingName ?? 'Unsaved Drawing';
-            runRecorderStep(recorder => {
-                recorder.recordProveSuccess(drawing, layerId, result.match ?? null, activeName);
-            });
+            recordProve(layerId, result.match ?? null, activeName);
         }
 
     } catch (err) {
@@ -1453,6 +1451,7 @@ export function checkLayerProvable(layerId: string): void {
 
 export function syncProvedStatus(): void {
     try {
+        const solvedDrawing = drawing;
         const child = getFirstOrderStatementChildLayer(drawing);
         let proved = false;
         if (child) {
@@ -1460,10 +1459,14 @@ export function syncProvedStatus(): void {
             proved = result.provable;
             if (proved) {
                 const activeName = ui.activeDrawingName ?? 'Unsaved Drawing';
-                runRecorderStep(recorder => {
-                    recorder.recordProveSuccess(drawing, child.id, result.match ?? null, activeName);
-                });
+                recordProve(child.id, result.match ?? null, activeName);
             }
+        }
+        // Recording may have loaded another subgoal, which synced its own status
+        // on load. The flag belongs to the drawing we just examined, so stop once
+        // the active drawing is no longer that one.
+        if (getDrawing() !== solvedDrawing) {
+            return;
         }
         const name = ui.activeDrawingName;
         if (name) {
@@ -1472,6 +1475,66 @@ export function syncProvedStatus(): void {
     } catch (err) {
         pushToast('error', `Proved status check failed:\n${(err as Error).message}`);
     }
+}
+
+// Re-entrancy guard for the solve -> load-next-subgoal walk below. Loading a
+// subgoal runs syncProvedStatus, which can close that subgoal's proof and
+// re-enter here; the walk below owns the chain instead.
+let advancingSubgoals = false;
+
+// A goal of the recorded drawing tree was just solved. The next subgoal still
+// awaiting a proof is loaded straight away; once none are left the recording is
+// terminated, which attaches the script to the drawing and opens the proof
+// modal.
+function advanceAfterSolve(solvedName: string): void {
+    advancingSubgoals = true;
+    try {
+        for (;;) {
+            const recorder = activeRecorder();
+            const next = recorder.nextPendingSubgoal();
+            if (!next) {
+                pushToast('info', `'${solvedName}' is solved and no subgoal is pending: stopping proof recording.`);
+                toggleProofRecording();
+                return;
+            }
+            if (!setActiveDrawing(next.drawingName)) {
+                return;
+            }
+            pushToast('info', `'${solvedName}' is solved. Loaded the next subgoal: '${next.drawingName}'.`);
+            solvedName = next.drawingName;
+            // setActiveDrawing syncs the proved status, so a subgoal that is
+            // already provable is discharged on load; keep walking in that case
+            // so the chain cannot dead-end on an already-solved subgoal.
+            if (recorder.statementInfo(next.drawingName)?.proved !== true) {
+                return;
+            }
+        }
+    } finally {
+        advancingSubgoals = false;
+    }
+}
+
+// Records a successful proof of `layerId` and reacts to it when this call is the
+// one that closed the proof. Re-proving an already-solved goal records nothing
+// and advances nothing, so the subgoal queue is never skipped.
+function recordProve(layerId: string, match: Map<Artefact, Artefact> | null, hostActiveName: string): void {
+    let closed = false;
+    runRecorderStep(recorder => {
+        closed = recorder.recordProveSuccess(drawing, layerId, match, hostActiveName) || closed;
+    });
+    if (!closed || advancingSubgoals) {
+        return;
+    }
+    const recorder = activeRecorder();
+    if (!ui.recordingActive || !recorder.isActive()) {
+        return;
+    }
+    // Only goals that belong to this recording navigate; proving an unrelated
+    // drawing is a no-op.
+    if (!recorder.statementInfo(hostActiveName)) {
+        return;
+    }
+    advanceAfterSolve(hostActiveName);
 }
 
 export function toggleFilterRedundantMatches(): void {

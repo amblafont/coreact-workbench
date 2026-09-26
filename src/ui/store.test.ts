@@ -4,9 +4,10 @@ import { getDrawing, drawingStore, ui, sortStore, rocqRecorder, abellaRecorder, 
     resetInteractionState, togglePositionPicker, isPositionPickerActive, isDraftPickerActive,
     applyPickedPosition, startPositionPicker, selectArtefactToInspect, removeArtefactNode,
     toggleEqualityExtend, equalityChildren, onArtefactNodeClick, createDraftArtefact,
-    splitFirstOrderRecording, openProofEditor, closeProofEditor, updateDrawingProof, removeDrawingProofs, suggestAdmittedProof, toggleProofRecording /* runRecorderStep */
+    splitFirstOrderRecording, openProofEditor, closeProofEditor, updateDrawingProof, removeDrawingProofs, suggestAdmittedProof, toggleProofRecording /* runRecorderStep */,
+    setActiveDrawing, checkLayerProvable, pendingProofCount
 } from './store.svelte.ts';
-import { Drawing, DrawingStore, getFirstOrderStatementChildLayer } from '../index.svelte.ts';
+import { Artefact, Drawing, DrawingStore, getFirstOrderStatementChildLayer } from '../index.svelte.ts';
 import { registerDefaultSorts } from '../demo/buildDemo';
 import { buildComposableEdgesRule, makeDrawing, makeEdge, makeVertex } from '../demo/helpers';
 
@@ -746,8 +747,9 @@ describe('rocq recording proof attachment', () => {
         toggleProofRecording();
         expect(rocqRecorder.isActive()).toBe(true);
         // expect(abellaRecorder.isActive()).toBe(true);
+        // Solving the main goal with no subgoal pending stops the recording by
+        // itself and opens the proof editor, so no manual stop is needed.
         syncProvedStatus();
-        toggleProofRecording();
         expect(rocqRecorder.isActive()).toBe(false);
         expect(abellaRecorder.isActive()).toBe(false);
 
@@ -814,4 +816,304 @@ describe('rocq recording proof attachment', () => {
         closeProofEditor();
     });
     */
+});
+
+describe('proof recording subgoal navigation', () => {
+    beforeEach(() => {
+        registerDefaultSorts(sortStore);
+        getDrawing().clear(true);
+        drawingStore.clear();
+        ui.activeDrawingName = null;
+        ui.recordingActive = false;
+        ui.toasts = [];
+        closeProofEditor();
+        vi.stubGlobal('confirm', () => true);
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        ui.activeDrawingName = null;
+        ui.recordingActive = false;
+        ui.toasts = [];
+        closeProofEditor();
+        if (abellaRecorder.isActive()) {
+            abellaRecorder.stop();
+        }
+        if (rocqRecorder.isActive()) {
+            rocqRecorder.stop();
+        }
+    });
+
+    // A host whose goal is NOT reachable from the rule's conclusion (it asks for
+    // the reverse edge), so the main goal stays open and the subgoals alone drive
+    // the recording.
+    function buildHost(): Drawing {
+        const host = new Drawing(sortStore);
+        const a = makeVertex(host, 'a');
+        const b = makeVertex(host, 'b');
+        makeEdge(host, 'g', a, b);
+        host.addLayer('conc', 'Conclusion', 'root');
+        makeEdge(host, 'reverse', b, a, 'conc');
+        return host;
+    }
+
+    function buildSolvableStatement(name: string): Drawing {
+        const stmt = new Drawing(sortStore);
+        const a = makeVertex(stmt, 'a');
+        const b = makeVertex(stmt, 'b');
+        makeEdge(stmt, 'g', a, b);
+        stmt.addLayer('conc', 'Conclusion', 'root');
+        makeEdge(stmt, 'c', a, b, 'conc');
+        drawingStore.addDrawing(name, stmt);
+        return stmt;
+    }
+
+    // A second-order rule with one premise layer per name. Its conclusion is an
+    // `isMono` the host does not already have, so the application is neither
+    // redundant nor a no-op and survives the store's default filters. Each
+    // premise goal demands an edge its premise layer does not supply, so every
+    // derived subgoal starts unproved; `solvablePremises` instead puts that edge
+    // in the premise layer, making each derived subgoal provable on load.
+    function buildSecondOrderRule(premiseNames: string[], solvablePremises = false): Drawing {
+        const rule = new Drawing(sortStore);
+        const v0 = makeVertex(rule, 'rv0');
+        const v1 = makeVertex(rule, 'rv1');
+        const re = makeEdge(rule, 're', v0, v1);
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        rule.newArtefact('isMono', { arrow: re }, {}, 'conclusion');
+        premiseNames.forEach((name, i) => {
+            const premiseId = `premise-${i}`;
+            rule.addLayer(premiseId, name, 'root');
+            const pv = rule.newArtefact('Vertex', {}, { position: [0, 0], label: `pv${i}` }, premiseId);
+            if (solvablePremises) {
+                makeEdge(rule, `pce${i}`, pv, v0, premiseId);
+            }
+            const childId = `premise-${i}-child`;
+            rule.addLayer(childId, `${name} Child`, premiseId);
+            makeEdge(rule, `pc${i}`, pv, v0, childId);
+        });
+        rule.setIsRule(true);
+        drawingStore.addDrawing('SO', rule);
+        return rule;
+    }
+
+    function byLabel(drawing: Drawing, label: string): Artefact {
+        const art = drawing.getArtefacts().find(a => String(a.data.label) === label);
+        if (!art) {
+            throw new Error(`No artefact labelled '${label}'.`);
+        }
+        return art;
+    }
+
+    function startRecording(): void {
+        toggleProofRecording();
+        expect(rocqRecorder.isActive()).toBe(true);
+    }
+
+    // Apply the rule and return the derived subgoal drawing names in
+    // registration order.
+    function applyRule(): string[] {
+        const before = new Set(drawingStore.getAllNames());
+        applyRuleAt('SO', 0);
+        return drawingStore.getAllNames().filter(n => !before.has(n));
+    }
+
+    function goalLayerOfCurrentDrawing() {
+        return getFirstOrderStatementChildLayer(getDrawing());
+    }
+
+    // Discharge the active subgoal. A derived subgoal is a flat two-layer
+    // drawing: the copied host context and the instantiated premise share the
+    // root layer, and the "Goal" child layer is what has to be proved. When the
+    // goal is not yet reachable, supply the edge it asks for in the root layer.
+    function solveCurrentSubgoal(): void {
+        const goal = goalLayerOfCurrentDrawing();
+        expect(goal).not.toBeNull();
+        if (getDrawing().checkLayerProvable(goal!.id).provable === false) {
+            getDrawing().newArtefact(
+                'Edge',
+                { source: byLabel(getDrawing(), 'pv0'), target: byLabel(getDrawing(), 'a') },
+                { width: 2, bend: 0, label: 'supplied' },
+                'root'
+            );
+            expect(getDrawing().checkLayerProvable(goal!.id).provable).toBe(true);
+        }
+        checkLayerProvable(goalLayerOfCurrentDrawing()!.id);
+    }
+
+    it('loads the next pending subgoal as soon as a subgoal is solved', () => {
+        drawingStore.addDrawing('Host', buildHost());
+        buildSecondOrderRule(['Premise A', 'Premise B']);
+        setActiveDrawing('Host');
+
+        startRecording();
+        const [subA, subB] = applyRule();
+        expect(subA).toBe('Host > SO > Premise A');
+        expect(subB).toBe('Host > SO > Premise B');
+        expect(ui.activeDrawingName).toBe('Host');
+
+        setActiveDrawing(subA);
+        solveCurrentSubgoal();
+
+        expect(ui.activeDrawingName).toBe(subB);
+        expect(rocqRecorder.isActive()).toBe(true);
+        expect(pendingProofCount()).toBe(1);
+    });
+
+    it('stops the recording and opens the proof modal when the last subgoal is solved', () => {
+        const host = buildHost();
+        drawingStore.addDrawing('Host', host);
+        buildSecondOrderRule(['Premise A']);
+        setActiveDrawing('Host');
+
+        startRecording();
+        const [subA] = applyRule();
+
+        setActiveDrawing(subA);
+        solveCurrentSubgoal();
+
+        expect(rocqRecorder.isActive()).toBe(false);
+        expect(ui.recordingActive).toBe(false);
+        expect(ui.proofEditorName).toBe('Host');
+        const rule = drawingStore.getDrawing('Host');
+        expect(rule?.drawing.isRule).toBe(true);
+        // The solved subgoal is inlined as a complete proof (no `admit.`); the
+        // still-open main goal is what leaves the lemma admitted.
+        expect(rule!.drawing.rocqProof).toContain('assert (Hpremise1');
+        expect(rule!.drawing.rocqProof).toContain('exact supplied.');
+        expect(rule!.drawing.rocqProof).toContain('Admitted.');
+        expect(drawingStore.getDrawing('Host (proof)')?.drawing).toBe(host);
+    });
+
+    it('solving the main goal with a pending subgoal loads that subgoal instead of stopping', () => {
+        const host = buildHost();
+        drawingStore.addDrawing('Host', host);
+        buildSecondOrderRule(['Premise A']);
+        setActiveDrawing('Host');
+
+        startRecording();
+        const [subA] = applyRule();
+        expect(rocqRecorder.isActive()).toBe(true);
+
+        // Satisfy the main goal: it asks for the reverse edge, which the rule's
+        // conclusion does not supply.
+        const goal = goalLayerOfCurrentDrawing()!;
+        host.newArtefact('Edge', { source: byLabel(host, 'b'), target: byLabel(host, 'a') }, { width: 2, bend: 0, label: 'back' }, 'root');
+        expect(host.checkLayerProvable(goal.id).provable).toBe(true);
+
+        checkLayerProvable(goal.id);
+
+        expect(rocqRecorder.isActive()).toBe(true);
+        expect(ui.activeDrawingName).toBe(subA);
+        expect(pendingProofCount()).toBe(1);
+    });
+
+    it('solving the main goal with no subgoal pending stops the recording and opens the modal', () => {
+        const stmt = buildSolvableStatement('Statement');
+        setActiveDrawing('Statement');
+
+        startRecording();
+        const goal = goalLayerOfCurrentDrawing()!;
+        expect(stmt.checkLayerProvable(goal.id).provable).toBe(true);
+
+        checkLayerProvable(goal.id);
+
+        expect(rocqRecorder.isActive()).toBe(false);
+        expect(ui.recordingActive).toBe(false);
+        expect(ui.proofEditorName).toBe('Statement');
+        const rule = drawingStore.getDrawing('Statement');
+        expect(rule?.drawing.isRule).toBe(true);
+        // The main goal is closed too, so the script ends with `Qed.`.
+        expect(rule!.drawing.rocqProof).toContain('Qed.');
+        expect(rule!.drawing.rocqProof).not.toContain('Admitted.');
+    });
+
+    it('a rule application that solves the main goal with no subgoal pending stops the recording', () => {
+        const host = buildHost();
+        drawingStore.addDrawing('Host', host);
+        // A first-order rule whose conclusion is the reverse edge the host goal
+        // asks for: applying it solves the main goal outright.
+        const rule = new Drawing(sortStore);
+        const v0 = makeVertex(rule, 'rv0');
+        const v1 = makeVertex(rule, 'rv1');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        makeEdge(rule, 'rce', v1, v0, 'conclusion');
+        rule.setIsRule(true);
+        drawingStore.addDrawing('FO', rule);
+        setActiveDrawing('Host');
+
+        startRecording();
+        expect(rocqRecorder.isActive()).toBe(true);
+        applyRuleAt('FO', 0);
+
+        expect(rocqRecorder.isActive()).toBe(false);
+        expect(ui.proofEditorName).toBe('Host');
+    });
+
+    it('re-solving an already solved subgoal does not skip the queue', () => {
+        drawingStore.addDrawing('Host', buildHost());
+        buildSecondOrderRule(['Premise A', 'Premise B']);
+        setActiveDrawing('Host');
+
+        startRecording();
+        const [subA, subB] = applyRule();
+
+        setActiveDrawing(subA);
+        solveCurrentSubgoal();
+        expect(ui.activeDrawingName).toBe(subB);
+
+        setActiveDrawing(subA);
+        checkLayerProvable(goalLayerOfCurrentDrawing()!.id);
+        expect(ui.activeDrawingName).toBe(subA);
+        expect(rocqRecorder.isActive()).toBe(true);
+        expect(pendingProofCount()).toBe(1);
+    });
+
+    it('chains through a subgoal that is already provable when it is loaded', () => {
+        drawingStore.addDrawing('Host', buildHost());
+        buildSecondOrderRule(['Premise A', 'Premise B'], true);
+        setActiveDrawing('Host');
+
+        startRecording();
+        const [subA, subB] = applyRule();
+        expect(subA).not.toBe(subB);
+
+        // Both derived subgoals are provable as they are loaded, so the walk
+        // must pass through A, discharge it, pass through B and then stop.
+        setActiveDrawing(subA);
+        solveCurrentSubgoal();
+
+        expect(rocqRecorder.isActive()).toBe(false);
+        expect(ui.proofEditorName).toBe('Host');
+    });
+
+    it('proving an unregistered drawing advances nothing while recording is on', () => {
+        drawingStore.addDrawing('Host', buildHost());
+        buildSolvableStatement('Other');
+        buildSecondOrderRule(['Premise A', 'Premise B']);
+        setActiveDrawing('Host');
+
+        startRecording();
+        const [subA] = applyRule();
+
+        setActiveDrawing('Other');
+        checkLayerProvable(goalLayerOfCurrentDrawing()!.id);
+
+        expect(ui.activeDrawingName).toBe('Other');
+        expect(rocqRecorder.isActive()).toBe(true);
+        // Both subgoals are still untouched.
+        expect(pendingProofCount()).toBe(2);
+        expect(drawingStore.getDrawing(subA)).toBeDefined();
+    });
+
+    it('proving a goal with no recording running advances nothing', () => {
+        drawingStore.addDrawing('Host', buildHost());
+        setActiveDrawing('Host');
+        expect(rocqRecorder.isActive()).toBe(false);
+
+        const goal = goalLayerOfCurrentDrawing()!;
+        expect(() => checkLayerProvable(goal.id)).not.toThrow();
+        expect(ui.activeDrawingName).toBe('Host');
+        expect(ui.proofEditorName).toBeNull();
+    });
 });

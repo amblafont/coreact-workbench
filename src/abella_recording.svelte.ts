@@ -188,6 +188,36 @@ export class AbellaRecorder {
         }));
     }
 
+    public statementInfo(drawingName: string): RecordedStatementInfo | null {
+        const stmt = this.statements.get(drawingName);
+        if (!stmt) {
+            return null;
+        }
+        return {
+            drawingName: stmt.drawingName,
+            lemmaName: stmt.lemmaName,
+            proved: stmt.proved,
+            isMain: stmt.isMain
+        };
+    }
+
+    // The first subgoal still awaiting a proof. `statements` is a SvelteMap, so
+    // iteration follows registration order, which is the order the premises were
+    // asserted in (`Hpremise1`, `Hpremise2`, ...).
+    public nextPendingSubgoal(): RecordedStatementInfo | null {
+        for (const stmt of this.statements.values()) {
+            if (!stmt.isMain && !stmt.proved) {
+                return {
+                    drawingName: stmt.drawingName,
+                    lemmaName: stmt.lemmaName,
+                    proved: stmt.proved,
+                    isMain: stmt.isMain
+                };
+            }
+        }
+        return null;
+    }
+
     private statementFor(hostActiveName: string): RecordedStatement | null {
         if (!this.active) {
             return null;
@@ -477,13 +507,15 @@ export class AbellaRecorder {
         stmt.bodyLines.push(`rename ${this.nextAutoHyp()} to ${createdField}.`);
     }
 
-    public recordProveSuccess(hostDrawing: Drawing, layerId: string | null, match: Map<Artefact, Artefact> | null, hostActiveName: string): void {
+    // Returns true when this call is the one that closed the proof, so callers
+    // can react to the goal being solved exactly once.
+    public recordProveSuccess(hostDrawing: Drawing, layerId: string | null, match: Map<Artefact, Artefact> | null, hostActiveName: string): boolean {
         const stmt = this.statementFor(hostActiveName);
         if (!stmt) {
-            return;
+            return false;
         }
         if (stmt.proved) {
-            return;
+            return false;
         }
 
         if (!stmt.ruleInfo) {
@@ -502,7 +534,7 @@ export class AbellaRecorder {
             stmt.bodyLines.push("search.");
             stmt.proved = true;
             stmt.proofClosedAt = stmt.bodyLines.length - 1;
-            return;
+            return true;
         }
 
         if (layerId !== stmt.conclusionLayerId) {
@@ -527,7 +559,7 @@ export class AbellaRecorder {
             stmt.bodyLines.push("search.");
             stmt.proved = true;
             stmt.proofClosedAt = stmt.bodyLines.length - 1;
-            return;
+            return true;
         }
 
         const witnessNames: string[] = [];
@@ -553,6 +585,7 @@ export class AbellaRecorder {
         stmt.bodyLines.push("search.");
         stmt.proved = true;
         stmt.proofClosedAt = startIndex;
+        return true;
     }
 
     public stop(): string {
