@@ -1,4 +1,7 @@
 <script lang="ts">
+    import type { AttributeType } from '../index.svelte.ts';
+    import { getAttributeType, getRelativePositionMeta, getSliderMeta } from '../index.svelte.ts';
+
     let {
         prefix,
         model,
@@ -11,25 +14,18 @@
     }: {
         prefix: string;
         model: { data: Record<string, any> };
-        attributes: Record<string, string | { type: string; min: number; max: number; default: number } | { type: string; target: string }>;
+        attributes: Record<string, AttributeType>;
         onValueChange: (attrName: string, value: string | number | boolean) => void;
         onSetPosition: (attrName: string, axis: 0 | 1, newVal: number) => void;
         isPickerActive: (attrName: string) => boolean;
         onPickPosition: (attrName: string) => void;
         isDepReady?: (attrName: string) => boolean;
     } = $props();
-
-    function getTypeName(at: string | { type: string; min: number; max: number; default: number } | { type: string; target: string }): string {
-        return typeof at === 'string' ? at : at.type;
-    }
-
-    function getTarget(at: { type: string; target: string } | string | { type: string; min: number; max: number; default: number }): string | null {
-        return typeof at === 'object' && 'target' in at ? at.target : null;
-    }
 </script>
 
 {#each Object.entries(attributes) as [attrName, expectedType]}
-    {@const typeName = getTypeName(expectedType)}
+    {@const typeName = getAttributeType(expectedType)}
+    {@const sliderMeta = getSliderMeta(expectedType)}
     {#if typeName === 'string' || typeName === 'number'}
         <div class="form-group">
             <label for="{prefix}-attr-{attrName}">{attrName} ({typeName})</label>
@@ -55,10 +51,10 @@
             <input
                 id="{prefix}-slider-{attrName}"
                 type="range"
-                min={typeof expectedType !== 'string' && 'min' in expectedType ? expectedType.min : 0}
-                max={typeof expectedType !== 'string' && 'min' in expectedType ? expectedType.max : 100}
+                min={sliderMeta ? sliderMeta.min : 0}
+                max={sliderMeta ? sliderMeta.max : 100}
                 step="1"
-                value={model.data[attrName] !== undefined ? model.data[attrName] : 0}
+                value={model.data[attrName] !== undefined ? model.data[attrName] : (sliderMeta ? sliderMeta.default : 0)}
                 oninput={(e) => {
                     const parsed = parseFloat((e.currentTarget as HTMLInputElement).value);
                     if (!Number.isNaN(parsed)) onValueChange(attrName, parsed);
@@ -104,7 +100,7 @@
         </div>
     {:else if typeName === 'relativePosition'}
         <div class="form-group">
-            <label for="{prefix}-rpos-{attrName}-x">{attrName} (dx, dy) <span style="font-size:0.75em;color:#888;">rel. {getTarget(expectedType)}</span></label>
+            <label for="{prefix}-rpos-{attrName}-x">{attrName} (dx, dy) <span style="font-size:0.75em;color:#888;">rel. {getRelativePositionMeta(expectedType)?.target}</span></label>
             <div class="position">
                 <input
                     id="{prefix}-rpos-{attrName}-x"

@@ -35,6 +35,24 @@ export interface SortDefinition {
     initContext?: (context: D3Context) => void;
 }
 
+/**
+ * Fill in the declared `default` of every slider attribute missing from `data`.
+ * Only sliders carry a default in their type, so other absent attributes are
+ * left absent and still rejected by `newArtefact`. Copy-on-write: `data` is
+ * returned untouched when nothing needs filling, and is never mutated.
+ */
+export function withSliderDefaults(sortDef: SortDefinition, data: Record<string, any>): Record<string, any> {
+    let filled: Record<string, any> | null = null;
+    for (const [attrName, attrType] of Object.entries(sortDef.attributes)) {
+        if (data[attrName] !== undefined) continue;
+        const meta = getSliderMeta(attrType);
+        if (!meta) continue;
+        if (!filled) filled = { ...data };
+        filled[attrName] = meta.default;
+    }
+    return filled ?? data;
+}
+
 export class Layer {
     public id: string;
     public name = $state<string>('');
@@ -896,6 +914,9 @@ export class Drawing {
             throw new Error(`Consistency Check Failed: Sort '${sortName}' is not defined.`);
         }
 
+        // A slider left out of `data` falls back to its declared default.
+        const resolvedData = withSliderDefaults(sortDef, data);
+
         const targetLayerId = layerId || (this.layers.size > 0 ? Array.from(this.layers.keys())[0] : "root");
         if (!this.layers.has(targetLayerId)) {
             throw new Error(`Consistency Check Failed: Layer '${targetLayerId}' does not exist.`);
@@ -930,7 +951,7 @@ export class Drawing {
 
         // 2. Validate Data Attributes (Strict Check)
         for (const [attrName, attrType] of Object.entries(sortDef.attributes)) {
-            const value = data[attrName];
+            const value = resolvedData[attrName];
             if (value === undefined) {
                 throw new Error(`Consistency Check Failed: Missing data attribute '${attrName}' for artefact of sort '${sortName}'.`);
             }
@@ -948,17 +969,17 @@ export class Drawing {
         }
 
         // Check for unexpected properties
-        for (const key of Object.keys(data)) {
+        for (const key of Object.keys(resolvedData)) {
             if (key === "label") {
-                if (typeof data[key] !== "string") {
-                    throw new Error(`Consistency Check Failed: Data attribute 'label' expected to be 'string', but got '${typeof data[key]}'.`);
+                if (typeof resolvedData[key] !== "string") {
+                    throw new Error(`Consistency Check Failed: Data attribute 'label' expected to be 'string', but got '${typeof resolvedData[key]}'.`);
                 }
             } else if (sortDef.attributes[key] === undefined) {
                 throw new Error(`Consistency Check Failed: Unexpected data attribute '${key}' provided for sort '${sortName}'.`);
             }
         }
 
-        const artefact = new Artefact(this.mintId(), sortName, { ...dependencies }, data, sortDef.drawFunction, targetLayerId);
+        const artefact = new Artefact(this.mintId(), sortName, { ...dependencies }, resolvedData, sortDef.drawFunction, targetLayerId);
         this.artefacts.push(artefact);
         
         return artefact;
@@ -1130,7 +1151,9 @@ export class Drawing {
             if (!sortDef) {
                 throw new Error(`Consistency Check Failed: Sort '${sortName}' is not defined.`);
             }
-            art = new Artefact(id, sortName, { ...dependencies }, data, sortDef.drawFunction, layerId);
+            // A slider absent from a persisted artefact (e.g. saved before the
+            // sort declared it) falls back to its default rather than loading undefined.
+            art = new Artefact(id, sortName, { ...dependencies }, withSliderDefaults(sortDef, data), sortDef.drawFunction, layerId);
         }
         this.artefacts.push(art);
         return art;
