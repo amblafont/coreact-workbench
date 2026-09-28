@@ -69,6 +69,32 @@ function edgeMidpoint(srcPos: number[], tgtPos: number[], bend: number, width: n
     return [midX, midY];
 }
 
+// Offset a quadratic Bézier sideways by d (signed), so that both ends of the
+// new curve stay square to the original curve's direction at that end.
+// u0/u1 are the unit tangents of the source curve at t=0 and t=1.
+function offsetQuadratic(
+    startX: number, startY: number, cx: number, cy: number, endX: number, endY: number,
+    u0x: number, u0y: number, u1x: number, u1y: number, d: number
+): { startX: number; startY: number; cx: number; cy: number; endX: number; endY: number } {
+    // Normals to the tangents, pointing to the same side of the curve
+    const n0x = -u0y, n0y = u0x;
+    const n1x = -u1y, n1y = u1x;
+
+    // The offset ends are start + d*n0 and end + d*n1. Moving the control
+    // point to where the two shifted tangent lines cross keeps the curve
+    // parallel to the source curve: v = k*(n0 + n1) with v.n0 = v.n1 = d.
+    const denom = 1 + n0x * n1x + n0y * n1y;
+    const k = denom > 1e-3 ? d / denom : 0;
+    const vx = k * (n0x + n1x);
+    const vy = k * (n0y + n1y);
+
+    return {
+        startX: startX + n0x * d, startY: startY + n0y * d,
+        cx: cx + vx, cy: cy + vy,
+        endX: endX + n1x * d, endY: endY + n1y * d
+    };
+}
+
 {
     sortStore
         .newSort(
@@ -167,8 +193,15 @@ function edgeMidpoint(srcPos: number[], tgtPos: number[], bend: number, width: n
                 if (data.isId) {
                     const doubleOffset = 3;
                     for (const side of [-1, 1]) {
+                        // Offset the tail-to-tip curve sideways along its own
+                        // end normals, so both lines stay square to the
+                        // vertex at the tail and to the arrow tip.
+                        const o = offsetQuadratic(
+                            startX, startY, cx, cy, tipX, tipY,
+                            ux0, uy0, ux1, uy1, doubleOffset * side
+                        );
                         lineGroup.append("path")
-                            .attr("d", `M ${startX + nx * doubleOffset * side},${startY + ny * doubleOffset * side} Q ${cx + nx * doubleOffset * side},${cy + ny * doubleOffset * side} ${tipX + nx * doubleOffset * side},${tipY + ny * doubleOffset * side}`)
+                            .attr("d", `M ${o.startX},${o.startY} Q ${o.cx},${o.cy} ${o.endX},${o.endY}`)
                             .attr("fill", "none")
                             .attr("stroke", "#999")
                             .attr("stroke-width", data.width);
@@ -300,27 +333,35 @@ function edgeMidpoint(srcPos: number[], tgtPos: number[], bend: number, width: n
                 const offset = 6;
                 const startGap = 24; // Clear the r=20 vertex circle
 
-                const group = context.append("g");
-
                 // Single open chevron (hat) at the tip
                 const hatWidth = 10;
                 const hatLength = 10;
+
+                // The two lines end on the hat's corner edges
+                const lineEndOffset = hatLength * (offset / hatWidth);
+                const lineStartX = startPos[0] + ux0 * startGap;
+                const lineStartY = startPos[1] + uy0 * startGap;
+                const lineEndX = midX - ux * lineEndOffset;
+                const lineEndY = midY - uy * lineEndOffset;
+
+                const group = context.append("g");
+
                 const w1X = midX - ux * hatLength - px * hatWidth;
                 const w1Y = midY - uy * hatLength - py * hatWidth;
                 const w2X = midX - ux * hatLength + px * hatWidth;
                 const w2Y = midY - uy * hatLength + py * hatWidth;
 
                 for (const side of [-1, 1]) {
-                    const startX = startPos[0] + ux0 * startGap + nx * offset * side;
-                    const startY = startPos[1] + uy0 * startGap + ny * offset * side;
-                    const ctrlX = cx + nx * offset * side;
-                    const ctrlY = cy + ny * offset * side;
-                    const lineEndOffset = hatLength * (offset / hatWidth);
-                    const endX = midX - ux * lineEndOffset + nx * offset * side;
-                    const endY = midY - uy * lineEndOffset + ny * offset * side;
+                    // Offset sideways along the curve's own end normals, so
+                    // both lines start at equal distance from the node and end
+                    // exactly on the hat's corner edges.
+                    const o = offsetQuadratic(
+                        lineStartX, lineStartY, cx, cy, lineEndX, lineEndY,
+                        ux0, uy0, ux, uy, offset * side
+                    );
 
                     group.append("path")
-                        .attr("d", `M ${startX},${startY} Q ${ctrlX},${ctrlY} ${endX},${endY}`)
+                        .attr("d", `M ${o.startX},${o.startY} Q ${o.cx},${o.cy} ${o.endX},${o.endY}`)
                         .attr("fill", "none")
                         .attr("stroke", "#8e44ad")
                         .attr("stroke-width", 2);
@@ -373,6 +414,12 @@ function edgeMidpoint(srcPos: number[], tgtPos: number[], bend: number, width: n
                 const cx = mx + bend * nx;
                 const cy = my + bend * ny;
 
+                // Start tangent at t=0, for offsetting the two lines
+                let ux0 = cx - a[0], uy0 = cy - a[1];
+                const u0Len = Math.hypot(ux0, uy0);
+                ux0 = u0Len > 0 ? ux0 / u0Len : (len > 0 ? dx / len : 1);
+                uy0 = u0Len > 0 ? uy0 / u0Len : (len > 0 ? dy / len : 0);
+
                 // End tangent at t=1, for orienting the chevron hat
                 let ux = b[0] - cx, uy = b[1] - cy;
                 const uLen = Math.hypot(ux, uy);
@@ -386,7 +433,11 @@ function edgeMidpoint(srcPos: number[], tgtPos: number[], bend: number, width: n
                 const offset = 6;
                 const hatWidth = 10;
                 const hatLength = 10;
+
+                // The two lines end on the hat's corner edges
                 const lineEndOffset = hatLength * (offset / hatWidth);
+                const lineEndX = b[0] - ux * lineEndOffset;
+                const lineEndY = b[1] - uy * lineEndOffset;
 
                 const w1X = b[0] - ux * hatLength - px * hatWidth;
                 const w1Y = b[1] - uy * hatLength - py * hatWidth;
@@ -396,15 +447,16 @@ function edgeMidpoint(srcPos: number[], tgtPos: number[], bend: number, width: n
                 const group = context.append("g");
 
                 for (const side of [-1, 1]) {
-                    const startX = a[0] + nx * offset * side;
-                    const startY = a[1] + ny * offset * side;
-                    const ctrlX = cx + nx * offset * side;
-                    const ctrlY = cy + ny * offset * side;
-                    const endX = b[0] - ux * lineEndOffset + nx * offset * side;
-                    const endY = b[1] - uy * lineEndOffset + ny * offset * side;
+                    // Offset sideways along the curve's own end normals, so
+                    // both lines start at equal distance from a and end
+                    // exactly on the hat's corner edges.
+                    const o = offsetQuadratic(
+                        a[0], a[1], cx, cy, lineEndX, lineEndY,
+                        ux0, uy0, ux, uy, offset * side
+                    );
 
                     group.append("path")
-                        .attr("d", `M ${startX},${startY} Q ${ctrlX},${ctrlY} ${endX},${endY}`)
+                        .attr("d", `M ${o.startX},${o.startY} Q ${o.cx},${o.cy} ${o.endX},${o.endY}`)
                         .attr("fill", "none")
                         .attr("stroke", "#8e44ad")
                         .attr("stroke-width", 2);
