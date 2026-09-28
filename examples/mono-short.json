@@ -142,7 +142,8 @@
             "o": "art_6"
           },
           "data": {
-            "label": "fm"
+            "label": "fm",
+            "bend": 62
           }
         },
         {
@@ -155,7 +156,8 @@
             "o": "art_6"
           },
           "data": {
-            "label": "gm"
+            "label": "gm",
+            "bend": -58
           }
         },
         {
@@ -179,7 +181,8 @@
         }
       ],
       "isRule": true,
-      "isFirstOrder": false
+      "isFirstOrder": false,
+      "proved": false
     },
     {
       "name": "Assoc",
@@ -319,7 +322,9 @@
             "2": "art_5",
             "o": "art_7"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_9",
@@ -344,7 +349,9 @@
             "2": "art_6",
             "o": "art_9"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_11",
@@ -369,7 +376,9 @@
             "2": "art_6",
             "o": "art_11"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_13",
@@ -394,7 +403,9 @@
             "2": "art_11",
             "o": "art_13"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_15",
@@ -408,7 +419,8 @@
         }
       ],
       "isRule": true,
-      "isFirstOrder": true
+      "isFirstOrder": true,
+      "proved": false
     },
     {
       "name": "Comp",
@@ -521,7 +533,9 @@
             "2": "art_4",
             "o": "art_5"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         }
       ],
       "isRule": true,
@@ -662,7 +676,8 @@
             "o": "art_7"
           },
           "data": {
-            "label": "fm"
+            "label": "fm",
+            "bend": 0
           }
         },
         {
@@ -675,7 +690,8 @@
             "o": "art_7"
           },
           "data": {
-            "label": "gm"
+            "label": "gm",
+            "bend": 0
           }
         },
         {
@@ -804,7 +820,9 @@
             "2": "art_4",
             "o": "art_5"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_7",
