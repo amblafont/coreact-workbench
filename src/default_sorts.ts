@@ -251,7 +251,7 @@ function edgeMidpoint(srcPos: number[], tgtPos: number[], bend: number, width: n
         .newSort(
             "Triangle",
             { "1": "Edge", "2": "Edge", o: "Edge" },
-            {},
+            { bend: BEND_ATTR },
             (data: any, context: import('./types').D3Context) => {
                 // A triangle is composed of three edges: "1", "2", and "o".
                 // Draw it like a 2-cell: a double arrow from the target of edge
@@ -266,14 +266,34 @@ function edgeMidpoint(srcPos: number[], tgtPos: number[], bend: number, width: n
                 const oWidth = typeof data["o"].width === "number" ? data["o"].width : 2;
                 const [midX, midY] = edgeMidpoint(oSrcPos, oTgtPos, oBend, oWidth, !!data["o"].isMono);
 
-                // Unit direction from the target of edge "1" to the middle of edge "o"
-                const vx = midX - startPos[0];
-                const vy = midY - startPos[1];
-                const vLen = Math.sqrt(vx * vx + vy * vy);
-                const ux = vLen > 0 ? vx / vLen : 1;
-                const uy = vLen > 0 ? vy / vLen : 0;
+                const bend = typeof data.bend === "number" ? data.bend : 0;
 
-                // Perpendicular unit vector for offsetting the two arrow lines
+                // Chord from the target of edge "1" to the middle of edge "o"
+                const dx = midX - startPos[0];
+                const dy = midY - startPos[1];
+                const len = Math.sqrt(dx * dx + dy * dy);
+
+                // Perpendicular unit vector to the chord
+                const nx = len > 0 ? -dy / len : 0;
+                const ny = len > 0 ? dx / len : 0;
+
+                // Control point for the bent double arrow
+                const cx = (startPos[0] + midX) / 2 + bend * nx;
+                const cy = (startPos[1] + midY) / 2 + bend * ny;
+
+                // Initial tangent at t=0, for clearing the source vertex
+                let ux0 = cx - startPos[0], uy0 = cy - startPos[1];
+                const u0Len = Math.hypot(ux0, uy0);
+                ux0 = u0Len > 0 ? ux0 / u0Len : (len > 0 ? dx / len : 1);
+                uy0 = u0Len > 0 ? uy0 / u0Len : (len > 0 ? dy / len : 0);
+
+                // Final tangent at t=1, for orienting the chevron hat
+                let ux = midX - cx, uy = midY - cy;
+                const uLen = Math.hypot(ux, uy);
+                ux = uLen > 0 ? ux / uLen : (len > 0 ? dx / len : 1);
+                uy = uLen > 0 ? uy / uLen : (len > 0 ? dy / len : 0);
+
+                // Perpendicular to the final tangent
                 const px = -uy;
                 const py = ux;
 
@@ -291,14 +311,16 @@ function edgeMidpoint(srcPos: number[], tgtPos: number[], bend: number, width: n
                 const w2Y = midY - uy * hatLength + py * hatWidth;
 
                 for (const side of [-1, 1]) {
-                    const startX = startPos[0] + ux * startGap + px * offset * side;
-                    const startY = startPos[1] + uy * startGap + py * offset * side;
+                    const startX = startPos[0] + ux0 * startGap + nx * offset * side;
+                    const startY = startPos[1] + uy0 * startGap + ny * offset * side;
+                    const ctrlX = cx + nx * offset * side;
+                    const ctrlY = cy + ny * offset * side;
                     const lineEndOffset = hatLength * (offset / hatWidth);
-                    const endX = midX - ux * lineEndOffset + px * offset * side;
-                    const endY = midY - uy * lineEndOffset + py * offset * side;
+                    const endX = midX - ux * lineEndOffset + nx * offset * side;
+                    const endY = midY - uy * lineEndOffset + ny * offset * side;
 
                     group.append("path")
-                        .attr("d", `M ${startX},${startY} L ${endX},${endY}`)
+                        .attr("d", `M ${startX},${startY} Q ${ctrlX},${ctrlY} ${endX},${endY}`)
                         .attr("fill", "none")
                         .attr("stroke", "#8e44ad")
                         .attr("stroke-width", 2);
