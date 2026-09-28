@@ -1,0 +1,158 @@
+{
+  "drawings": [
+    {
+      "name": "rule",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        },
+        {
+          "id": "layer-mulitmgl",
+          "name": "Child of Root Layer",
+          "parentId": "root",
+          "color": "#9ce96a",
+          "colorEnabled": true,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "a1",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              164,
+              377
+            ]
+          }
+        },
+        {
+          "id": "a2",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              352,
+              362
+            ]
+          }
+        },
+        {
+          "id": "a3",
+          "sortName": "Edge",
+          "layerId": "layer-mulitmgl",
+          "dependencies": {
+            "source": "a1",
+            "target": "a2"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0
+          }
+        },
+        {
+          "id": "a4",
+          "sortName": "Equality",
+          "layerId": "layer-mulitmgl",
+          "dependencies": {
+            "0": "a1",
+            "1": "a2"
+          },
+          "data": {}
+        },
+        {
+          "id": "a5",
+          "sortName": "isId",
+          "layerId": "layer-mulitmgl",
+          "dependencies": {
+            "arrow": "a3"
+          },
+          "data": {}
+        }
+      ],
+      "isRule": true,
+      "isFirstOrder": true,
+      "proved": false
+    },
+    {
+      "name": "test",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        },
+        {
+          "id": "layer-mulium5g",
+          "name": "Child of Root Layer",
+          "parentId": "root",
+          "color": "#68d797",
+          "colorEnabled": true,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "a1",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              273,
+              322
+            ]
+          }
+        },
+        {
+          "id": "a2",
+          "sortName": "Vertex",
+          "layerId": "layer-mulium5g",
+          "dependencies": {},
+          "data": {
+            "position": [
+              325,
+              378
+            ]
+          }
+        },
+        {
+          "id": "a3",
+          "sortName": "Edge",
+          "layerId": "layer-mulium5g",
+          "dependencies": {
+            "source": "a1",
+            "target": "a2"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0
+          }
+        },
+        {
+          "id": "a4",
+          "sortName": "isId",
+          "layerId": "layer-mulium5g",
+          "dependencies": {
+            "arrow": "a3"
+          },
+          "data": {}
+        }
+      ],
+      "isRule": false,
+      "isFirstOrder": false,
+      "proved": false
+    }
+  ]
+}

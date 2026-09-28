@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { exportDrawingsToRocq, ruleParamBaseName } from '../rocq_export';
 import { RocqRecorder } from '../rocq_recording.svelte.ts';
-import { Drawing, DrawingStore, findFirstOrderRuleApplications, applyFirstOrderRule, findSecondOrderRuleApplications, applySecondOrderRule, getFirstOrderStatementChildLayer } from '../index.svelte.ts';
+import { Drawing, DrawingStore, findFirstOrderRuleApplications, applyFirstOrderRule, findSecondOrderRuleApplications, applySecondOrderRule, filterNoProgressRuleApplications, getFirstOrderStatementChildLayer } from '../index.svelte.ts';
 import { newSortStore, makeVertex, makeEdge, makeDrawing, buildComposableHost, buildIsMonoInChildLayerRule, buildIsMonoOnlyConclusionRule, buildSecondOrderRule } from './helpers';
 
 describe('rocq export', () => {
@@ -140,7 +140,11 @@ describe('rocq export', () => {
         const script = recorder.stop();
 
         expect(script).toContain('@EqConclusionRule_rule a b');
-        expect(script).toContain('as eq_a_b');
+        // A conclusion equality is masked as `_`: `destruct_sigma` runs
+        // `subst_all ()` after the destruct, so the name would never survive as
+        // a hypothesis anyway.
+        expect(script).toContain('destruct_sigma (@EqConclusionRule_rule a b) as _.');
+        expect(script).not.toContain('as eq_a_b');
     });
 
     it('applies a second-order rule with a single non-equality conclusion', () => {
@@ -444,6 +448,138 @@ describe('rocq export', () => {
         const code = exportDrawingsToRocq(store.getAllDrawings(), sortStore);
         expect(code).toContain('Parameter SigmaEqRule_rule : forall (x y : Vertex), Σ (eq_x_y : x = y),');
         expect(code).toContain('Edge x y');
+    });
+
+    // `destruct_sigma` runs `subst_all ()` right after each `destruct`, so an
+    // equality binder never survives as a named hypothesis: emit `_` instead of
+    // the host equality name.
+    it('masks a trailing conclusion equality as _ in destruct_sigma', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+
+        const host = new Drawing(sortStore);
+        const ha = makeVertex(host, 'a');
+        const hb = makeVertex(host, 'b');
+        makeEdge(host, 'g', ha, hb);
+        host.newEqualityArtefact([ha, hb], 'root');
+        store.addDrawing('MainDrawing', host);
+
+        const rule = new Drawing(sortStore);
+        const rx = makeVertex(rule, 'x');
+        const ry = makeVertex(rule, 'y');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        makeEdge(rule, 'f', rx, ry, 'conclusion');
+        rule.newEqualityArtefact([rx, ry], 'conclusion');
+        rule.setIsRule(true);
+        store.addDrawing('TrailingEqRule', rule);
+
+        const recorder = new RocqRecorder();
+        recorder.start(host, 'MainDrawing', sortStore);
+        const apps = findFirstOrderRuleApplications(rule, host, { flexible: true });
+        expect(apps.length).toBe(1);
+        const created = applyFirstOrderRule(rule, host, apps[0]);
+        recorder.recordRuleApply(rule, 'TrailingEqRule', apps[0], host, created, 'MainDrawing', sortStore);
+        const script = recorder.stop();
+
+        expect(script).toContain('destruct_sigma (@TrailingEqRule_rule a b) as f _.');
+        expect(script).not.toContain('as f eq_');
+    });
+
+    it('masks a leading conclusion equality in the assert-then-destruct_sigma form', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+
+        const host = new Drawing(sortStore);
+        makeVertex(host, 'a');
+        makeVertex(host, 'b');
+        store.addDrawing('MainDrawing', host);
+
+        const rule = new Drawing(sortStore);
+        const rx = makeVertex(rule, 'x');
+        const ry = makeVertex(rule, 'y');
+        rule.addLayer('premise-1', 'Premise', 'root');
+        makeEdge(rule, 'pe', rx, ry, 'premise-1');
+        rule.addLayer('premise-1-child', 'Premise Child', 'premise-1');
+        makeEdge(rule, 'pce', rx, ry, 'premise-1-child');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        rule.newEqualityArtefact([rx, ry], 'conclusion');
+        makeEdge(rule, 'ce', rx, ry, 'conclusion');
+        rule.setIsRule(true);
+        store.addDrawing('EqFirstConclusion', rule);
+
+        const recorder = new RocqRecorder();
+        recorder.start(host, 'MainDrawing', sortStore);
+        const apps = findSecondOrderRuleApplications(rule, host);
+        expect(apps.length).toBeGreaterThan(0);
+        const result = applySecondOrderRule(rule, host, apps[0], { hostName: 'MainDrawing', ruleName: 'EqFirstConclusion' });
+        recorder.recordRuleApply(rule, 'EqFirstConclusion', apps[0], host, { artefacts: result.hostArtefacts, created: result.hostCreated, derived: result.derivedRules }, 'MainDrawing', sortStore);
+        const script = recorder.stop();
+
+        // Arity > 1 with premises: the term has an arrow type, so it is asserted
+        // under a real name first. The `as` list masks the equality, the trailing
+        // artefact keeps its host name.
+        expect(script).toMatch(/assert \(\w+ := @EqFirstConclusion_rule [^)]*\); destruct_sigma \w+ as _ ce\./);
+        expect(script).not.toContain('as eq_');
+    });
+
+    it('records a rule whose first conclusion equality collapsed onto one host artefact', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+
+        // Two distinct host Triangles whose `1`/`2` deps are provably equal
+        // (mirrors bug4's a23/a24) and whose `o` edge is literally the same
+        // artefact, so a flexible match can send the two rule Triangles to the
+        // two host Triangles while `f` and `g` both land on that shared edge.
+        const host = makeDrawing();
+        const hx = makeVertex(host, 'x');
+        const hy = makeVertex(host, 'y');
+        const hz = makeVertex(host, 'z');
+        const ho = makeEdge(host, 'o', hx, hz);
+        const hu1 = makeEdge(host, 'u1', hx, hy);
+        const hu2 = makeEdge(host, 'u2', hx, hy);
+        const hv1 = makeEdge(host, 'v1', hy, hz);
+        const hv2 = makeEdge(host, 'v2', hy, hz);
+        host.newArtefact('Triangle', { '1': hu1, '2': hv1, o: ho }, {}, 'root');
+        host.newArtefact('Triangle', { '1': hu2, '2': hv2, o: ho }, {}, 'root');
+        host.newEqualityArtefact([hu1, hu2], 'root');
+        host.newEqualityArtefact([hv1, hv2], 'root');
+        store.addDrawing('MainDrawing', host);
+
+        const rule = makeDrawing();
+        const rx = makeVertex(rule, 'x');
+        const ry = makeVertex(rule, 'y');
+        const rz = makeVertex(rule, 'z');
+        const re1 = makeEdge(rule, 'e1', rx, ry);
+        const re2 = makeEdge(rule, 'e2', ry, rz);
+        const rf = makeEdge(rule, 'f', rx, rz);
+        const rg = makeEdge(rule, 'g', rx, rz);
+        const rfo = rule.newArtefact('Triangle', { '1': re1, '2': re2, o: rf }, {}, 'root');
+        const rgo = rule.newArtefact('Triangle', { '1': re1, '2': re2, o: rg }, {}, 'root');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        rule.newEqualityArtefact([rf, rg], 'conclusion');
+        rule.newEqualityArtefact([rfo, rgo], 'conclusion');
+        rule.setIsRule(true);
+        store.addDrawing('SharedBase', rule);
+
+        const apps = findFirstOrderRuleApplications(rule, host, { injective: false, flexible: true });
+        // The cross match: the two Triangles land on the two different host
+        // Triangles, so the `fo = go` equality still makes progress, while
+        // `f` and `g` both land on the shared `o` edge.
+        const cross = apps.find(app => app.matchedArtefacts.get(rgo) !== app.matchedArtefacts.get(rfo));
+        expect(cross).toBeDefined();
+        expect(filterNoProgressRuleApplications(rule, host, [cross!]).length).toBe(1);
+
+        const result = applyFirstOrderRule(rule, host, cross!);
+        expect(result.created.has(rule.getArtefacts().find(a => a.sortName === "Equality" && a.dependencies['0'] === rf)!)).toBe(false);
+
+        const recorder = new RocqRecorder();
+        recorder.start(host, 'MainDrawing', sortStore);
+        expect(() => recorder.recordRuleApply(rule, 'SharedBase', cross!, host, result, 'MainDrawing', sortStore)).not.toThrow();
+        const script = recorder.stop();
+
+        // Both conclusion elements are equalities, so both binders are masked
+        // and the collapsed one needs no name of its own.
+        expect(script).toMatch(/destruct_sigma \(@SharedBase_rule [^)]*\) as _ _\./);
     });
 
     it('exports a rule with a three-artefact root equality as separate equality binders', () => {

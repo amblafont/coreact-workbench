@@ -15,6 +15,7 @@ import {
     filterNoProgressRuleApplications,
     filterSolvesGoalRuleApplications,
     getFirstOrderStatementChildLayer,
+    isEqualityRule,
     computeProved,
     type SortDefinition,
     type Layer,
@@ -147,7 +148,8 @@ export const ui = $state({
     filterNoProgressMatches: true,
     filterInjectiveMatches: true,
     filterFlexibleMatches: false,
-    filterSolvesGoalMatches: false
+    filterSolvesGoalMatches: false,
+    autoApplyEqualityRules: false
 });
 
 // ---------------------------------------------------------------------------
@@ -1557,6 +1559,13 @@ export function toggleFilterSolvesGoalMatches(): void {
     ui.filterSolvesGoalMatches = !ui.filterSolvesGoalMatches;
 }
 
+export function toggleAutoApplyEqualityRules(): void {
+    ui.autoApplyEqualityRules = !ui.autoApplyEqualityRules;
+    if (ui.autoApplyEqualityRules) {
+        runEqualityRuleAutoApply();
+    }
+}
+
 export function solvesGoalFilterApplicable(): boolean {
     return getFirstOrderStatementChildLayer(drawing) !== null;
 }
@@ -1569,13 +1578,19 @@ export interface RuleAppEntry {
     name: string;
     drawing: Drawing;
     isFirstOrder: boolean;
+    isEqualityRule: boolean;
     applications: RuleApplication[];
     hiddenRedundant: number;
     hiddenNoProgress: number;
     hiddenSolvesGoal: number;
 }
 
-export function computeRuleMatches(): RuleAppEntry[] {
+/**
+ * Matching options default to the panel's 'Injective match' / 'Flexible match'
+ * checkboxes. The auto-apply pass passes its own options instead (see
+ * `AUTO_APPLY_MATCH_OPTIONS`).
+ */
+export function computeRuleMatches(matchOptions?: MatchOptions): RuleAppEntry[] {
     // Tracked structural guard: the matcher below runs under `untrack`, so this
     // derived still invalidates when the host drawing changes. We deliberately
     // read each artefact's reactive fields (membership, sort, layer, dependency
@@ -1589,25 +1604,25 @@ export function computeRuleMatches(): RuleAppEntry[] {
     void hostGuard;
     void drawing.getAllLayers();
 
+    const options: MatchOptions = matchOptions ?? {
+        injective: ui.filterInjectiveMatches,
+        flexible: ui.filterFlexibleMatches
+    };
     const entries: RuleAppEntry[] = [];
     for (const entry of drawingStore.getAllDrawings()) {
         const ruleDrawing = entry.drawing;
         if (!ruleDrawing.isRule) continue;
         let applications: RuleApplication[];
-        const matchOptions: MatchOptions = {
-            injective: ui.filterInjectiveMatches,
-            flexible: ui.filterFlexibleMatches
-        };
         const isFirstOrder = drawingStore.checkIsFirstOrder(ruleDrawing);
         try {
             applications = untrack(() => isFirstOrder
-                ? findFirstOrderRuleApplications(ruleDrawing, drawing, matchOptions)
-                : findSecondOrderRuleApplications(ruleDrawing, drawing, matchOptions));
+                ? findFirstOrderRuleApplications(ruleDrawing, drawing, options)
+                : findSecondOrderRuleApplications(ruleDrawing, drawing, options));
         } catch {
             continue;
         }
 
-        entries.push({ name: entry.name, drawing: ruleDrawing, isFirstOrder, applications, hiddenRedundant: 0, hiddenNoProgress: 0, hiddenSolvesGoal: 0 });
+        entries.push({ name: entry.name, drawing: ruleDrawing, isFirstOrder, isEqualityRule: isFirstOrder && isEqualityRule(ruleDrawing), applications, hiddenRedundant: 0, hiddenNoProgress: 0, hiddenSolvesGoal: 0 });
     }
     return entries;
 }
@@ -1638,7 +1653,7 @@ export function applyRuleFilters(entries: RuleAppEntry[]): RuleAppEntry[] {
             hiddenSolvesGoal = total - applications.length;
         }
 
-        return { name, drawing: ruleDrawing, isFirstOrder: entry.isFirstOrder, applications, hiddenRedundant, hiddenNoProgress, hiddenSolvesGoal };
+        return { name, drawing: ruleDrawing, isFirstOrder: entry.isFirstOrder, isEqualityRule: entry.isEqualityRule, applications, hiddenRedundant, hiddenNoProgress, hiddenSolvesGoal };
     });
 }
 
@@ -1646,22 +1661,127 @@ export function computeRuleApplications(): RuleAppEntry[] {
     return applyRuleFilters(computeRuleMatches());
 }
 
+// ---------------------------------------------------------------------------
+// Auto-applying equality rules
+// ---------------------------------------------------------------------------
+
+// Re-entrancy guard: the pass below drives the application code, which triggers
+// the pass again on success. Without the guard every nested application would
+// start its own pass over the host.
+let equalityAutoApplyRunning = false;
+
+// Auto-apply matches equality rules as if 'Filter no-progress matches' and
+// 'Flexible match' were on and 'Injective match' were off, whatever the panel
+// shows: an equality rule only ever asserts equalities, so every match that is
+// not already provable is worth applying, and matching up to provable equality
+// without injectivity collapses the applications that would assert the very
+// same thing. Dropping injectivity can only make an application degenerate (two
+// children of the asserted equality collapse onto one host artefact), and such
+// an application asserts nothing new, so the no-progress filter below removes it
+// before it is applied.
+const AUTO_APPLY_MATCH_OPTIONS: MatchOptions = { injective: false, flexible: true };
+
+/**
+ * Applies the first equality rule that still has an application which asserts
+ * something new, and returns the name of the rule that was applied, or null if
+ * no equality rule applies anymore (or the application failed and left the host
+ * unchanged, in which case the very same application would be selected again).
+ */
+function applyNextEqualityRule(): string | null {
+    // Raw matches: the redundant and solves-the-goal filters are panel settings
+    // and do not restrict what auto-apply does. The no-progress filter is applied
+    // here below regardless of its checkbox, since an application that asserts
+    // nothing new would otherwise be selected again on every iteration and the
+    // pass would never reach a fixpoint.
+    for (const entry of computeRuleMatches(AUTO_APPLY_MATCH_OPTIONS)) {
+        if (!entry.isEqualityRule) continue;
+        const next = untrack(() => filterNoProgressRuleApplications(entry.drawing, drawing, entry.applications))
+            .find(app => app.matchedArtefacts.size > 0);
+        if (!next) continue;
+
+        // A failed application leaves the host untouched, so the very same
+        // application would be selected again; stop instead of looping. Note that
+        // a successful application may add no artefact at all, when it merges
+        // into an existing equality, so success cannot be read off the host.
+        return applyRuleEntry(entry, next) ? entry.name : null;
+    }
+    return null;
+}
+
+/**
+ * Summarises a pass: one line per rule, in the order the rules were first
+ * applied, with a count for the rules applied more than once.
+ */
+function formatEqualityAutoApplyToast(appliedNames: string[]): string {
+    const counts = new Map<string, number>();
+    for (const name of appliedNames) counts.set(name, (counts.get(name) ?? 0) + 1);
+    const total = appliedNames.length;
+    const header = total === 1
+        ? 'Auto-applied 1 equality rule application:'
+        : `Auto-applied ${total} equality rule applications:`;
+    const lines = [...counts].map(([name, count]) => `- ${name}${count > 1 ? ` (×${count})` : ''}`);
+    return `${header}\n${lines.join('\n')}`;
+}
+
+/**
+ * Applies equality rules (see `isEqualityRule`) until none of them makes
+ * progress anymore, matching them with `AUTO_APPLY_MATCH_OPTIONS`. Each
+ * iteration asserts an equality that is not already provable in the host, so
+ * every step merges two equality classes and the pass reaches a fixpoint after
+ * finitely many steps. Each pass ends with a single toast summarising what it
+ * applied.
+ */
+export function runEqualityRuleAutoApply(): void {
+    if (!ui.autoApplyEqualityRules || equalityAutoApplyRunning) return;
+    equalityAutoApplyRunning = true;
+    const appliedNames: string[] = [];
+    try {
+        for (;;) {
+            const name = applyNextEqualityRule();
+            if (!name) break;
+            appliedNames.push(name);
+        }
+    } finally {
+        equalityAutoApplyRunning = false;
+    }
+    // Only the outermost pass reports: while the guard is set, the pass that
+    // applyRuleEntry triggers on every application is a no-op.
+    if (appliedNames.length > 0) {
+        pushToast('info', formatEqualityAutoApplyToast(appliedNames));
+    }
+}
+
 export function applyRuleAt(savedRuleName: string, appIndex: number): void {
     const entry = computeRuleApplications().find(e => e.name === savedRuleName);
-    if (!entry || !entry.applications[appIndex]) return;
-    const { name, drawing: ruleDrawing, applications } = entry;
-    const app = applications[appIndex];
+    const app = entry?.applications[appIndex];
+    if (!entry || !app) return;
+    applyRuleEntry(entry, app);
+}
+
+/**
+ * Applies one rule application, records it, and re-runs the auto-apply pass.
+ * Callers pass the application itself, so that the pass can apply a match the
+ * panel is not showing without going through panel indices. Reports whether the
+ * rule was actually applied: an application that only merges into an existing
+ * equality does not add an artefact, so the host's artefact count cannot be
+ * used to tell success from failure.
+ */
+function applyRuleEntry(entry: RuleAppEntry, app: RuleApplication): boolean {
+    const { name, drawing: ruleDrawing } = entry;
     const activeName = ui.activeDrawingName ?? 'Unsaved Drawing';
     const goalWasProved = computeProved(drawing);
     let applicationResult: { artefacts: Artefact[]; created: Map<Artefact, Artefact>; derivedNames?: string[]; derived?: DerivedRule[] } | null = null;
+    let applied = false;
     try {
         if (entry.isFirstOrder) {
             const result = applyFirstOrderRule(ruleDrawing, drawing, app);
             applicationResult = result;
+            applied = true;
             console.log(`Applied '${name}': added ${result.artefacts.length} artefact(s).`);
         } else {
             const result = applySecondOrderRule(ruleDrawing, drawing, app, { hostName: activeName, ruleName: name });
             applicationResult = { artefacts: result.hostArtefacts, created: result.hostCreated, derived: result.derivedRules };
+            applied = true;
             console.log(`Applied '${name}': added ${result.hostArtefacts.length} artefact(s), derived ${result.derivedRules.length} drawing(s).`);
             const createdNames: string[] = [];
             for (const derived of result.derivedRules) {
@@ -1693,6 +1813,10 @@ export function applyRuleAt(savedRuleName: string, appIndex: number): void {
     } catch (err) {
         pushToast('error', `Error applying rule '${name}':\n${(err as Error).message}`);
     }
+    if (applied) {
+        runEqualityRuleAutoApply();
+    }
+    return applied;
 }
 
 export function generateReverseRulesFor(savedRuleName: string): void {

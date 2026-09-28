@@ -2510,6 +2510,29 @@ export function getFirstOrderStatementChildLayer(drawing: Drawing): Layer | null
     return childLayers[0];
 }
 
+/**
+ * An equality rule is a first-order rule whose child layer holds only equality
+ * artefacts: applying it asserts new equalities between host artefacts and
+ * creates no other artefact. The child layer must be non-empty, so a rule with
+ * an empty conclusion is not an equality rule (applying it would be a no-op).
+ */
+export function isEqualityRule(rule: Drawing): boolean {
+    if (!rule.isRule) {
+        return false;
+    }
+    const layers = rule.getAllLayers();
+    const rootLayers = layers.filter(l => l.parentId === null);
+    if (rootLayers.length !== 1) {
+        return false;
+    }
+    const childLayers = layers.filter(l => l.parentId === rootLayers[0].id);
+    if (childLayers.length !== 1) {
+        return false;
+    }
+    const childArts = rule.getArtefacts().filter(a => a.layerId === childLayers[0].id);
+    return childArts.length > 0 && childArts.every(a => a.sortName === "Equality");
+}
+
 export function computeProved(drawing: Drawing): boolean {
     const child = getFirstOrderStatementChildLayer(drawing);
     if (!child) {

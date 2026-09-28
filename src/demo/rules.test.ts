@@ -9,6 +9,7 @@ import {
     filterRedundantRuleApplications,
     filterNoProgressRuleApplications,
     filterSolvesGoalRuleApplications,
+    isEqualityRule,
     EqualityArtefact,
     type Drawing
 } from '../index.svelte.ts';
@@ -21,6 +22,9 @@ import {
     buildIsMonoInChildLayerRule,
     buildIsMonoInRootRule,
     buildChildEqRule,
+    buildEqualityOnlyRule,
+    buildFlexibleEqualityRule,
+    buildNonInjectiveEqualityRule,
     buildSecondOrderRule,
     buildTrianglePairHost,
     buildSharedEdgeTrianglesRule
@@ -764,5 +768,116 @@ describe('label substitution in rule conclusion', () => {
         expect(vertices.length).toBe(2);
         const newVertex = vertices.find(v => v.data.label === 'copy of p');
         expect(newVertex).toBeDefined();
+    });
+});
+
+describe('equality rule classification', () => {
+    it('accepts a first-order rule whose child layer holds only equalities', () => {
+        expect(isEqualityRule(buildEqualityOnlyRule())).toBe(true);
+    });
+
+    it('rejects a first-order rule whose child layer also holds a regular artefact', () => {
+        expect(isEqualityRule(buildChildEqRule())).toBe(false);
+    });
+
+    it('rejects a first-order rule with an empty child layer', () => {
+        expect(isEqualityRule(buildSharedEdgeTrianglesRule())).toBe(false);
+    });
+
+    it('rejects a second-order rule', () => {
+        expect(isEqualityRule(buildSecondOrderRule())).toBe(false);
+    });
+
+    it('rejects a drawing that is not marked as a rule', () => {
+        const drawing = makeDrawing();
+        const v0 = makeVertex(drawing, 'v0');
+        const v1 = makeVertex(drawing, 'v1');
+        makeEdge(drawing, 'e1', v0, v1);
+        drawing.addLayer('conclusion', 'Conclusion', 'root');
+        drawing.newEqualityArtefact([v0, v1], 'conclusion');
+        expect(isEqualityRule(drawing)).toBe(false);
+    });
+
+    it('applies an equality rule to a host by asserting one equality only', () => {
+        const rule = buildEqualityOnlyRule();
+        const host = buildComposableHost().host;
+        const before = host.getArtefacts().length;
+
+        const apps = findFirstOrderRuleApplications(rule, host);
+        const created = applyFirstOrderRule(rule, host, apps[0]);
+
+        expect(created.artefacts).toHaveLength(1);
+        expect(created.artefacts[0].sortName).toBe('Equality');
+        expect(host.getArtefacts().length).toBe(before + 1);
+    });
+});
+
+describe('equality rule matching options', () => {
+    // A host with a single edge, so a three-vertex pattern only matches when
+    // injectivity is off.
+    function buildShortHost(): Drawing {
+        const host = makeDrawing();
+        const v0 = makeVertex(host, 'v0');
+        const v1 = makeVertex(host, 'v1');
+        makeEdge(host, 'e1', v0, v1);
+        return host;
+    }
+
+    it('only matches a pattern larger than the host with injectivity off', () => {
+        const rule = buildNonInjectiveEqualityRule();
+        const host = buildShortHost();
+
+        expect(findFirstOrderRuleApplications(rule, host, { injective: true })).toEqual([]);
+        expect(findFirstOrderRuleApplications(rule, host, { injective: false }).length).toBeGreaterThan(0);
+    });
+
+    it('asserts a new equality for a match that is only available without injectivity', () => {
+        const rule = buildNonInjectiveEqualityRule();
+        const host = buildShortHost();
+
+        const apps = findFirstOrderRuleApplications(rule, host, { injective: false });
+        // Without injectivity the first match often maps all three pattern
+        // vertices onto the same host vertex, which asserts nothing: such a
+        // degenerate match is what the no-progress filter is there to drop.
+        const created = applyFirstOrderRule(rule, host, filterNoProgressRuleApplications(rule, host, apps)[0]);
+
+        expect(created.artefacts).toHaveLength(1);
+        expect(created.artefacts[0].sortName).toBe('Equality');
+    });
+
+    it('only matches up to provable equality with flexible matching', () => {
+        const rule = buildFlexibleEqualityRule();
+        // h1 runs from v0 to v1, h2 from v3 to v2, and v1 is already equal to
+        // v3: h2.source is only provably the end of h1, not identical to it.
+        const host = makeDrawing();
+        const v0 = makeVertex(host, 'v0');
+        const v1 = makeVertex(host, 'v1');
+        const v2 = makeVertex(host, 'v2');
+        const v3 = makeVertex(host, 'v3');
+        makeEdge(host, 'h1', v0, v1);
+        makeEdge(host, 'h2', v3, v2);
+        host.newEqualityArtefact([v1, v3], 'root');
+
+        expect(findFirstOrderRuleApplications(rule, host, { flexible: false })).toEqual([]);
+        expect(findFirstOrderRuleApplications(rule, host, { flexible: true }).length).toBeGreaterThan(0);
+    });
+
+    it('collapses applications that would assert the same thing under flexible matching', () => {
+        const rule = buildEqualityOnlyRule();
+        const host = makeDrawing();
+        const v0 = makeVertex(host, 'v0');
+        const v1 = makeVertex(host, 'v1');
+        const v2 = makeVertex(host, 'v2');
+        const e1 = makeEdge(host, 'e1', v0, v1);
+        makeEdge(host, 'e2', v1, v2);
+        // A copy of e1, provably equal to it and hence interchangeable.
+        const e1bis = makeEdge(host, 'e1bis', v0, v1);
+        host.newEqualityArtefact([e1, e1bis], 'root');
+
+        const strict = findFirstOrderRuleApplications(rule, host, { flexible: false });
+        const flexible = findFirstOrderRuleApplications(rule, host, { flexible: true });
+
+        expect(strict.length).toBe(2);
+        expect(flexible.length).toBe(1);
     });
 });

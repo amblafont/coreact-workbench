@@ -147,6 +147,34 @@ The function returns `{ hostArtefacts, derivedRules }`, where `hostArtefacts` is
 
 ---
 
+## 4.5 Auto-applying equality rules
+
+An **equality rule** (`isEqualityRule(rule)`) is a first-order rule whose child layer holds at least one artefact and only `Equality` artefacts. Applying one asserts equalities between already matched host artefacts and creates nothing else.
+
+The *Applicable Rules* panel offers an **Auto-apply equality rules** checkbox (`ui.autoApplyEqualityRules`). When it is on:
+
+1. a pass runs immediately after the box is checked, and after every successful rule application (`applyRuleAt`);
+2. each pass applies one matching equality-rule application, re-matches the host, and repeats until no equality rule makes progress anymore;
+3. the pass skips applications with an empty match, and re-applies `filterNoProgressRuleApplications` regardless of the *Filter no-progress matches* setting, so unchecking that filter cannot make the pass loop;
+4. it stops if an application fails (an error is reported by `applyRuleEntry` itself) and the passes are non-reentrant. Success is read from the application, not from the host's artefact count, because an application whose equality merges into an existing one adds no artefact;
+5. auto-applied rules are recorded by the proof recorders exactly like manual applications;
+6. each pass ends with a single `info` toast (`formatEqualityAutoApplyToast`) listing the rules it applied, one line per rule with a count for the rules applied more than once, e.g. `Auto-applied 2 equality rule applications:\n- EqEnds (×2)`. Only the outermost pass reports one: while the re-entrancy guard is set, the pass that `applyRuleEntry` triggers on every application returns immediately, so the per-application passes are silent. Nothing is pushed when a pass applies nothing.
+
+The pass terminates because every step asserts an equality that is not already provable in the host, so each step merges two equality classes: at most `#artefacts - 1` steps are possible.
+
+### Matching options
+
+The pass does **not** read the four checkboxes of the panel. It matches with fixed options `AUTO_APPLY_MATCH_OPTIONS = { injective: false, flexible: true }` (`computeRuleMatches` takes the options, defaulting to the two injectivity/flexibility checkboxes for the panel list), and it takes the raw matches, so neither the redundant filter nor the *Solves the goal* filter restricts it. The only filter it applies is the no-progress one, unconditionally. The list in the panel still follows the checkboxes, so a match the pass uses may be missing from the list.
+
+The options are fixed because they are the ones under which an equality rule matches maximally:
+
+- **Injectivity off.** An equality rule asserts nothing but equalities, so a non-injective match is meaningful: it says the host already has artefacts for the pattern, possibly the same one twice. Every non-degenerate such application asserts an equality between two distinct host artefacts. The degenerate ones (two children of the asserted equality matched to one host artefact) assert nothing new and are removed by the no-progress filter before being applied.
+- **Flexible on.** A pattern dependency only has to be *provably* equal to the image of the pattern artefact it comes from. This is what lets a pattern edge be matched to a host edge that starts at a vertex merely equal to the end of another host edge.
+- **Redundant filtering is not needed.** Flexible matching collapses applications whose images are provably equal, and what remains is the no-progress filter: an application whose equality is already provable would be selected again on every iteration, and asserting it again would put a duplicate line into the proof script. After one application the equality holds, so all the duplicates it enabled are no-progress and are skipped.
+- **Solves-the-goal filtering is irrelevant.** Proving the goal is a property of the proof, not of the drawing; an equality rule application that helps prove the goal is applied just like any other.
+
+---
+
 ## 5. Summary of rules of thumb
 
 - **Only the rule's root layer matches.** Everything below it is structure.
@@ -156,3 +184,4 @@ The function returns `{ hostArtefacts, derivedRules }`, where `hostArtefacts` is
 - **The `checkLayerProvable` consistency matcher always behaves as injectivity off + flexible on**: it never enforces injectivity and always allows dependencies to match up to provable equality.
 - **Applying merges the conclusion into the host root**, including conclusion-layer tag artefacts (e.g. `isMono`).
 - **Second-order application builds one derived drawing per premise** that copies the host root (minus conclusion content) plus the premise layer and its child layer, without rule marking.
+- **Equality rules can be auto-applied**: an equality rule (first-order, child layer with only equalities) creates no artefact other than equalities, so the panel can apply all of them automatically, repeatedly, until no new equality follows. Auto-apply matches with injectivity off and flexible on and ignores the panel's other filters; the list in the panel still follows them.

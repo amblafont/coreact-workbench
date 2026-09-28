@@ -1,7 +1,7 @@
 import { SvelteMap } from 'svelte/reactivity';
 import { Artefact, Drawing, DrawingStore, SortStore } from "./index.svelte.ts";
 import type { DerivedRule } from "./index.svelte.ts";
-import { drawingExportNames, ruleTypeInfo, newExportRegistry, renderExactTerm, renderForallChain, renderSigma, sanitizeIdent } from "./rocq_export";
+import { drawingExportNames, ruleTypeInfo, newExportRegistry, NameRegistry, renderExactTerm, renderForallChain, renderSigma, sanitizeIdent } from "./rocq_export";
 import type { LayerElement, RuleTypeInfo } from "./rocq_export";
 
 function escapeRegExp(s: string): string {
@@ -302,11 +302,21 @@ export class RocqRecorder {
 
         // Names for the conclusion binders, in the exported conclusion's
         // (dependency-ordered) order, always sourced from the host layer:
-        // created host copies for artefacts/equalities.
+        // created host copies for artefacts/equalities. Equality binders keep
+        // a real name here because `assertName` needs an identifier, but the
+        // `destruct_sigma` pattern masks them out (see below).
         const ruleArtById = new Map<string, Artefact>();
         for (const ruleArt of ruleDrawing.getArtefacts()) {
             ruleArtById.set(ruleArt.id, ruleArt);
         }
+
+        // A conclusion equality whose two children both match the same host
+        // artefact creates no host copy (see applyRuleConclusion), so it has no
+        // field name to source. Such an element is masked with `_` in the
+        // `destruct_sigma` pattern, but `assertName` still needs an identifier on
+        // the assert paths, and Rocq rejects both `_` there and a name already
+        // used in the goal. Mint a fresh one against the host field names.
+        const placeholderNames = new NameRegistry(hostNames.fieldNames.values());
 
         const conclusionHostNames = ruleInfo.conclusionElements.map(el => {
             const ruleArt = el.artefactId ? ruleArtById.get(el.artefactId) : undefined;
@@ -315,6 +325,9 @@ export class RocqRecorder {
             }
             const hostCopy = applicationResult.created.get(ruleArt);
             if (!hostCopy) {
+                if (el.kind === "equation") {
+                    return placeholderNames.unique("eq");
+                }
                 throw new Error(`Consistency Check Failed: No created host artefact for conclusion element '${el.name}' in rule '${savedRuleName}'.`);
             }
             const hostId = hostCopy.id;
@@ -327,7 +340,15 @@ export class RocqRecorder {
             return hostFieldName;
         });
 
-        const assertName = conclusionHostNames[0] ?? "h";
+        // `destruct_sigma` runs `subst_all ()` right after every `destruct`, so
+        // an equality binder never survives as a hypothesis: the tactic either
+        // eliminates it itself or the remaining `try (...)` fallback swallows the
+        // recursive call. Its host name would therefore be dead weight, and worse,
+        // it can clash with a name already in the goal. Mask those binders with
+        // `_` so `generate_name` picks a fresh anonymous name instead.
+        const conclusionDestructPattern = ruleInfo.conclusionElements.map((el, i) => el.kind === "equation" ? "_" : conclusionHostNames[i]);
+
+        const assertName = conclusionHostNames[0] ?? "eq";
         const conclusionArity = ruleInfo.conclusionElements.length;
 
         // Second-order rules: assert each premise as an inline proof whose body
@@ -413,9 +434,9 @@ export class RocqRecorder {
             if (conclusionArity === 0) {
                 stmt.bodyLines.push(`assert (${assertName} := @${ruleParam} ${fullArgsStr}).`);
             } else if (conclusionArity === 1) {
-                stmt.bodyLines.push(`destruct_sigma (@${ruleParam} ${fullArgsStr}) as ${conclusionHostNames.join(" ")}.`);
+                stmt.bodyLines.push(`destruct_sigma (@${ruleParam} ${fullArgsStr}) as ${conclusionDestructPattern.join(" ")}.`);
             } else {
-                stmt.bodyLines.push(`assert (${assertName} := @${ruleParam} ${fullArgsStr}); destruct_sigma ${assertName} as ${conclusionHostNames.join(" ")}.`);
+                stmt.bodyLines.push(`assert (${assertName} := @${ruleParam} ${fullArgsStr}); destruct_sigma ${assertName} as ${conclusionDestructPattern.join(" ")}.`);
             }
             return;
         }
@@ -423,7 +444,7 @@ export class RocqRecorder {
         if (conclusionArity === 0) {
             stmt.bodyLines.push(`assert (${assertName} := @${ruleParam} ${argsStr}).`);
         } else {
-            stmt.bodyLines.push(`destruct_sigma (@${ruleParam} ${argsStr}) as ${conclusionHostNames.join(" ")}.`);
+            stmt.bodyLines.push(`destruct_sigma (@${ruleParam} ${argsStr}) as ${conclusionDestructPattern.join(" ")}.`);
         }
     }
 

@@ -113,6 +113,75 @@ export function buildChildEqRule(): Drawing {
     return drawing;
 }
 
+/**
+ * A first-order rule whose child layer holds a single equality artefact and
+ * nothing else, i.e. an equality rule: applying it asserts an equality between
+ * the two matched host artefacts and creates nothing else.
+ */
+export function buildEqualityOnlyRule(): Drawing {
+    const drawing = makeDrawing();
+    const qv0 = makeVertex(drawing, 'qv0');
+    const qv1 = makeVertex(drawing, 'qv1');
+    const qv2 = makeVertex(drawing, 'qv2');
+    makeEdge(drawing, 'qe1', qv0, qv1);
+    makeEdge(drawing, 'qe2', qv1, qv2);
+    drawing.addLayer('conclusion', 'Conclusion', 'root');
+    drawing.newEqualityArtefact([qv0, qv1], 'conclusion');
+    drawing.setIsRule(true);
+    return drawing;
+}
+
+/**
+ * An equality rule asserting that the two ends of every edge it matches are
+ * equal. On a path of two edges it has two applications, so applying it once
+ * asserts one equality and the other one is left for a further pass.
+ */
+export function buildEdgeEndpointEqualityRule(): Drawing {
+    const drawing = makeDrawing();
+    const qv0 = makeVertex(drawing, 'qv0');
+    const qv1 = makeVertex(drawing, 'qv1');
+    makeEdge(drawing, 'qe1', qv0, qv1);
+    drawing.addLayer('conclusion', 'Conclusion', 'root');
+    drawing.newEqualityArtefact([qv0, qv1], 'conclusion');
+    drawing.setIsRule(true);
+    return drawing;
+}
+
+/**
+ * An equality rule whose three pattern vertices are asserted equal in one go.
+ * On a host with fewer vertices than the pattern it has no injective match, so
+ * it can only be applied with injectivity off.
+ */
+export function buildNonInjectiveEqualityRule(): Drawing {
+    const drawing = makeDrawing();
+    const qv0 = makeVertex(drawing, 'qv0');
+    const qv1 = makeVertex(drawing, 'qv1');
+    const qv2 = makeVertex(drawing, 'qv2');
+    drawing.addLayer('conclusion', 'Conclusion', 'root');
+    drawing.newEqualityArtefact([qv0, qv1, qv2], 'conclusion');
+    drawing.setIsRule(true);
+    return drawing;
+}
+
+/**
+ * An equality rule whose pattern is a three-vertex path, asserting the three
+ * vertices equal. It only matches a host whose second edge starts at a vertex
+ * that is merely provably equal to the end of the first edge, i.e. it needs
+ * flexible matching.
+ */
+export function buildFlexibleEqualityRule(): Drawing {
+    const drawing = makeDrawing();
+    const qv0 = makeVertex(drawing, 'qv0');
+    const qv1 = makeVertex(drawing, 'qv1');
+    const qv2 = makeVertex(drawing, 'qv2');
+    makeEdge(drawing, 'qe1', qv0, qv1);
+    makeEdge(drawing, 'qe2', qv1, qv2);
+    drawing.addLayer('conclusion', 'Conclusion', 'root');
+    drawing.newEqualityArtefact([qv0, qv1, qv2], 'conclusion');
+    drawing.setIsRule(true);
+    return drawing;
+}
+
 export function buildSecondOrderRule(): Drawing {
     const drawing = makeDrawing();
     const sv0 = makeVertex(drawing, 'sv0');

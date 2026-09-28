@@ -1,6 +1,6 @@
 <script lang="ts">
     import type { Artefact } from '../index.svelte.ts';
-    import { computeRuleMatches, applyRuleFilters, applyRuleAt, ui, toggleFilterRedundantMatches, toggleFilterNoProgressMatches, toggleFilterInjectiveMatches, toggleFilterFlexibleMatches, toggleFilterSolvesGoalMatches, solvesGoalFilterApplicable } from './store.svelte.ts';
+    import { computeRuleMatches, applyRuleFilters, applyRuleAt, ui, toggleFilterRedundantMatches, toggleFilterNoProgressMatches, toggleFilterInjectiveMatches, toggleFilterFlexibleMatches, toggleFilterSolvesGoalMatches, toggleAutoApplyEqualityRules, solvesGoalFilterApplicable } from './store.svelte.ts';
 
     const matches = $derived(computeRuleMatches());
     const entries = $derived(applyRuleFilters(matches));
@@ -66,6 +66,10 @@
         <input type="checkbox" checked={ui.filterSolvesGoalMatches} disabled={!solvesGoalFilterApplicable()} onchange={toggleFilterSolvesGoalMatches} />
         Solves the goal
     </label>
+    <label class="rule-checkbox-label" title="Apply every matching equality rule (a first-order rule whose child layer contains only equality artefacts) as soon as this is checked, and after each application of any rule. Auto-apply matches without injectivity and up to provable equality, whatever the checkboxes above say; those only shape this list.">
+        <input type="checkbox" checked={ui.autoApplyEqualityRules} onchange={toggleAutoApplyEqualityRules} />
+        Auto-apply equality rules
+    </label>
 </div>
 
 {#each entries as entry (entry.name)}
@@ -85,6 +89,9 @@
                     <span class="first-order-badge" title="First-order rule: root layer has only one child">First-Order</span>
                 {:else}
                     <span class="second-order-badge" title="Second-order rule: root layer has several child layers">Second-Order</span>
+                {/if}
+                {#if entry.isEqualityRule}
+                    <span class="equality-badge" title="Equality rule: the child layer holds only equality artefacts, so applying it asserts equalities only">Equality</span>
                 {/if}
             </div>
             <div class="rule-app-match">{labels.length > 0 ? labels.join(', ') : '(no labelled artefacts)'}</div>

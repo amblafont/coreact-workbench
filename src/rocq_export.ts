@@ -76,7 +76,13 @@ Notation "( x , .. , y , p )" :=
 
 export const SUBST_ALL_TACTIC = `Ltac subst_all1 :=
   repeat (match goal with 
-     | e : ?x = ?y |- _ => subst x; pose (x := y);
+     | e : ?x = ?y |- _ => 
+        (* if e is a reflexive equality we use UIP *)
+        ( (subst x; pose (x := y)) ||
+         (
+            let h := fresh in 
+            assert (h := UIP e); subst e)
+        );
      (* This cbn simplifies x (sometimes pose adds some explicit casting)
          and also transport along e (which are now transport along eq_refl)
           *)
@@ -90,15 +96,26 @@ export const INTROS_SIGMA_TACTIC = `Ltac2 intros_sigma () := repeat (intros; sub
 export const SUBST_ALL_IN_TACTIC = `Tactic Notation "subst_all_in"  uconstr(B)  :=
   subst_all1;  exact B.`;
 
-export const DESTRUCT_SIGMA_TACTIC = `(* We use ltac2 because in ltac1 it is not be possible 
+export const DESTRUCT_SIGMA_TACTIC = `Ltac2 generate_name (l : Std.intro_pattern):ident :=
+  match l with
+  | Std.IntroNaming (Std.IntroIdentifier x) => x
+  | Std.IntroAction Std.IntroWildcard => Fresh.in_goal @equal
+  | _ => 
+  (* raise an error *)
+  Control.throw_invalid_argument  "destruct_sigma: unsupported pattern"
+  end.
+
+(* We use ltac2 because in ltac1 it is not be possible 
 to destructure the list of identifiers. destruct_sigma substitutes the equalities *)
 
-Ltac2 rec destruct_sigma_tac (t : constr) (l : ident list) :=
+Ltac2 rec destruct_sigma_tac (t : constr) (l : Std.intro_pattern list) :=
   match l with
   | [] => ()
-  | [x] =>
+  | [xi] =>
+      let x := generate_name xi in
       assert ($x := $t); subst_all ()
-  | x :: q =>
+  | xi :: q =>
+      let x := generate_name xi in
       let h := Fresh.in_goal @destruct in
       destruct $t as [$x $h];
       subst_all ();
@@ -108,7 +125,7 @@ Ltac2 rec destruct_sigma_tac (t : constr) (l : ident list) :=
   end.
 
 Ltac2 Notation "destruct_sigma"
-    t(constr) "as" l(list1(ident)) :=
+    t(constr) "as" l(list1(intropattern)) :=
   destruct_sigma_tac t l. `;
 
 function getSort(sortStore: SortStore, name: string): SortDefinition {
@@ -644,6 +661,10 @@ export function exportDrawingsToRocq(drawings: Array<{ name: string; drawing: Dr
     const lines: string[] = [];
     lines.push("Require Import Ltac2.Ltac2.");
     lines.push("From Ltac2 Require Import Ltac1CompatNotations.");
+    lines.push("Generalizable All Variables.");
+    lines.push("Set Implicit Arguments.");
+    lines.push("");
+    lines.push("Axiom UIP : forall A, forall (x : A) (p : x = x), p = eq_refl.");
     lines.push("");
     lines.push(SIGMA_DEFINITION);
     lines.push("");
@@ -661,8 +682,6 @@ export function exportDrawingsToRocq(drawings: Array<{ name: string; drawing: Dr
     lines.push("");
     lines.push(DESTRUCT_SIGMA_TACTIC);
     lines.push("");
-    lines.push("Generalizable All Variables.");
-    lines.push("Set Implicit Arguments.");
     lines.push("");
 
     const sortDefs = sortStore.getAllSorts().filter(def => def.name !== "Equality");

@@ -5,11 +5,11 @@ import { getDrawing, drawingStore, ui, sortStore, rocqRecorder, abellaRecorder, 
     applyPickedPosition, startPositionPicker, selectArtefactToInspect, removeArtefactNode,
     toggleEqualityExtend, equalityChildren, onArtefactNodeClick, createDraftArtefact,
     splitFirstOrderRecording, openProofEditor, closeProofEditor, updateDrawingProof, removeDrawingProofs, suggestAdmittedProof, toggleProofRecording /* runRecorderStep */,
-    setActiveDrawing, checkLayerProvable, pendingProofCount
+    setActiveDrawing, checkLayerProvable, pendingProofCount, toggleAutoApplyEqualityRules, computeRuleApplications
 } from './store.svelte.ts';
 import { Artefact, Drawing, DrawingStore, getFirstOrderStatementChildLayer } from '../index.svelte.ts';
 import { registerDefaultSorts } from '../demo/buildDemo';
-import { buildComposableEdgesRule, makeDrawing, makeEdge, makeVertex } from '../demo/helpers';
+import { buildComposableEdgesRule, buildChildEqRule, buildEdgeEndpointEqualityRule, buildEqualityOnlyRule, buildFlexibleEqualityRule, buildIsMonoInChildLayerRule, buildNonInjectiveEqualityRule, makeDrawing, makeEdge, makeVertex } from '../demo/helpers';
 
 describe('export selection bookkeeping', () => {
     beforeEach(() => {
@@ -1115,5 +1115,275 @@ describe('proof recording subgoal navigation', () => {
         expect(() => checkLayerProvable(goal.id)).not.toThrow();
         expect(ui.activeDrawingName).toBe('Host');
         expect(ui.proofEditorName).toBeNull();
+    });
+});
+
+describe('auto-apply equality rules', () => {
+    // A host made of a path v0 -e1-> v1 -e2-> v2: the equality rule of
+    // `buildEqualityOnlyRule` matches it and asserts v0 = v1.
+    function buildHostDrawing(): void {
+        const v0 = makeVertex(getDrawing(), 'v0');
+        const v1 = makeVertex(getDrawing(), 'v1');
+        const v2 = makeVertex(getDrawing(), 'v2');
+        makeEdge(getDrawing(), 'e1', v0, v1);
+        makeEdge(getDrawing(), 'e2', v1, v2);
+        drawingStore.addDrawing('Host', getDrawing());
+        setActiveDrawing('Host');
+    }
+
+    function equalities(): Artefact[] {
+        return getDrawing().getArtefacts().filter(a => a.sortName === 'Equality');
+    }
+
+    // A host with a single edge: too small for the three-vertex pattern of
+    // `buildNonInjectiveEqualityRule` to match injectively.
+    function buildShortHostDrawing(): void {
+        const v0 = makeVertex(getDrawing(), 'v0');
+        const v1 = makeVertex(getDrawing(), 'v1');
+        makeEdge(getDrawing(), 'e1', v0, v1);
+        drawingStore.addDrawing('Host', getDrawing());
+        setActiveDrawing('Host');
+    }
+
+    // A host whose second edge starts at a vertex that is only provably equal to
+    // the end of its first edge, so the path pattern of
+    // `buildFlexibleEqualityRule` needs flexible matching.
+    function buildDetourHostDrawing(): void {
+        const v0 = makeVertex(getDrawing(), 'v0');
+        const v1 = makeVertex(getDrawing(), 'v1');
+        const v2 = makeVertex(getDrawing(), 'v2');
+        const v3 = makeVertex(getDrawing(), 'v3');
+        makeEdge(getDrawing(), 'h1', v0, v1);
+        makeEdge(getDrawing(), 'h2', v3, v2);
+        getDrawing().newEqualityArtefact([v1, v3], 'root');
+        drawingStore.addDrawing('Host', getDrawing());
+        setActiveDrawing('Host');
+    }
+
+    function equalityLabels(): string[] {
+        return equalities()
+            .flatMap(eq => equalityChildren(eq).map(child => String(child.data.label)))
+            .sort();
+    }
+
+    beforeEach(() => {
+        registerDefaultSorts(sortStore);
+        getDrawing().clear(true);
+        drawingStore.clear();
+        ui.activeDrawingName = null;
+        ui.toasts = [];
+        ui.autoApplyEqualityRules = false;
+        ui.filterNoProgressMatches = true;
+        ui.filterSolvesGoalMatches = false;
+        ui.filterInjectiveMatches = true;
+        ui.filterFlexibleMatches = false;
+    });
+
+    afterEach(() => {
+        ui.activeDrawingName = null;
+        ui.toasts = [];
+        ui.autoApplyEqualityRules = false;
+    });
+
+    it('is off by default, so a rule application asserts no equality of its own', () => {
+        const { rule } = buildComposableEdgesRule();
+        drawingStore.addDrawing('Comp', rule);
+        buildHostDrawing();
+
+        applyRuleAt('Comp', 0);
+
+        expect(ui.autoApplyEqualityRules).toBe(false);
+        expect(getDrawing().getArtefacts().filter(a => a.sortName === 'Edge')).toHaveLength(3);
+        expect(equalities()).toHaveLength(0);
+    });
+
+    it('applies every matching equality rule as soon as the box is checked', () => {
+        drawingStore.addDrawing('Eq', buildEqualityOnlyRule());
+        buildHostDrawing();
+
+        toggleAutoApplyEqualityRules();
+
+        expect(ui.autoApplyEqualityRules).toBe(true);
+        expect(equalities()).toHaveLength(1);
+    });
+
+    it('stops at a fixpoint and does not duplicate the asserted equality', () => {
+        drawingStore.addDrawing('Eq', buildEqualityOnlyRule());
+        buildHostDrawing();
+
+        toggleAutoApplyEqualityRules();
+        toggleAutoApplyEqualityRules();
+        toggleAutoApplyEqualityRules();
+
+        expect(equalities()).toHaveLength(1);
+    });
+
+    it('keeps going until every matching equality rule is applied', () => {
+        // 'EqEnds' asserts the two ends of every edge it matches: two
+        // applications are available, and both have to run within the pass. The
+        // two equalities overlap on v1, so the host ends up with a single
+        // equality spanning the three vertices.
+        drawingStore.addDrawing('EqEnds', buildEdgeEndpointEqualityRule());
+        buildHostDrawing();
+
+        expect(computeRuleApplications().map(e => [e.name, e.applications.length])).toEqual([['EqEnds', 2]]);
+
+        toggleAutoApplyEqualityRules();
+
+        const asserted = equalities();
+        expect(asserted).toHaveLength(1);
+        expect(equalityChildren(asserted[0]).map(a => String(a.data.label)).sort()).toEqual(['v0', 'v1', 'v2']);
+    });
+
+    it('applies equality rules after any application of any rule', () => {
+        // The flag is set directly here: this test is about the trigger firing
+        // on a rule application, not about checking the box.
+        drawingStore.addDrawing('IsMono', buildIsMonoInChildLayerRule());
+        drawingStore.addDrawing('Eq', buildEqualityOnlyRule());
+        buildHostDrawing();
+        ui.autoApplyEqualityRules = true;
+
+        expect(equalities()).toHaveLength(0);
+        applyRuleAt('IsMono', 0);
+
+        expect(getDrawing().getArtefacts().filter(a => a.sortName === 'isMono')).toHaveLength(1);
+        expect(equalities()).toHaveLength(1);
+    });
+
+    it('leaves already asserted equalities alone when the box is unchecked again', () => {
+        drawingStore.addDrawing('Eq', buildEqualityOnlyRule());
+        buildHostDrawing();
+
+        toggleAutoApplyEqualityRules();
+        toggleAutoApplyEqualityRules();
+        toggleAutoApplyEqualityRules();
+
+        expect(ui.autoApplyEqualityRules).toBe(true);
+        expect(equalities()).toHaveLength(1);
+    });
+
+    it('reaches a fixpoint even with the no-progress filter disabled', () => {
+        drawingStore.addDrawing('Eq', buildEqualityOnlyRule());
+        buildHostDrawing();
+        ui.filterNoProgressMatches = false;
+
+        toggleAutoApplyEqualityRules();
+
+        expect(equalities()).toHaveLength(1);
+    });
+
+    it('reports what it applied in a single toast, counting repeated rules', () => {
+        // 'EqEnds' matches both edges of the host, so the pass applies it twice.
+        // The second application merges into the equality the first one created,
+        // adding no artefact, so the count also guards the pass against treating
+        // a merge as a failed application.
+        drawingStore.addDrawing('EqEnds', buildEdgeEndpointEqualityRule());
+        buildHostDrawing();
+
+        toggleAutoApplyEqualityRules();
+
+        expect(ui.toasts).toHaveLength(1);
+        expect(ui.toasts[0].kind).toBe('info');
+        expect(ui.toasts[0].message).toBe('Auto-applied 2 equality rule applications:\n- EqEnds (×2)');
+    });
+
+    it('uses the singular wording for a single application', () => {
+        drawingStore.addDrawing('Eq', buildNonInjectiveEqualityRule());
+        buildShortHostDrawing();
+
+        toggleAutoApplyEqualityRules();
+
+        expect(ui.toasts.map(t => t.message)).toEqual(['Auto-applied 1 equality rule application:\n- Eq']);
+    });
+
+    it('reports the pass once when a manual application triggers it', () => {
+        drawingStore.addDrawing('IsMono', buildIsMonoInChildLayerRule());
+        drawingStore.addDrawing('Eq', buildEqualityOnlyRule());
+        buildHostDrawing();
+        ui.autoApplyEqualityRules = true;
+
+        applyRuleAt('IsMono', 0);
+
+        // The pass runs again on every application it makes; the re-entrancy
+        // guard makes all but the outermost one silent.
+        expect(ui.toasts.filter(t => t.message.startsWith('Auto-applied'))).toHaveLength(1);
+    });
+
+    it('says nothing when the pass has nothing to apply', () => {
+        drawingStore.addDrawing('Eq', buildEqualityOnlyRule());
+        buildHostDrawing();
+        toggleAutoApplyEqualityRules();
+        ui.toasts = [];
+
+        // Nothing is left to apply, whether the box is re-checked...
+        toggleAutoApplyEqualityRules();
+        toggleAutoApplyEqualityRules();
+
+        expect(ui.toasts.filter(t => t.message.startsWith('Auto-applied'))).toHaveLength(0);
+    });
+
+    it('applies a rule that has no injective match, with injective matching on', () => {
+        drawingStore.addDrawing('Eq', buildNonInjectiveEqualityRule());
+        buildShortHostDrawing();
+
+        // The panel list follows the checkboxes, so the rule is not shown here.
+        expect(computeRuleApplications().map(e => [e.name, e.applications.length])).toEqual([['Eq', 0]]);
+
+        toggleAutoApplyEqualityRules();
+
+        expect(equalityLabels()).toEqual(['v0', 'v1']);
+    });
+
+    it('applies a rule that only matches up to provable equality, with flexible matching off', () => {
+        drawingStore.addDrawing('Eq', buildFlexibleEqualityRule());
+        buildDetourHostDrawing();
+
+        expect(computeRuleApplications().map(e => [e.name, e.applications.length])).toEqual([['Eq', 0]]);
+
+        toggleAutoApplyEqualityRules();
+
+        // The host already equates v1 with v3, so the asserted equality merges
+        // with it into a single artefact.
+        expect(equalities()).toHaveLength(1);
+        expect(equalityLabels()).toEqual(['v0', 'v1', 'v2', 'v3']);
+    });
+
+    it('ignores the solves-the-goal filter', () => {
+        drawingStore.addDrawing('Eq', buildNonInjectiveEqualityRule());
+        buildShortHostDrawing();
+        // A goal no application can prove, so the panel hides every match.
+        getDrawing().addLayer('goal', 'Goal', 'root');
+        getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'g' }, 'goal');
+        ui.filterSolvesGoalMatches = true;
+
+        expect(computeRuleApplications().map(e => [e.name, e.applications.length])).toEqual([['Eq', 0]]);
+
+        toggleAutoApplyEqualityRules();
+
+        expect(equalityLabels()).toEqual(['v0', 'v1']);
+    });
+
+    it('does not read the injective and flexible checkboxes', () => {
+        drawingStore.addDrawing('Eq', buildNonInjectiveEqualityRule());
+        buildShortHostDrawing();
+        ui.filterInjectiveMatches = false;
+        ui.filterFlexibleMatches = true;
+
+        // The panel list now shows the match the pass would have used anyway.
+        expect(computeRuleApplications().map(e => [e.name, e.applications.length])).toEqual([['Eq', 1]]);
+
+        toggleAutoApplyEqualityRules();
+
+        expect(equalityLabels()).toEqual(['v0', 'v1']);
+    });
+
+    it('never auto-applies a rule whose child layer holds more than equalities', () => {
+        drawingStore.addDrawing('ChildEq', buildChildEqRule());
+        buildHostDrawing();
+        const before = getDrawing().getArtefacts().length;
+
+        toggleAutoApplyEqualityRules();
+
+        expect(getDrawing().getArtefacts().length).toBe(before);
     });
 });

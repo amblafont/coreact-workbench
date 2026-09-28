@@ -677,6 +677,17 @@ body {
     letter-spacing: 0.5px;
     margin-left: 4px;
 }
+.equality-badge {
+    font-size: 0.7em;
+    font-weight: bold;
+    background-color: #16a085;
+    color: white;
+    padding: 2px 5px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-left: 4px;
+}
 .proved-badge {
     font-size: 0.7em;
     font-weight: bold;
@@ -734,6 +745,9 @@ body {
     margin-left: 6px;
 }
 .rule-app-name .second-order-badge {
+    margin-left: 6px;
+}
+.rule-app-name .equality-badge {
     margin-left: 6px;
 }
 .active-badge {
@@ -1104,6 +1118,7 @@ body {
 
 .toast-message {
     flex: 1;
+    white-space: pre-wrap;
 }
 
 .toast-success-icon {
