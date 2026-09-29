@@ -142,7 +142,8 @@
             "o": "art_6"
           },
           "data": {
-            "label": "fm"
+            "label": "fm",
+            "bend": 0
           }
         },
         {
@@ -155,7 +156,8 @@
             "o": "art_6"
           },
           "data": {
-            "label": "gm"
+            "label": "gm",
+            "bend": 0
           }
         },
         {
@@ -319,7 +321,9 @@
             "2": "art_5",
             "o": "art_7"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_9",
@@ -344,7 +348,9 @@
             "2": "art_6",
             "o": "art_9"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_11",
@@ -369,7 +375,9 @@
             "2": "art_6",
             "o": "art_11"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_13",
@@ -394,7 +402,9 @@
             "2": "art_11",
             "o": "art_13"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_15",
@@ -521,7 +531,9 @@
             "2": "art_4",
             "o": "art_5"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         }
       ],
       "isRule": true,
@@ -662,7 +674,8 @@
             "o": "art_7"
           },
           "data": {
-            "label": "fm"
+            "label": "fm",
+            "bend": 0
           }
         },
         {
@@ -675,7 +688,8 @@
             "o": "art_7"
           },
           "data": {
-            "label": "gm"
+            "label": "gm",
+            "bend": 0
           }
         },
         {
@@ -817,7 +831,8 @@
             "o": "art_5"
           },
           "data": {
-            "label": "fo"
+            "label": "fo",
+            "bend": 0
           }
         },
         {
@@ -830,7 +845,8 @@
             "o": "art_6"
           },
           "data": {
-            "label": "go"
+            "label": "go",
+            "bend": 0
           }
         },
         {
@@ -1123,7 +1139,9 @@
             "2": "art_5",
             "o": "art_9"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_15",
@@ -1134,7 +1152,9 @@
             "2": "art_4",
             "o": "art_10"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_16",
@@ -1223,7 +1243,8 @@
             "o": "art_17"
           },
           "data": {
-            "label": "ju"
+            "label": "ju",
+            "bend": 0
           }
         },
         {
@@ -1236,7 +1257,8 @@
             "o": "art_17"
           },
           "data": {
-            "label": "iu"
+            "label": "iu",
+            "bend": 0
           }
         },
         {
@@ -1249,7 +1271,8 @@
             "o": "art_18"
           },
           "data": {
-            "label": "jf"
+            "label": "jf",
+            "bend": 0
           }
         },
         {
@@ -1262,7 +1285,8 @@
             "o": "art_18"
           },
           "data": {
-            "label": "if"
+            "label": "if",
+            "bend": 0
           }
         },
         {
@@ -1428,7 +1452,9 @@
             "2": "art_7",
             "o": "art_8"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_10",
@@ -1439,7 +1465,9 @@
             "2": "art_6",
             "o": "art_8"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_11",
@@ -1457,8 +1485,7 @@
         }
       ],
       "isRule": true,
-      "isFirstOrder": true,
-      "proved": false
+      "isFirstOrder": true
     },
     {
       "name": "Square > Def (reverse)",
@@ -1617,7 +1644,9 @@
             "2": "art_5",
             "o": "art_9"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_11",
@@ -1628,7 +1657,9 @@
             "2": "art_7",
             "o": "art_9"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         }
       ],
       "isRule": true,
@@ -1751,7 +1782,9 @@
             "2": "art_4",
             "o": "art_5"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_8",
@@ -1775,8 +1808,7 @@
         }
       ],
       "isRule": true,
-      "isFirstOrder": true,
-      "proved": false
+      "isFirstOrder": true
     },
     {
       "name": "IdRight",
@@ -1885,7 +1917,9 @@
             "2": "art_4",
             "o": "art_5"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_7",
@@ -2296,7 +2330,9 @@
             "2": "art_5",
             "o": "art_10"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_15",
@@ -2307,7 +2343,9 @@
             "2": "art_4",
             "o": "art_11"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         }
       ],
       "isRule": true,
@@ -2532,7 +2570,8 @@
             "o": "art_10"
           },
           "data": {
-            "label": "ju"
+            "label": "ju",
+            "bend": 0
           }
         },
         {
@@ -2545,7 +2584,8 @@
             "o": "art_10"
           },
           "data": {
-            "label": "iu"
+            "label": "iu",
+            "bend": 0
           }
         },
         {
@@ -2558,7 +2598,8 @@
             "o": "art_11"
           },
           "data": {
-            "label": "jf"
+            "label": "jf",
+            "bend": 0
           }
         },
         {
@@ -2571,7 +2612,8 @@
             "o": "art_11"
           },
           "data": {
-            "label": "if"
+            "label": "if",
+            "bend": 0
           }
         },
         {
@@ -2696,7 +2738,9 @@
             "2": "art_4",
             "o": "art_5"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_7",
@@ -2730,154 +2774,8 @@
       ],
       "isRule": true,
       "isFirstOrder": true,
-      "rocqProof": "Lemma IdRightComp_rule : forall (Vertex_2 Vertex_3 Vertex_4 : Vertex)(f : Edge Vertex_2 Vertex_3)(Edge_2 : Edge Vertex_3 Vertex_4)(eq_Vertex_Vertex : Vertex_3 = Vertex_4), ltac:(subst_all_in (forall (isId_2 : isId Edge_2), Σ (f_2 : Edge Vertex_2 Vertex_4)(Triangle_2 : Triangle f Edge_2 f_2), f = f_2)).\nintros_sigma ().\nset (f_3 := f : Edge Vertex_2 Vertex_4).\ndestruct_sigma (@IdRight_rule Vertex_2 Vertex_3 Vertex_4 f Edge_2 f_3 eq_refl isId_2 eq_refl) as Triangle_3.\nexact (f, Triangle_3, eq_refl).\nQed.\n",
-      "abellaProof": "Theorem IdRightComp_rule : forall Vertex_2 Vertex_3 Vertex_4 f Edge_2 isId_2, vertex Vertex_2 -> vertex Vertex_3 -> vertex Vertex_4 -> edge Vertex_2 Vertex_3 f -> edge Vertex_3 Vertex_4 Edge_2 -> Vertex_3 = Vertex_4 -> isId Edge_2 isId_2 -> exists f_2 Triangle_2, edge Vertex_2 Vertex_4 f_2 /\\ triangle f Edge_2 f_2 Triangle_2 /\\ f = f_2.\nintros Vertex_2 Vertex_3 Vertex_4 f Edge_2 eq_Vertex_Vertex isId_2.\nassert (edge Vertex_2 Vertex_4 f).\nsearch.\nrename H1 to f_3.\nwitness f Triangle_3.\nsplit.\nsplit.\nsearch.\n",
-      "proved": false
-    },
-    {
-      "name": "IdLeftComp",
-      "layers": [
-        {
-          "id": "root",
-          "name": "Root Layer",
-          "parentId": null,
-          "color": "#3498db",
-          "colorEnabled": false,
-          "visible": true
-        },
-        {
-          "id": "layer-mu43x0gi",
-          "name": "Child of Root Layer",
-          "parentId": "root",
-          "color": "#220194",
-          "colorEnabled": true,
-          "visible": true
-        }
-      ],
-      "artefacts": [
-        {
-          "id": "art_0",
-          "sortName": "Vertex",
-          "layerId": "root",
-          "dependencies": {},
-          "data": {
-            "position": [
-              264,
-              335
-            ]
-          }
-        },
-        {
-          "id": "art_1",
-          "sortName": "Vertex",
-          "layerId": "root",
-          "dependencies": {},
-          "data": {
-            "position": [
-              364,
-              243
-            ]
-          }
-        },
-        {
-          "id": "art_2",
-          "sortName": "Vertex",
-          "layerId": "root",
-          "dependencies": {},
-          "data": {
-            "position": [
-              473,
-              342
-            ]
-          }
-        },
-        {
-          "id": "art_3",
-          "sortName": "Edge",
-          "layerId": "root",
-          "dependencies": {
-            "source": "art_0",
-            "target": "art_1"
-          },
-          "data": {
-            "width": 2,
-            "bend": 0
-          }
-        },
-        {
-          "id": "art_4",
-          "sortName": "Edge",
-          "layerId": "root",
-          "dependencies": {
-            "source": "art_1",
-            "target": "art_2"
-          },
-          "data": {
-            "width": 2,
-            "bend": 0,
-            "label": "f"
-          }
-        },
-        {
-          "id": "art_5",
-          "sortName": "Edge",
-          "layerId": "layer-mu43x0gi",
-          "dependencies": {
-            "source": "art_0",
-            "target": "art_2"
-          },
-          "data": {
-            "width": 2,
-            "bend": 0,
-            "label": "f"
-          }
-        },
-        {
-          "id": "art_6",
-          "sortName": "isId",
-          "layerId": "root",
-          "dependencies": {
-            "arrow": "art_3"
-          },
-          "data": {}
-        },
-        {
-          "id": "art_7",
-          "sortName": "Triangle",
-          "layerId": "layer-mu43x0gi",
-          "dependencies": {
-            "1": "art_3",
-            "2": "art_4",
-            "o": "art_5"
-          },
-          "data": {}
-        },
-        {
-          "id": "art_8",
-          "sortName": "Equality",
-          "layerId": "root",
-          "dependencies": {
-            "0": "art_0",
-            "1": "art_1"
-          },
-          "data": {}
-        },
-        {
-          "id": "art_9",
-          "sortName": "Equality",
-          "layerId": "layer-mu43x0gi",
-          "dependencies": {
-            "0": "art_4",
-            "1": "art_5"
-          },
-          "data": {}
-        }
-      ],
-      "isRule": true,
-      "isFirstOrder": true,
-      "rocqProof": "Lemma IdLeftComp_rule : forall (Vertex_2 Vertex_3 Vertex_4 : Vertex)(Edge_2 : Edge Vertex_2 Vertex_3)(eq_Vertex_Vertex : Vertex_2 = Vertex_3), ltac:(subst_all_in (forall (f : Edge Vertex_3 Vertex_4)(isId_2 : isId Edge_2), Σ (f_2 : Edge Vertex_2 Vertex_4)(Triangle_2 : Triangle Edge_2 f f_2), f = f_2)).\nintros_sigma ().\nset (f_3 := f : Edge Vertex_2 Vertex_4).\ndestruct_sigma (@IdLeft_rule Vertex_2 Vertex_3 Vertex_4 Edge_2 eq_refl f f_3 isId_2 eq_refl) as Triangle_3.\nexact (f, Triangle_3, eq_refl).\nQed.\n",
-      "abellaProof": "Theorem IdLeftComp_rule : forall Vertex_2 Vertex_3 Vertex_4 Edge_2 f isId_2, vertex Vertex_2 -> vertex Vertex_3 -> vertex Vertex_4 -> edge Vertex_2 Vertex_3 Edge_2 -> Vertex_2 = Vertex_3 -> edge Vertex_3 Vertex_4 f -> isId Edge_2 isId_2 -> exists f_2 Triangle_2, edge Vertex_2 Vertex_4 f_2 /\\ triangle Edge_2 f f_2 Triangle_2 /\\ f = f_2.\nintros Vertex_2 Vertex_3 Vertex_4 Edge_2 eq_Vertex_Vertex f isId_2.\nassert (edge Vertex_2 Vertex_4 f).\nsearch.\nrename H1 to f_3.\nwitness f Triangle_3.\nsplit.\nsplit.\nsearch.\n",
-      "proved": false
+      "rocqProof": "Lemma IdRightComp_rule : forall (Vertex_2 Vertex_3 Vertex_4 : Vertex)(eq_Vertex_Vertex : Vertex_3 = Vertex_4), ltac:(subst_all_in (forall (f : Edge Vertex_2 Vertex_3)(Edge_2 : Edge Vertex_3 Vertex_4)(isId_2 : isId Edge_2), Σ (f_2 : Edge Vertex_2 Vertex_4)(eq_f_f : f = f_2), ltac:(subst_all_in (Triangle f Edge_2 f_2)))).\nintros_sigma ().\nset (f_3 := f : Edge Vertex_2 Vertex_4).\ndestruct_sigma (@IdRight_rule Vertex_2 Vertex_3 Vertex_4 eq_refl f Edge_2 f_3 eq_refl isId_2) as Triangle_3.\nexact (f, eq_refl, Triangle_3).\nQed.\n",
+      "abellaProof": "Theorem IdRightComp_rule : forall Vertex_2 Vertex_3 Vertex_4 f Edge_2 isId_2, vertex Vertex_2 -> vertex Vertex_3 -> vertex Vertex_4 -> Vertex_3 = Vertex_4 -> edge Vertex_2 Vertex_3 f -> edge Vertex_3 Vertex_4 Edge_2 -> isId Edge_2 isId_2 -> exists f_2 Triangle_2, edge Vertex_2 Vertex_4 f_2 /\\ f = f_2 /\\ triangle f Edge_2 f_2 Triangle_2.\nskip."
     },
     {
       "name": "IdRightComp2",
@@ -2986,7 +2884,9 @@
             "2": "art_4",
             "o": "art_5"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_7",
@@ -3020,7 +2920,7 @@
       ],
       "isRule": true,
       "isFirstOrder": true,
-      "rocqProof": "Lemma IdRightComp2_rule : forall (Vertex_2 Vertex_3 Vertex_4 : Vertex)(Edge_2 : Edge Vertex_3 Vertex_4)(f_2 : Edge Vertex_2 Vertex_4)(eq_Vertex_Vertex : Vertex_3 = Vertex_4), ltac:(subst_all_in (forall (isId_2 : isId Edge_2), Σ (f : Edge Vertex_2 Vertex_3)(Triangle_2 : Triangle f Edge_2 f_2), f = f_2)).\nintros_sigma ().\nset (f_3 := f_2 : Edge Vertex_2 Vertex_3).\ndestruct_sigma (@IdRight_rule Vertex_2 Vertex_3 Vertex_4 f_3 Edge_2 f_2 eq_refl isId_2 eq_refl) as Triangle_3.\nexact (f_2, Triangle_3, eq_refl).\nQed.\n",
+      "rocqProof": "Lemma IdRightComp2_rule : forall (Vertex_2 Vertex_3 Vertex_4 : Vertex)(eq_Vertex_Vertex : Vertex_3 = Vertex_4), ltac:(subst_all_in (forall (Edge_2 : Edge Vertex_3 Vertex_4)(f_2 : Edge Vertex_2 Vertex_4)(isId_2 : isId Edge_2), Σ (f : Edge Vertex_2 Vertex_3)(eq_f_f : f = f_2), ltac:(subst_all_in (Triangle f Edge_2 f_2)))).\nintros_sigma ().\nset (f_3 := f_2 : Edge Vertex_2 Vertex_3).\ndestruct_sigma (@IdRight_rule Vertex_2 Vertex_3 Vertex_4 eq_refl f_3 Edge_2 f_2 eq_refl isId_2) as Triangle_3.\nexact (f_2, eq_refl, Triangle_3).\nQed.\n",
       "abellaProof": "Theorem IdRightComp2_rule : forall Vertex_2 Vertex_3 Vertex_4 Edge_2 f_2 isId_2, vertex Vertex_2 -> vertex Vertex_3 -> vertex Vertex_4 -> edge Vertex_3 Vertex_4 Edge_2 -> edge Vertex_2 Vertex_4 f_2 -> Vertex_3 = Vertex_4 -> isId Edge_2 isId_2 -> exists f Triangle_2, edge Vertex_2 Vertex_3 f /\\ triangle f Edge_2 f_2 Triangle_2 /\\ f = f_2.\nintros Vertex_2 Vertex_3 Vertex_4 Edge_2 f_2 eq_Vertex_Vertex isId_2.\nassert (edge Vertex_2 Vertex_3 f_2).\nsearch.\nrename H1 to f_3.\nwitness f_2 Triangle_3.\nsplit.\nsplit.\nsearch.\n"
     },
     {
@@ -3139,7 +3039,9 @@
             "2": "art_4",
             "o": "art_5"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_8",
@@ -3164,8 +3066,154 @@
       ],
       "isRule": true,
       "isFirstOrder": true,
-      "rocqProof": "Lemma IdLeftComp2_rule : forall (Vertex_2 Vertex_3 Vertex_4 : Vertex)(Edge_2 : Edge Vertex_2 Vertex_3)(eq_Vertex_Vertex : Vertex_2 = Vertex_3), ltac:(subst_all_in (forall (f_2 : Edge Vertex_2 Vertex_4)(isId_2 : isId Edge_2), Σ (f : Edge Vertex_3 Vertex_4)(Triangle_2 : Triangle Edge_2 f f_2), f = f_2)).\nintros_sigma ().\nset (f_3 := f_2 : Edge Vertex_3 Vertex_4).\ndestruct_sigma (@IdLeft_rule Vertex_2 Vertex_3 Vertex_4 Edge_2 eq_refl f_3 f_2 isId_2 eq_refl) as Triangle_3.\nexact (f_2, Triangle_3, eq_refl).\nQed.\n",
-      "abellaProof": "Theorem IdLeftComp2_rule : forall Vertex_2 Vertex_3 Vertex_4 Edge_2 f_2 isId_2, vertex Vertex_2 -> vertex Vertex_3 -> vertex Vertex_4 -> edge Vertex_2 Vertex_3 Edge_2 -> Vertex_2 = Vertex_3 -> edge Vertex_2 Vertex_4 f_2 -> isId Edge_2 isId_2 -> exists f Triangle_2, edge Vertex_3 Vertex_4 f /\\ triangle Edge_2 f f_2 Triangle_2 /\\ f = f_2.\nintros Vertex_2 Vertex_3 Vertex_4 Edge_2 eq_Vertex_Vertex f_2 isId_2.\nassert (edge Vertex_3 Vertex_4 f_2).\nsearch.\nrename H1 to f_3.\nwitness f_2 Triangle_3.\nsplit.\nsplit.\nsearch.\n"
+      "rocqProof": "Lemma IdLeftComp2_rule : forall (Vertex_2 Vertex_3 Vertex_4 : Vertex)(eq_Vertex_Vertex : Vertex_2 = Vertex_3), ltac:(subst_all_in (forall (Edge_2 : Edge Vertex_2 Vertex_3)(f_2 : Edge Vertex_2 Vertex_4)(isId_2 : isId Edge_2), Σ (f : Edge Vertex_3 Vertex_4)(eq_f_f : f = f_2), ltac:(subst_all_in (Triangle Edge_2 f f_2)))).\nintros_sigma ().\ndestruct_sigma (@IdLeft_rule Vertex_2 Vertex_2 Vertex_4 eq_refl Edge_2 f_2 f_2 eq_refl isId_2) as Triangle_3.\nexact (f_2, eq_refl, Triangle_3).\nQed.\n",
+      "abellaProof": "Theorem IdLeftComp2_rule : forall Vertex_2 Vertex_3 Vertex_4 Edge_2 f_2 isId_2, vertex Vertex_2 -> vertex Vertex_3 -> vertex Vertex_4 -> Vertex_2 = Vertex_3 -> edge Vertex_2 Vertex_3 Edge_2 -> edge Vertex_2 Vertex_4 f_2 -> isId Edge_2 isId_2 -> exists f Triangle_2, edge Vertex_3 Vertex_4 f /\\ f = f_2 /\\ triangle Edge_2 f f_2 Triangle_2.\nskip."
+    },
+    {
+      "name": "IdLeftComp",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        },
+        {
+          "id": "layer-mu43x0gi",
+          "name": "Child of Root Layer",
+          "parentId": "root",
+          "color": "#220194",
+          "colorEnabled": true,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "art_0",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              264,
+              335
+            ]
+          }
+        },
+        {
+          "id": "art_1",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              364,
+              243
+            ]
+          }
+        },
+        {
+          "id": "art_2",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              473,
+              342
+            ]
+          }
+        },
+        {
+          "id": "art_3",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "art_0",
+            "target": "art_1"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0
+          }
+        },
+        {
+          "id": "art_4",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "art_1",
+            "target": "art_2"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "f"
+          }
+        },
+        {
+          "id": "art_5",
+          "sortName": "Edge",
+          "layerId": "layer-mu43x0gi",
+          "dependencies": {
+            "source": "art_0",
+            "target": "art_2"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "f"
+          }
+        },
+        {
+          "id": "art_6",
+          "sortName": "isId",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "art_3"
+          },
+          "data": {}
+        },
+        {
+          "id": "art_7",
+          "sortName": "Triangle",
+          "layerId": "layer-mu43x0gi",
+          "dependencies": {
+            "1": "art_3",
+            "2": "art_4",
+            "o": "art_5"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "art_8",
+          "sortName": "Equality",
+          "layerId": "root",
+          "dependencies": {
+            "0": "art_0",
+            "1": "art_1"
+          },
+          "data": {}
+        },
+        {
+          "id": "art_9",
+          "sortName": "Equality",
+          "layerId": "layer-mu43x0gi",
+          "dependencies": {
+            "0": "art_4",
+            "1": "art_5"
+          },
+          "data": {}
+        }
+      ],
+      "isRule": true,
+      "isFirstOrder": true,
+      "rocqProof": "Lemma IdLeftComp_rule : forall (Vertex_2 Vertex_3 Vertex_4 : Vertex)(eq_Vertex_Vertex : Vertex_2 = Vertex_3), ltac:(subst_all_in (forall (Edge_2 : Edge Vertex_2 Vertex_3)(f : Edge Vertex_3 Vertex_4)(isId_2 : isId Edge_2), Σ (f_2 : Edge Vertex_2 Vertex_4)(eq_f_f : f = f_2), ltac:(subst_all_in (Triangle Edge_2 f f_2)))).\nintros_sigma ().\ndestruct_sigma (@IdLeft_rule Vertex_2 Vertex_2 Vertex_4 eq_refl Edge_2 f f eq_refl isId_2) as Triangle_3.\nexact (f, eq_refl, Triangle_3).\nQed.\n",
+      "abellaProof": "Theorem IdLeftComp_rule : forall Vertex_2 Vertex_3 Vertex_4 Edge_2 f isId_2, vertex Vertex_2 -> vertex Vertex_3 -> vertex Vertex_4 -> Vertex_2 = Vertex_3 -> edge Vertex_2 Vertex_3 Edge_2 -> edge Vertex_3 Vertex_4 f -> isId Edge_2 isId_2 -> exists f_2 Triangle_2, edge Vertex_2 Vertex_4 f_2 /\\ f = f_2 /\\ triangle Edge_2 f f_2 Triangle_2.\nskip."
     },
     {
       "name": "PbkFromMono",
@@ -3368,8 +3416,8 @@
       ],
       "isRule": true,
       "isFirstOrder": true,
-      "rocqProof": "Lemma PbkFromMono_rule : forall (a a_2 a_3 d : Vertex)(e1 : Edge a a_2)(eq_a_a_a : a = a_3)(eq_a_a_a_2 : a_3 = a_2), ltac:(subst_all_in (forall (e2 : Edge a a_3)(f1 : Edge a_2 d)(f2 : Edge a_3 d)(isId_2 : isId e1)(isId_3 : isId e2)(isMono_2 : isMono f1)(isMono_3 : isMono f2)(eq_f1_f2 : f1 = f2), ltac:(subst_all_in (Pullback e1 e2 f2 f1)))).\nintros_sigma ().\nassert (Hpremise1 : Square e1 e2 f2 f1). {\n  intros_sigma ().\n  destruct_sigma (@IdLeftComp_rule a a_2 d e1 eq_refl f1 isId_2) as f Triangle_2 eq_f1_f2_f.\n  destruct_sigma (@IdLeft_rule a a_3 d e2 eq_refl f2 f isId_3 eq_refl) as Triangle_3.\n  destruct_sigma (@Square_rule a a_2 a_3 d e1 e2 f2 f1 f Triangle_2 Triangle_3) as Square_3.\n  exact Square_3.\n}\nassert (Hpremise2 : forall (x : Vertex)(Edge_2 : Edge x a_3)(Edge_3 : Edge x a_2)(Square_2 : Square Edge_3 Edge_2 f2 f1), Σ (Edge_4 : Edge x a)(Triangle_2 : Triangle Edge_4 e2 Edge_2), Triangle Edge_4 e1 Edge_3). {\n  intros_sigma ().\n  destruct_sigma (@IdRightComp2_rule x a a_3 e2 Edge_2 eq_refl isId_3) as f Triangle_4 eq_f_Edge.\n  destruct_sigma (@Square___Def__reverse__rule x a_2 a_3 d Edge_3 Edge_2 f1 f2 Square_2) as Edge_5 Triangle_5 Triangle_6.\n  destruct_sigma (@Mono2___Premise__reverse__rule a d x f1 Edge_2 Edge_3 Edge_5 isMono_2 Triangle_6 Triangle_5) as eq_f_Edge_Edge.\n  destruct_sigma (@IdRight_rule x a a_2 f e1 Edge_3 eq_refl isId_2 eq_refl) as Triangle_7.\n  exact (Edge_2, Triangle_4, Triangle_7).\n}\nassert (Hpremise3 : forall (y : Vertex)(Edge_2 : Edge y a_3)(Edge_3 : Edge y a_2)(i j : Edge y a)(iu : Triangle i e2 Edge_2)(xif : Triangle i e1 Edge_3)(ju : Triangle j e2 Edge_2)(jf : Triangle j e1 Edge_3), i = j). {\n  intros_sigma ().\n  destruct_sigma (@IdRightComp_rule y a a_2 i e1 eq_refl isId_2) as f Triangle_2 eq_i_f.\n  destruct_sigma (@IdRightComp_rule y a a_2 j e1 eq_refl isId_2) as f_2 Triangle_3 eq_j_f.\n  destruct_sigma (@UniqueCompo_rule y a a_2 i e1 Edge_3 f xif Triangle_2) as eq_i_f_Edge eq_xif_Triangle.\n  destruct_sigma (@UniqueCompo_rule y a a_2 j e1 Edge_3 f_2 jf Triangle_3) as eq_j_f_i_f_Edge eq_jf_Triangle.\n  exact eq_refl.\n}\ndestruct_sigma (@Pullback_rule a a_2 a_3 d e1 e2 f2 f1 Hpremise1 Hpremise2 Hpremise3) as Pullback_3.\nexact Pullback_3.\nQed.\n",
-      "abellaProof": "Theorem PbkFromMono_rule : forall a a_2 a_3 d e1 e2 f1 f2 isId_2 isId_3 isMono_2 isMono_3, vertex a -> vertex a_2 -> vertex a_3 -> vertex d -> edge a a_2 e1 -> a = a_3 -> a_3 = a_2 -> edge a a_3 e2 -> edge a_2 d f1 -> edge a_3 d f2 -> isId e1 isId_2 -> isId e2 isId_3 -> isMono f1 isMono_2 -> isMono f2 isMono_3 -> f1 = f2 -> exists Pullback_2, pullback e1 e2 f2 f1 Pullback_2.\nintros a a_2 a_3 d e1 eq_a_a_a eq_a_a_a_2 e2 f1 f2 isId_2 isId_3 isMono_2 isMono_3 eq_f1_f2.\nassert (exists Square_2, square e1 e2 f2 f1 Square_2).\n  assert (exists Square_3, square e1 e2 f2 f1 Square_3).\n  apply Square_rule to a a_2 a_3 d e1 e2 f2 f1 f Triangle_2 Triangle_3.\n  case H5.\n  witness Square_3.\n  search.\nassert (forall x Edge_2 Edge_3 Square_2, vertex x -> edge x a_3 Edge_2 -> edge x a_2 Edge_3 -> square Edge_3 Edge_2 f2 f1 Square_2 -> exists Edge_4 Triangle_2 Triangle_3, edge x a Edge_4 /\\ triangle Edge_4 e2 Edge_2 Triangle_2 /\\ triangle Edge_4 e1 Edge_3 Triangle_3).\n  intros x Edge_2 Edge_3 Square_2.\n  assert (exists Edge_5 Triangle_5 Triangle_6, edge x d Edge_5 /\\ triangle Edge_3 f1 Edge_6 Triangle_5 /\\ triangle Edge_2 f2 Edge_6 Triangle_6).\n  apply Square___Def__reverse__rule to x a_2 a_3 d Edge_3 Edge_2 f1 f2 Square_2.\n  case H6.\n  assert (Edge_2 = Edge_3).\n  apply Mono2___Premise__reverse__rule to a d x f1 Edge_2 Edge_3 Edge_5 isMono_2 Triangle_6 Triangle_5.\n  case H7.\n  witness Edge_2 Triangle_4 Triangle_7.\n  split.\n  split.\n  search.\nassert (forall y Edge_2 Edge_3 i j iu xif ju jf, vertex y -> edge y a_3 Edge_2 -> edge y a_2 Edge_3 -> edge y a i -> edge y a j -> triangle i e2 Edge_2 iu -> triangle i e1 Edge_3 xif -> triangle j e2 Edge_2 ju -> triangle j e1 Edge_3 jf -> i = j).\n  intros y Edge_2 Edge_3 i j iu xif ju jf.\n  assert (Edge_3 = f /\\ xif = Triangle_2).\n  apply UniqueCompo_rule to y a a_2 i e1 Edge_3 f xif Triangle_2.\n  case H8.\n  assert (Edge_3 = f_2 /\\ jf = Triangle_3).\n  apply UniqueCompo_rule to y a a_2 j e1 Edge_3 f_2 jf Triangle_3.\n  case H9.\n  search.\nassert (exists Pullback_3, pullback e1 e2 f2 f1 Pullback_3).\napply Pullback_rule to a a_2 a_3 d e1 e2 f2 f1 H1 H2 H3.\ncase H4.\nwitness Pullback_3.\nsearch.\n"
+      "rocqProof": "Lemma PbkFromMono_rule : forall (a a_2 a_3 d : Vertex)(eq_a_a_a : a = a_3)(eq_a_a_a_2 : a_3 = a_2), ltac:(subst_all_in (forall (e1 : Edge a a_2)(e2 : Edge a a_3)(f1 : Edge a_2 d)(f2 : Edge a_3 d)(eq_f1_f2 : f1 = f2), ltac:(subst_all_in (forall (isMono_2 : isMono f1)(isMono_3 : isMono f2)(isId_2 : isId e1)(isId_3 : isId e2), Pullback e1 e2 f2 f1)))).\nintros_sigma ().\nassert (Hpremise1 : Square e1 e2 f2 f1). {\n  intros_sigma ().\n  destruct_sigma (@IdLeftComp_rule a a_2 d eq_refl e1 f1 isId_2) as f _ Triangle_2.\n  destruct_sigma (@IdLeft_rule a a_3 d eq_refl e2 f2 f eq_refl isId_3) as Triangle_3.\n  destruct_sigma (@Square_rule a a_2 a_3 d e1 e2 f2 f1 f Triangle_2 Triangle_3) as Square_3.\n  exact Square_3.\n}\nassert (Hpremise2 : forall (x : Vertex)(Edge_2 : Edge x a_3)(Edge_3 : Edge x a_2)(Square_2 : Square Edge_3 Edge_2 f2 f1), Σ (Edge_4 : Edge x a)(Triangle_2 : Triangle Edge_4 e2 Edge_2), Triangle Edge_4 e1 Edge_3). {\n  intros_sigma ().\n  destruct_sigma (@Square___Def__reverse__rule x a_2 a_3 d Edge_3 f1 Edge_2 f2 Square_2) as Edge_5 Triangle_4 Triangle_5.\n  destruct_sigma (@Mono2___Premise__reverse__rule a d x f1 Edge_2 Edge_3 Edge_5 Triangle_5 Triangle_4 isMono_2) as _.\n  destruct_sigma (@UniqueCompo_rule x a d Edge_2 f1 Edge_5 Edge_5 Triangle_4 Triangle_5) as _ _.\n  destruct_sigma (@IdRightComp2_rule x a a_3 eq_refl e2 Edge_2 isId_3) as f _ Triangle_6.\n  destruct_sigma (@IdRight_rule x a a_2 eq_refl f e1 Edge_3 eq_refl isId_2) as Triangle_7.\n  exact (Edge_2, Triangle_6, Triangle_7).\n}\nassert (Hpremise3 : forall (y : Vertex)(Edge_2 : Edge y a_3)(Edge_3 : Edge y a_2)(i j : Edge y a)(ju : Triangle j e2 Edge_2)(iu : Triangle i e2 Edge_2)(jf : Triangle j e1 Edge_3)(xif : Triangle i e1 Edge_3), i = j). {\n  intros_sigma ().\n  destruct_sigma (@IdRightComp_rule y a a_2 eq_refl i e1 isId_2) as f _ Triangle_2.\n  destruct_sigma (@UniqueCompo_rule y a a i e1 Edge_3 i xif Triangle_2) as _ _.\n  destruct_sigma (@IdRightComp_rule y a a_2 eq_refl j e1 isId_2) as f_2 _ Triangle_3.\n  destruct_sigma (@UniqueCompo_rule y a a j e1 Edge_3 j jf Triangle_3) as _ _.\n  exact eq_refl.\n}\ndestruct_sigma (@Pullback_rule a a_2 a_3 d e1 e2 f2 f1 Hpremise1 Hpremise2 Hpremise3) as Pullback_3.\nexact Pullback_3.\nQed.\n",
+      "abellaProof": "Theorem PbkFromMono_rule : forall a a_2 a_3 d e1 e2 f1 f2 isMono_2 isMono_3 isId_2 isId_3, vertex a -> vertex a_2 -> vertex a_3 -> vertex d -> a = a_3 -> a_3 = a_2 -> edge a a_2 e1 -> edge a a_3 e2 -> edge a_2 d f1 -> edge a_3 d f2 -> f1 = f2 -> isMono f1 isMono_2 -> isMono f2 isMono_3 -> isId e1 isId_2 -> isId e2 isId_3 -> exists Pullback_2, pullback e1 e2 f2 f1 Pullback_2.\nskip."
     },
     {
       "name": "MonoFromPullback",
@@ -3563,8 +3611,8 @@
       ],
       "isRule": true,
       "isFirstOrder": true,
-      "rocqProof": "Lemma MonoFromPullback_rule : forall (a a_2 a_3 d : Vertex)(e1 : Edge a a_2)(eq_a_a_a : a = a_3)(eq_a_a_a_2 : a_3 = a_2), ltac:(subst_all_in (forall (e2 : Edge a a_3)(f1 : Edge a_2 d)(f2 : Edge a_3 d)(isId_2 : isId e1)(isId_3 : isId e2)(Pullback_2 : Pullback e1 e2 f2 f1)(eq_f1_f2 : f1 = f2), ltac:(subst_all_in (isMono f1)))).\nintros_sigma ().\nassert (Hpremise1 : forall (x : Vertex)(f g : Edge x a_2)(h : Edge x d)(fm : Triangle f f1 h)(gm : Triangle g f1 h), f = g). {\n  intros_sigma ().\n  set (g_2 := g : Edge x a_3).\n  set (h_2 := h : Edge x d).\n  set (gm_2 := gm : Triangle g_2 f2 h).\n  destruct_sigma (@Square_rule x a_2 a_3 d f g_2 f2 f1 h fm gm_2) as Square_2.\n  destruct_sigma (@Pullback___Exist__reverse__rule a a_2 a_3 d x e1 e2 f2 f1 g_2 f Pullback_2 Square_2) as Edge_2 Triangle_2 Triangle_3.\n  destruct_sigma (@IdRightComp_rule x a a_2 Edge_2 e1 eq_refl isId_2) as f_2 Triangle_4 eq_Edge_f.\n  destruct_sigma (@IdRightComp_rule x a a_3 Edge_2 e2 eq_refl isId_3) as f_3 Triangle_5 eq_Edge_f_f.\n  destruct_sigma (@UniqueCompo_rule x a a_2 Edge_2 e1 f f_2 Triangle_3 Triangle_4) as eq_Edge_f_f_f eq_Triangle_Triangle.\n  destruct_sigma (@UniqueCompo_rule x a a_3 Edge_2 e2 g_2 f_3 Triangle_2 Triangle_5) as eq_g_g_Edge_f_f_f eq_Triangle_Triangle_2.\n  exact eq_refl.\n}\ndestruct_sigma (@Mono2_rule a_2 d f1 Hpremise1) as isMono_3.\nexact isMono_3.\nQed.\n",
-      "abellaProof": "Theorem MonoFromPullback_rule : forall a a_2 a_3 d e1 e2 f1 f2 isId_2 isId_3 Pullback_2, vertex a -> vertex a_2 -> vertex a_3 -> vertex d -> edge a a_2 e1 -> a = a_3 -> a_3 = a_2 -> edge a a_3 e2 -> edge a_2 d f1 -> edge a_3 d f2 -> isId e1 isId_2 -> isId e2 isId_3 -> pullback e1 e2 f2 f1 Pullback_2 -> f1 = f2 -> exists isMono_2, isMono f1 isMono_2.\nintros a a_2 a_3 d e1 eq_a_a_a eq_a_a_a_2 e2 f1 f2 isId_2 isId_3 Pullback_2 eq_f1_f2.\nassert (forall x f g h fm gm, vertex x -> edge x a_2 f -> edge x a_2 g -> edge x d h -> triangle f f1 h fm -> triangle g f1 h gm -> f = g).\n  intros x f g h fm gm.\n  assert (edge x a_3 g).\n  search.\n  rename H3 to g_2.\n  assert (edge x d h).\n  search.\n  rename H4 to h_2.\n  assert (triangle g_2 f2 h gm).\n  search.\n  rename H5 to gm_2.\n  assert (exists Square_2, square f g_2 f2 f1 Square_2).\n  apply Square_rule to x a_2 a_3 d f g_2 f2 f1 h fm gm_2.\n  case H6.\n  assert (exists Edge_2 Triangle_2 Triangle_3, edge x a Edge_2 /\\ triangle Edge_4 e2 g_2 Triangle_2 /\\ triangle Edge_4 e1 f Triangle_3).\n  apply Pullback___Exist__reverse__rule to a a_2 a_3 d x e1 e2 f2 f1 g_2 f Pullback_2 Square_2.\n  case H7.\n  assert (f = f_2 /\\ Triangle_3 = Triangle_4).\n  apply UniqueCompo_rule to x a a_2 Edge_2 e1 f f_2 Triangle_3 Triangle_4.\n  case H8.\n  assert (g_2 = f_3 /\\ Triangle_2 = Triangle_5).\n  apply UniqueCompo_rule to x a a_3 Edge_2 e2 g_2 f_3 Triangle_2 Triangle_5.\n  case H9.\n  search.\nassert (exists isMono_3, isMono f1 isMono_3).\napply Mono2_rule to a_2 d f1 H1.\ncase H2.\nwitness isMono_3.\nsearch.\n"
+      "rocqProof": "Lemma MonoFromPullback_rule : forall (a a_2 a_3 d : Vertex)(eq_a_a_a : a = a_3)(eq_a_a_a_2 : a_3 = a_2), ltac:(subst_all_in (forall (e1 : Edge a a_2)(e2 : Edge a a_3)(f1 : Edge a_2 d)(f2 : Edge a_3 d)(eq_f1_f2 : f1 = f2), ltac:(subst_all_in (forall (Pullback_2 : Pullback e1 e2 f2 f1)(isId_2 : isId e1)(isId_3 : isId e2), isMono f1)))).\nintros_sigma ().\nassert (Hpremise1 : forall (x : Vertex)(f g : Edge x a_2)(h : Edge x d)(fm : Triangle f f1 h)(gm : Triangle g f1 h), f = g). {\n  intros_sigma ().\n  set (g_2 := g : Edge x a_3).\n  set (gm_2 := gm : Triangle g_2 f2 h).\n  destruct_sigma (@Square_rule x a_3 a_2 d g_2 f f1 f2 h gm_2 fm) as Square_2.\n  destruct_sigma (@Square_rule x a_2 a_3 d f g_2 f2 f1 h fm gm_2) as Square_3.\n  destruct_sigma (@Pullback___Exist__reverse__rule a a_2 a_3 d x e1 e2 f2 f1 g_2 f Pullback_2 Square_3) as Edge_2 Triangle_2 Triangle_3.\n  destruct_sigma (@IdRightComp_rule x a a_2 eq_refl Edge_2 e1 isId_2) as f_2 _ Triangle_4.\n  destruct_sigma (@UniqueCompo_rule x a a Edge_2 e1 f Edge_2 Triangle_3 Triangle_4) as _ _.\n  destruct_sigma (@IdRightComp_rule x a a_3 eq_refl Edge_2 e2 isId_3) as f_3 _ Triangle_5.\n  destruct_sigma (@UniqueCompo_rule x a a f e2 f g Triangle_5 Triangle_2) as _ _.\n  exact eq_refl.\n}\ndestruct_sigma (@Mono2_rule a_2 d f1 Hpremise1) as isMono_3.\nexact isMono_3.\nQed.\n",
+      "abellaProof": "Theorem MonoFromPullback_rule : forall a a_2 a_3 d e1 e2 f1 f2 Pullback_2 isId_2 isId_3, vertex a -> vertex a_2 -> vertex a_3 -> vertex d -> a = a_3 -> a_3 = a_2 -> edge a a_2 e1 -> edge a a_3 e2 -> edge a_2 d f1 -> edge a_3 d f2 -> f1 = f2 -> pullback e1 e2 f2 f1 Pullback_2 -> isId e1 isId_2 -> isId e2 isId_3 -> exists isMono_2, isMono f1 isMono_2.\nskip."
     }
   ]
 }

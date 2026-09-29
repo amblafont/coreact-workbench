@@ -419,8 +419,7 @@
         }
       ],
       "isRule": true,
-      "isFirstOrder": true,
-      "proved": false
+      "isFirstOrder": true
     },
     {
       "name": "Comp",
@@ -707,7 +706,8 @@
       ],
       "isRule": true,
       "isFirstOrder": true,
-      "parentName": "Mono2"
+      "parentName": "Mono2",
+      "proved": false
     },
     {
       "name": "MonoStart",
@@ -854,8 +854,8 @@
       ],
       "isRule": true,
       "isFirstOrder": true,
-      "rocqProof": "Lemma MonoStart_rule : forall (a b c : Vertex)(m : Edge a b)(n : Edge b c)(mn : Edge a c)(isMono_2 : isMono m)(isMono_3 : isMono n)(Triangle_2 : Triangle m n mn), isMono mn.\nintros_sigma ().\nassert (Hpremise1 : forall (x : Vertex)(f g : Edge x a)(h : Edge x c)(fm : Triangle f mn h)(gm : Triangle g mn h), f = g). {\n  intros_sigma ().\n  destruct_sigma (@Comp_rule x a b f m) as fm_2 Triangle_3.\n  destruct_sigma (@Comp_rule x a b g m) as gm_2 Triangle_4.\n  destruct_sigma (@Comp_rule x b c fm_2 n) as fmn Triangle_5.\n  destruct_sigma (@Assoc_rule x a b c f m fm_2 n fmn mn h Triangle_3 Triangle_5 Triangle_2 fm) as eq_fmn_h.\n  destruct_sigma (@Comp_rule x b c gm_2 n) as gmn Triangle_6.\n  destruct_sigma (@Assoc_rule x a b c g m gm_2 n gmn mn h Triangle_4 Triangle_6 Triangle_2 gm) as eq_fmn_h_gmn.\n  destruct_sigma (@Mono2___Premise__reverse__rule b c x n fm_2 gm_2 h isMono_3 Triangle_5 Triangle_6) as eq_fm_gm.\n  destruct_sigma (@Mono2___Premise__reverse__rule a b x m f g fm_2 isMono_2 Triangle_3 Triangle_4) as eq_f_g.\n  exact eq_refl.\n}\ndestruct_sigma (@Mono2_rule a c mn Hpremise1) as isMono_5.\nexact isMono_5.\nQed.\n",
-      "abellaProof": "Theorem MonoStart_rule : forall a b c m n mn isMono_2 isMono_3 Triangle_2, vertex a -> vertex b -> vertex c -> edge a b m -> edge b c n -> edge a c mn -> isMono m isMono_2 -> isMono n isMono_3 -> triangle m n mn Triangle_2 -> exists isMono_4, isMono mn isMono_4.\nintros a b c m n mn isMono_2 isMono_3 Triangle_2.\nassert (forall x f g h fm gm, vertex x -> edge x a f -> edge x a g -> edge x c h -> triangle f mn h fm -> triangle g mn h gm -> f = g).\n  intros x f g h fm gm.\n  assert (exists fm_2 Triangle_3, edge x b fm_2 /\\ triangle f m x_f_g Triangle_3).\n  apply Comp_rule to x a b f m.\n  case H3.\n  assert (exists gm_2 Triangle_4, edge x b gm_2 /\\ triangle g m x_f_g Triangle_4).\n  apply Comp_rule to x a b g m.\n  case H4.\n  assert (exists fmn Triangle_5, edge x c fmn /\\ triangle fm_2 n x_f_g Triangle_5).\n  apply Comp_rule to x b c fm_2 n.\n  case H5.\n  assert (fmn = h).\n  apply Assoc_rule to x a b c f m fm_2 n fmn mn h Triangle_3 Triangle_5 Triangle_2 fm.\n  case H6.\n  assert (exists gmn Triangle_6, edge x c gmn /\\ triangle gm_2 n x_f_g Triangle_6).\n  apply Comp_rule to x b c gm_2 n.\n  case H7.\n  assert (gmn = h).\n  apply Assoc_rule to x a b c g m gm_2 n gmn mn h Triangle_4 Triangle_6 Triangle_2 gm.\n  case H8.\n  assert (fm_2 = gm_2).\n  apply Mono2___Premise__reverse__rule to b c x n fm_2 gm_2 h isMono_3 Triangle_5 Triangle_6.\n  case H9.\n  assert (f = g).\n  apply Mono2___Premise__reverse__rule to a b x m f g fm_2 isMono_2 Triangle_3 Triangle_4.\n  case H10.\n  search.\nassert (exists isMono_5, isMono mn isMono_5).\napply Mono2_rule to a c mn H1.\ncase H2.\nwitness isMono_5.\nsearch.\n"
+      "rocqProof": "Lemma MonoStart_rule : forall (a b c : Vertex)(m : Edge a b)(n : Edge b c)(mn : Edge a c)(Triangle_2 : Triangle m n mn)(isMono_2 : isMono m)(isMono_3 : isMono n), isMono mn.\nintros_sigma ().\nassert (Hpremise1 : forall (x : Vertex)(f g : Edge x a)(h : Edge x c)(fm : Triangle f mn h)(gm : Triangle g mn h), f = g). {\n  intros_sigma ().\n  destruct_sigma (@Comp_rule x a b f m) as fm_2 Triangle_3.\n  destruct_sigma (@Comp_rule x a b g m) as gm_2 Triangle_4.\n  destruct_sigma (@Comp_rule x b c fm_2 n) as fmn Triangle_5.\n  destruct_sigma (@Assoc_rule x a b c f m n fm_2 fmn mn h Triangle_3 Triangle_5 Triangle_2 fm) as _.\n  destruct_sigma (@Comp_rule x b c gm_2 n) as gmn Triangle_6.\n  destruct_sigma (@Assoc_rule x a b c g m n gm_2 gmn mn h Triangle_4 Triangle_6 Triangle_2 gm) as _.\n  destruct_sigma (@Mono2___Premise__reverse__rule b c x n fm_2 gm_2 h Triangle_5 Triangle_6 isMono_3) as _.\n  destruct_sigma (@Mono2___Premise__reverse__rule a b x m f g fm_2 Triangle_3 Triangle_4 isMono_2) as _.\n  exact eq_refl.\n}\ndestruct_sigma (@Mono2_rule a c mn Hpremise1) as isMono_5.\nexact isMono_5.\nQed.\n",
+      "abellaProof": "Theorem MonoStart_rule : forall a b c m n mn Triangle_2 isMono_2 isMono_3, vertex a -> vertex b -> vertex c -> edge a b m -> edge b c n -> edge a c mn -> triangle m n mn Triangle_2 -> isMono m isMono_2 -> isMono n isMono_3 -> exists isMono_4, isMono mn isMono_4.\nskip."
     }
   ]
 }
