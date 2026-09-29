@@ -11,7 +11,11 @@ import {
     filterSolvesGoalRuleApplications,
     isEqualityRule,
     EqualityArtefact,
-    type Drawing
+    orderPatternBySort,
+    sortRankMap,
+    type Artefact,
+    type Drawing,
+    type RuleApplication
 } from '../index.svelte.ts';
 import {
     makeDrawing,
@@ -547,6 +551,190 @@ describe('no-progress match filtering', () => {
 
         const filtered = filterNoProgressRuleApplications(rule, host, apps);
         expect(filtered.length).toBe(0);
+    });
+
+    // The conclusion is "edge q : x->y, with q = r". When the host has more than one
+    // candidate for q, a verdict taken from whichever candidate the search reached
+    // first depends on the host's artefact order: the first candidate may not be
+    // provably equal to r, so the match looks like it makes progress even though
+    // another candidate does satisfy q = r.
+    function buildConclusionEqualityRule(): Drawing {
+        const rule = makeDrawing();
+        const rv0 = makeVertex(rule, 'x');
+        const rv1 = makeVertex(rule, 'y');
+        const rEdge = makeEdge(rule, 'r', rv0, rv1);
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        const rq = makeEdge(rule, 'q', rv0, rv1, 'conclusion');
+        rule.newEqualityArtefact([rq, rEdge], 'conclusion');
+        rule.setIsRule(true);
+        return rule;
+    }
+
+    function buildParallelEdgeHost(firstLabel: string, secondLabel: string): Drawing {
+        const host = makeDrawing();
+        const hv0 = makeVertex(host, 'a');
+        const hv1 = makeVertex(host, 'b');
+        makeEdge(host, firstLabel, hv0, hv1);
+        makeEdge(host, secondLabel, hv0, hv1);
+        return host;
+    }
+
+    it('filters a match whose conclusion equality holds for a later candidate, not the first', () => {
+        const rule = buildConclusionEqualityRule();
+        // 'f' is drawn first, so it is the first candidate the conclusion search
+        // reaches; it is not provably equal to the matched root edge 'e'.
+        const host = buildParallelEdgeHost('f', 'e');
+
+        const apps = findFirstOrderRuleApplications(rule, host);
+        expect(apps.length).toBe(2);
+
+        const filtered = filterNoProgressRuleApplications(rule, host, apps);
+        expect(filtered.length).toBe(0);
+    });
+
+    it('gives the same verdict when the host candidates are drawn in the other order', () => {
+        const rule = buildConclusionEqualityRule();
+        const host = buildParallelEdgeHost('e', 'f');
+
+        const apps = findFirstOrderRuleApplications(rule, host);
+        expect(apps.length).toBe(2);
+
+        const filtered = filterNoProgressRuleApplications(rule, host, apps);
+        expect(filtered.length).toBe(0);
+    });
+
+    it('filters a match when the conclusion can be witnessed on the already-matched edge', () => {
+        const rule = buildConclusionEqualityRule();
+        // The host has a single edge for the conclusion to land on, so the only
+        // witness maps q onto the same edge r was matched to. The conclusion equality
+        // then holds trivially and applying the rule only adds a duplicate, so the
+        // match makes no progress.
+        const host = makeDrawing();
+        const hv0 = makeVertex(host, 'a');
+        const hv1 = makeVertex(host, 'b');
+        makeEdge(host, 'f', hv0, hv1);
+
+        const apps = findFirstOrderRuleApplications(rule, host);
+        expect(apps.length).toBe(1);
+
+        const filtered = filterNoProgressRuleApplications(rule, host, apps);
+        expect(filtered.length).toBe(0);
+    });
+
+    it('keeps a match whose conclusion artefact has no candidate in the host at all', () => {
+        const rule = makeDrawing();
+        const rv0 = makeVertex(rule, 'x');
+        const rv1 = makeVertex(rule, 'y');
+        const rv2 = makeVertex(rule, 'z');
+        makeEdge(rule, 'r', rv0, rv1);
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        makeEdge(rule, 'q', rv0, rv2, 'conclusion');
+        rule.setIsRule(true);
+
+        // The host has no edge from a to c, so no witness for q exists.
+        const host = makeDrawing();
+        const hv0 = makeVertex(host, 'a');
+        const hv1 = makeVertex(host, 'b');
+        makeVertex(host, 'c');
+        makeEdge(host, 'f', hv0, hv1);
+
+        const apps = findFirstOrderRuleApplications(rule, host);
+        expect(apps.length).toBe(1);
+
+        const filtered = filterNoProgressRuleApplications(rule, host, apps);
+        expect(filtered.length).toBe(1);
+    });
+});
+
+describe('pattern ordering follows sort declaration order', () => {
+    // The same rule, built with its root artefacts created in opposite orders. Both
+    // are valid: an artefact can only be created once its dependencies exist, but
+    // unrelated artefacts may be created in any relative order.
+    function buildComposableRootRule(order: 'forward' | 'reverse'): Drawing {
+        const rule = makeDrawing();
+        const mk = (): { rv0: Artefact; rv1: Artefact; rv2: Artefact } => {
+            if (order === 'forward') {
+                const rv0 = makeVertex(rule, 'rv0');
+                const rv1 = makeVertex(rule, 'rv1');
+                const rv2 = makeVertex(rule, 'rv2');
+                return { rv0, rv1, rv2 };
+            }
+            const rv2 = makeVertex(rule, 'rv2');
+            const rv1 = makeVertex(rule, 'rv1');
+            const rv0 = makeVertex(rule, 'rv0');
+            return { rv0, rv1, rv2 };
+        };
+        const { rv0, rv1, rv2 } = mk();
+        if (order === 'forward') {
+            makeEdge(rule, 're1', rv0, rv1);
+            makeEdge(rule, 're2', rv1, rv2);
+        } else {
+            makeEdge(rule, 're2', rv1, rv2);
+            makeEdge(rule, 're1', rv0, rv1);
+        }
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        makeEdge(rule, 're3', rv0, rv2, 'conclusion');
+        rule.setIsRule(true);
+        return rule;
+    }
+
+    function normaliseApplications(apps: RuleApplication[]): string[] {
+        return apps
+            .map(app => [...app.matchedArtefacts]
+                .map(([ruleArt, hostArt]) => `${ruleArt.data.label}=>${hostArt.data.label}`)
+                .sort()
+                .join(','))
+            .sort();
+    }
+
+    it('groups a pattern by sort while keeping the creation order within a sort', () => {
+        const rule = buildComposableRootRule('reverse');
+        const arts = rule.getArtefacts().filter(a => a.layerId === 'root' && a.sortName !== 'Equality');
+
+        const ordered = orderPatternBySort(arts, sortRankMap(rule.sortStore));
+
+        // Created as re2, re1, rv2, rv1, rv0, so edges would come first if the
+        // creation order were kept; vertices are declared before edges.
+        expect(ordered.map(a => a.data.label)).toEqual(['rv2', 'rv1', 'rv0', 're2', 're1']);
+    });
+
+    it('always places a pattern artefact after the pattern artefacts it depends on', () => {
+        for (const order of ['forward', 'reverse'] as const) {
+            const rule = buildComposableRootRule(order);
+            const arts = rule.getArtefacts().filter(a => a.layerId === 'root' && a.sortName !== 'Equality');
+            const ordered = orderPatternBySort(arts, sortRankMap(rule.sortStore));
+            const position = new Map(ordered.map((a, i) => [a, i] as const));
+
+            for (const a of ordered) {
+                for (const dep of Object.values(a.dependencies)) {
+                    expect(position.get(dep)).toBeLessThan(position.get(a)!);
+                }
+            }
+        }
+    });
+
+    it('finds the same set of applications whatever order the rule was created in', () => {
+        const { host } = buildComposableHost();
+
+        const forward = findFirstOrderRuleApplications(buildComposableRootRule('forward'), host);
+        const reverse = findFirstOrderRuleApplications(buildComposableRootRule('reverse'), host);
+
+        expect(forward.length).toBeGreaterThan(0);
+        expect(normaliseApplications(reverse)).toEqual(normaliseApplications(forward));
+    });
+
+    it('gives the same no-progress filter result whatever order the rule was created in', () => {
+        const { host } = buildComposableHost();
+        const forwardRule = buildComposableRootRule('forward');
+        const reverseRule = buildComposableRootRule('reverse');
+
+        const forwardApps = findFirstOrderRuleApplications(forwardRule, host);
+        const reverseApps = findFirstOrderRuleApplications(reverseRule, host);
+
+        const forwardFiltered = filterNoProgressRuleApplications(forwardRule, host, forwardApps);
+        const reverseFiltered = filterNoProgressRuleApplications(reverseRule, host, reverseApps);
+
+        expect(normaliseApplications(reverseFiltered)).toEqual(normaliseApplications(forwardFiltered));
     });
 });
 

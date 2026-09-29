@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { exportDrawingsToRocq, ruleParamBaseName } from '../rocq_export';
+import { exportDrawingsToRocq, ruleParamBaseName, ruleTypeInfo, newExportRegistry, orderLayerElements } from '../rocq_export';
+import type { LayerElement } from '../rocq_export';
 import { RocqRecorder } from '../rocq_recording.svelte.ts';
-import { Drawing, DrawingStore, findFirstOrderRuleApplications, applyFirstOrderRule, findSecondOrderRuleApplications, applySecondOrderRule, filterNoProgressRuleApplications, getFirstOrderStatementChildLayer } from '../index.svelte.ts';
+import { Drawing, DrawingStore, findFirstOrderRuleApplications, applyFirstOrderRule, findSecondOrderRuleApplications, applySecondOrderRule, filterNoProgressRuleApplications, getFirstOrderStatementChildLayer, sortEmissionOrder } from '../index.svelte.ts';
 import { newSortStore, makeVertex, makeEdge, makeDrawing, buildComposableHost, buildIsMonoInChildLayerRule, buildIsMonoOnlyConclusionRule, buildSecondOrderRule } from './helpers';
 
 describe('rocq export', () => {
@@ -290,7 +291,7 @@ describe('rocq export', () => {
         expect(script).toContain('admit.');
     });
 
-    it('orders rule arguments topologically, interleaving root equalities at their dependency position', () => {
+    it('orders rule arguments by sort group, each sort followed by its equalities', () => {
         const sortStore = newSortStore();
         const store = new DrawingStore();
 
@@ -326,6 +327,69 @@ describe('rocq export', () => {
 
         expect(script).toContain('@ArgOrderRule_rule a b c eq_refl mw isMono_2');
         expect(script).not.toContain('@ArgOrderRule_rule a b c mw isMono_2 eq_refl');
+    });
+
+    it('groups layer binders by sort declaration order regardless of drawing order', () => {
+        const sortStore = newSortStore();
+
+        const rule = new Drawing(sortStore);
+        const rv0 = makeVertex(rule, 'v0');
+        const rv1 = makeVertex(rule, 'v1');
+        const rv2 = makeVertex(rule, 'v2');
+        const re1 = makeEdge(rule, 'e1', rv0, rv1);
+        const re2 = makeEdge(rule, 'e2', rv1, rv2);
+        const re3 = makeEdge(rule, 'e3', rv2, rv0);
+        const re4 = makeEdge(rule, 'e4', rv0, rv2);
+        // A Pullback and a further Edge are created out of sort order, and the
+        // two equalities last of all: the grouping, not the drawing order,
+        // decides the binder sequence.
+        rule.newArtefact('Pullback', { p1: re1, p2: re2, q1: re3, q2: re4 }, { label: 'pb' }, 'root');
+        const re5 = makeEdge(rule, 'e5', rv1, rv0);
+        rule.newEqualityArtefact([rv0, rv1], 'root');
+        rule.newEqualityArtefact([re1, re5], 'root');
+
+        const info = ruleTypeInfo(rule, 'SortGroupRule', sortStore, newExportRegistry(sortStore), {
+            reserveParam: false,
+            includePremises: false
+        });
+
+        expect(info.rootElements.map(el => el.name)).toEqual([
+            'v0', 'v1', 'v2', 'eq_v0_v1',
+            'e1', 'e2', 'e3', 'e4', 'e5', 'eq_e1_e5',
+            'pb'
+        ]);
+        expect(info.type).toBe(
+            'forall (v0 v1 v2 : Vertex)(eq_v0_v1 : v0 = v1), ' +
+            'ltac:(subst_all_in (forall (e1 : Edge v0 v1)(e2 : Edge v1 v2)(e3 : Edge v2 v0)' +
+            '(e4 : Edge v0 v2)(e5 : Edge v1 v0)(eq_e1_e5 : e1 = e5), ' +
+            'ltac:(subst_all_in (forall (pb : Pullback e1 e2 e3 e4), True))))'
+        );
+    });
+
+    it('orders sorts for the binders by the same order it declares their Parameters', () => {
+        const sortStore = newSortStore();
+
+        expect(sortEmissionOrder(sortStore)).toEqual([
+            'Vertex', 'Edge', 'Pullback', 'Triangle', 'Square', 'isMono', 'isId', 'EqEdges'
+        ]);
+
+        const code = exportDrawingsToRocq([{ name: 'Plain', drawing: makeDrawing() }], sortStore);
+        const declared = code
+            .split('\n')
+            .filter(line => line.startsWith('Parameter '))
+            .map(line => line.slice('Parameter '.length).split(' ')[0]);
+        expect(declared).toEqual(sortEmissionOrder(sortStore));
+    });
+
+    it('rejects a sort order that would emit a dependency after its dependent', () => {
+        const vertex: LayerElement = { name: 'a', type: 'Vertex', kind: 'artefact', groupSort: 'Vertex', deps: [], artefactId: 'a1' };
+        const edge: LayerElement = { name: 'f', type: 'Edge a b', kind: 'artefact', groupSort: 'Edge', deps: ['a'], artefactId: 'a2' };
+
+        // A sorts file that declared Edge before Vertex: grouping follows it and
+        // would bind `f` at a type mentioning `a`, so the layering is rejected.
+        expect(() => orderLayerElements([vertex, edge], ['Edge', 'Vertex']))
+            .toThrow(/'f' depends on a, which is emitted later/);
+        expect(orderLayerElements([vertex, edge], ['Vertex', 'Edge'])).toEqual([vertex, edge]);
     });
 
     it('applies a first-order rule combining an artefact and a conclusion-layer isMono, naming it from the host', () => {
@@ -453,7 +517,10 @@ describe('rocq export', () => {
     // `destruct_sigma` runs `subst_all ()` right after each `destruct`, so an
     // equality binder never survives as a named hypothesis: emit `_` instead of
     // the host equality name.
-    it('masks a trailing conclusion equality as _ in destruct_sigma', () => {
+    // A vertex equality is emitted right after the vertex group, i.e. before
+    // the edge, so the edge is the sigma witness and the equality is the
+    // masked binder that precedes it.
+    it('masks a conclusion equality on an earlier sort before the witness in destruct_sigma', () => {
         const sortStore = newSortStore();
         const store = new DrawingStore();
 
@@ -481,7 +548,7 @@ describe('rocq export', () => {
         recorder.recordRuleApply(rule, 'TrailingEqRule', apps[0], host, created, 'MainDrawing', sortStore);
         const script = recorder.stop();
 
-        expect(script).toContain('destruct_sigma (@TrailingEqRule_rule a b) as f _.');
+        expect(script).toContain('destruct_sigma (@TrailingEqRule_rule a b) as _ f.');
         expect(script).not.toContain('as f eq_');
     });
 

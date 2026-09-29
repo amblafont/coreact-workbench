@@ -81,14 +81,16 @@ describe('abella export', () => {
 
         const code = exportDrawingsToAbella(store.getAllDrawings(), sortStore);
         expect(code).not.toContain('exists a = b');
-        expect(code).toContain('exists g, edge a b g /\\ a = b.');
-        expect(code).toMatch(/Theorem EqRule_rule :[^\n]*a = b\./)
+        // The vertex equality is grouped with the vertex sort, so it precedes
+        // the edge in the conjunction.
+        expect(code).toContain('exists g, a = b /\\ edge a b g.');
+        expect(code).toMatch(/Theorem EqRule_rule :[^\n]*a = b[^\n]*\nskip\./)
     });
 });
 
 describe('abella rendering primitives', () => {
-    const artefact = (name: string, type: string): LayerElement => ({ name, type, kind: 'artefact', deps: [] });
-    const equation = (name: string, type: string): LayerElement => ({ name, type, kind: 'equation', deps: [] });
+    const artefact = (name: string, type: string): LayerElement => ({ name, type, kind: 'artefact', groupSort: 'Edge', deps: [] });
+    const equation = (name: string, type: string): LayerElement => ({ name, type, kind: 'equation', groupSort: 'Vertex', deps: [] });
 
     it('renderAbellaSigma yields True, a witness, or a witnessed conjunction', () => {
         const sortStore = newSortStore();

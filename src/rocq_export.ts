@@ -1,3 +1,4 @@
+import { sortEmissionOrder } from "./index.svelte.ts";
 import type { Artefact, Drawing, Layer, SortDefinition, SortStore } from "./index.svelte.ts";
 
 export interface RocqDrawingRef {
@@ -197,34 +198,6 @@ export interface FieldItem {
     deps: string[];
 }
 
-export function topoSortFields(items: FieldItem[]): FieldItem[] {
-    const names = items.map(item => item.name);
-    const nameSet = new Set(names);
-    const indeg = new Map<string, number>();
-    for (const item of items) {
-        indeg.set(item.name, item.deps.filter(dep => nameSet.has(dep)).length);
-    }
-    const order: FieldItem[] = [];
-    const queue = items.filter(item => indeg.get(item.name) === 0);
-    while (queue.length > 0) {
-        const item = queue.shift()!;
-        order.push(item);
-        for (const other of items) {
-            if (other.deps.includes(item.name)) {
-                const current = indeg.get(other.name)! - 1;
-                indeg.set(other.name, current);
-                if (current === 0 && !order.includes(other) && !queue.includes(other)) {
-                    queue.push(other);
-                }
-            }
-        }
-    }
-    if (order.length !== items.length) {
-        throw new Error("Consistency Check Failed: Cyclic field dependencies within a layer record.");
-    }
-    return order;
-}
-
 export interface DrawingModel {
     name: string;
     layerById: Map<string, Layer>;
@@ -403,8 +376,66 @@ export function computeProofFieldNames(
 
 export interface LayerElement extends FieldItem {
     kind: "artefact" | "equation";
+    /**
+     * The sort whose group this element is emitted in. For an `artefact` that
+     * is its own sort; for an `equation` it is the sort of its latest-ranked
+     * child, so the equality follows the artefacts it constrains.
+     */
+    groupSort: string;
     artefactId?: string;
     eqIndex?: number;
+}
+
+/**
+ * Reject an ordering in which an element's same-layer dependencies are not all
+ * emitted before it, which would bind a type mentioning a name that is not yet
+ * in scope.
+ */
+function assertDependenciesPrecede(items: FieldItem[]): void {
+    const seen = new Set<string>();
+    for (const item of items) {
+        const missing = item.deps.filter(dep => !seen.has(dep));
+        if (missing.length > 0) {
+            throw new Error(
+                `Consistency Check Failed: Sort groups do not order layer dependencies; '${item.name}' depends on ${missing.join(", ")}, which is emitted later. Every sort must be declared after the sorts it depends on.`
+            );
+        }
+        seen.add(item.name);
+    }
+}
+
+/**
+ * Group a layer's elements by sort declaration order, emitting each sort's
+ * artefacts before the equalities over them. Order inside a group is the
+ * incoming order, i.e. the drawing's artefact order.
+ *
+ * `sortOrder` must be dependency-respecting (see `sortEmissionOrder`), which is
+ * what makes the result a valid topological order: a sort's same-layer
+ * dependencies are always sorts declared before it, and an equality is grouped
+ * after the latest of its children. `SortStore.newSort` enforces that invariant
+ * by refusing to declare a sort before its dependencies, so the grouping is
+ * sound by construction and `assertDependenciesPrecede` only exists to turn a
+ * violation into a clear error rather than a binder list Rocq cannot parse.
+ */
+export function orderLayerElements(elements: LayerElement[], sortOrder: string[]): LayerElement[] {
+    const rank = new Map(sortOrder.map((sortName, index) => [sortName, index] as const));
+    const fallbackRank = sortOrder.length;
+    const buckets = new Map<number, LayerElement[]>();
+    for (const el of elements) {
+        const key = (rank.get(el.groupSort) ?? fallbackRank) * 2 + (el.kind === "equation" ? 1 : 0);
+        const bucket = buckets.get(key);
+        if (bucket) {
+            bucket.push(el);
+        } else {
+            buckets.set(key, [el]);
+        }
+    }
+    const ordered: LayerElement[] = [];
+    for (const key of [...buckets.keys()].sort((a, b) => a - b)) {
+        ordered.push(...buckets.get(key)!);
+    }
+    assertDependenciesPrecede(ordered);
+    return ordered;
 }
 
 export function buildLayerElements(
@@ -412,8 +443,10 @@ export function buildLayerElements(
     sortStore: SortStore,
     model: DrawingModel,
     proofNames: ProofFieldNames,
-    layerId: string
+    layerId: string,
+    sortOrder: string[]
 ): LayerElement[] {
+    const rank = new Map(sortOrder.map((sortName, index) => [sortName, index] as const));
     const items: LayerElement[] = [];
     const layerArtefacts = drawing.getArtefacts().filter(art => art.layerId === layerId);
 
@@ -428,8 +461,18 @@ export function buildLayerElements(
                 .filter(id => model.artefactById.get(id)?.layerId === layerId)
                 .map(id => model.fieldNames.get(id))
                 .filter((name): name is string => !!name);
+            let groupSort = art.sortName;
+            let groupRank = rank.get(groupSort) ?? -1;
+            for (const id of childIds) {
+                const childSort = model.artefactById.get(id)?.sortName;
+                const childRank = childSort ? (rank.get(childSort) ?? -1) : -1;
+                if (childSort && childRank > groupRank) {
+                    groupSort = childSort;
+                    groupRank = childRank;
+                }
+            }
             names.forEach((name, index) => {
-                items.push({ name, type: equalityConjunctType(model, art, index), deps: depFieldNames, kind: "equation", artefactId: art.id, eqIndex: index });
+                items.push({ name, type: equalityConjunctType(model, art, index), deps: depFieldNames, kind: "equation", groupSort, artefactId: art.id, eqIndex: index });
             });
         } else {
             const fieldName = model.fieldNames.get(art.id);
@@ -451,11 +494,11 @@ export function buildLayerElements(
                     }
                 }
             }
-            items.push({ name: fieldName, type: fieldType(model, sortStore, art), deps: depFieldNames, kind: "artefact", artefactId: art.id });
+            items.push({ name: fieldName, type: fieldType(model, sortStore, art), deps: depFieldNames, kind: "artefact", groupSort: art.sortName, artefactId: art.id });
         }
     }
 
-    return topoSortFields(items) as LayerElement[];
+    return orderLayerElements(items, sortOrder);
 }
 
 function binderGroups(elements: LayerElement[]): Array<{ names: string[]; type: string }> {
@@ -562,13 +605,14 @@ export function ruleTypeInfo(
 ): RuleTypeInfo {
     const model = buildDrawingModel(drawing, name, registry);
     const proofNames = computeProofFieldNames(drawing, model, registry);
+    const sortOrder = sortEmissionOrder(sortStore);
 
     const rootLayers = drawing.getAllLayers().filter(l => l.parentId === null);
     if (rootLayers.length !== 1) {
         throw new Error(`Consistency Check Failed: Rule drawing '${name}' must have exactly one root layer.`);
     }
     const root = rootLayers[0];
-    const rootElements = buildLayerElements(drawing, sortStore, model, proofNames, root.id);
+    const rootElements = buildLayerElements(drawing, sortStore, model, proofNames, root.id, sortOrder);
 
     const rootChildren = drawing.getAllLayers().filter(l => l.parentId === root.id);
     const conclusion = rootChildren.find(child => {
@@ -598,7 +642,7 @@ export function ruleTypeInfo(
         };
     }
 
-    const conclusionElements = buildLayerElements(drawing, sortStore, model, proofNames, conclusion.id);
+    const conclusionElements = buildLayerElements(drawing, sortStore, model, proofNames, conclusion.id, sortOrder);
     const conclusionStr = renderSigma(conclusionElements);
 
     let type: string;
@@ -612,8 +656,8 @@ export function ruleTypeInfo(
                     throw new Error(`Consistency Check Failed: Premise layer '${premise.name}' in rule drawing '${name}' has no child layer.`);
                 }
                 return {
-                    premiseElements: buildLayerElements(drawing, sortStore, model, proofNames, premise.id),
-                    childElements: buildLayerElements(drawing, sortStore, model, proofNames, childOfPremise.id)
+                    premiseElements: buildLayerElements(drawing, sortStore, model, proofNames, premise.id, sortOrder),
+                    childElements: buildLayerElements(drawing, sortStore, model, proofNames, childOfPremise.id, sortOrder)
                 };
             });
         premiseLayers = premises;
@@ -684,23 +728,9 @@ export function exportDrawingsToRocq(drawings: Array<{ name: string; drawing: Dr
     lines.push("");
     lines.push("");
 
-    const sortDefs = sortStore.getAllSorts().filter(def => def.name !== "Equality");
-    const emittedSorts = new Set<string>();
-    const emitSort = (name: string): void => {
-        if (emittedSorts.has(name)) {
-            return;
-        }
-        const def = getSort(sortStore, name);
-        for (const [, depSortName] of Object.entries(def.dependencies)) {
-            if (depSortName !== "Equality") {
-                emitSort(depSortName);
-            }
-        }
-        emittedSorts.add(name);
+    for (const sortName of sortEmissionOrder(sortStore)) {
+        const def = getSort(sortStore, sortName);
         lines.push(`Parameter ${def.name} : ${sortHeaderType(sortStore, def)}.`);
-    };
-    for (const def of sortDefs) {
-        emitSort(def.name);
     }
 
     const rules = drawings.filter(ref => ref.drawing.isRule);
