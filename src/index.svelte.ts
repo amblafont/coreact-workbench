@@ -98,6 +98,21 @@ export class SortStore {
         return Array.from(this.sorts.values());
     }
 
+    /**
+     * The sorts in the order they were declared, excluding the built-in
+     * `Equality` pseudo-sort.
+     *
+     * This order is dependency-respecting by construction: `newSort` refuses to
+     * declare a sort before its dependencies, so a sort's dependencies are always
+     * earlier in this list. Callers may treat it as the order in which sorts are
+     * emitted, both for the preamble and for grouping a layer's binders.
+     */
+    getSortNames(): string[] {
+        return Array.from(this.sorts.values())
+            .filter(def => def.name !== "Equality")
+            .map(def => def.name);
+    }
+
     newSort(
         name: string,
         dependencies: Record<string, string>,
@@ -109,7 +124,10 @@ export class SortStore {
             throw new Error(`Consistency Check Failed: Sort '${name}' is already defined.`);
         }
 
-        // Consistency check: all dependencies must be already defined sorts
+        // Consistency check: all dependencies must be already defined sorts.
+        // This is load-bearing, not just validation: it is what makes
+        // `getSortNames()` a dependency-respecting order, which the exporters and
+        // the rule matcher both rely on.
         for (const [depKey, depSortName] of Object.entries(dependencies)) {
             if (!this.sorts.has(depSortName)) {
                 throw new Error(`Consistency Check Failed: Dependency sort '${depSortName}' for dependency '${depKey}' in sort '${name}' is not defined.`);
@@ -200,63 +218,25 @@ export function processWhenReady<T>(
     }
 }
 
-function requireSort(sortStore: SortStore, name: string): SortDefinition {
-    const def = sortStore.getSort(name);
-    if (!def) {
-        throw new Error(`Consistency Check Failed: Sort '${name}' is not defined.`);
-    }
-    return def;
-}
-
 /**
- * The order in which sorts are declared as `Parameter`s: a depth-first walk of
- * `SortStore.getAllSorts()` that emits every dependency before the sort that
- * names it. This is the single source of truth for both the preamble and the
- * order in which a layer's artefact binders are grouped.
- */
-export function sortEmissionOrder(sortStore: SortStore): string[] {
-    const order: string[] = [];
-    const emitted = new Set<string>();
-    const emitSort = (name: string): void => {
-        if (emitted.has(name)) {
-            return;
-        }
-        emitted.add(name);
-        for (const [, depSortName] of Object.entries(requireSort(sortStore, name).dependencies)) {
-            if (depSortName !== "Equality") {
-                emitSort(depSortName);
-            }
-        }
-        order.push(name);
-    };
-    for (const def of sortStore.getAllSorts()) {
-        if (def.name !== "Equality") {
-            emitSort(def.name);
-        }
-    }
-    return order;
-}
-
-/**
- * A sort's position in `sortEmissionOrder`. Every dependency of a sort is declared
- * before that sort, so comparing ranks also compares dependency order: an artefact
- * never has the same rank as an artefact it depends on.
+ * A sort's position in `SortStore.getSortNames()`. Every dependency of a sort is
+ * declared before that sort, so comparing ranks also compares dependency order: an
+ * artefact never has the same rank as an artefact it depends on.
  */
 export function sortRankMap(sortStore: SortStore): Map<string, number> {
     const rank = new Map<string, number>();
-    sortEmissionOrder(sortStore).forEach((name, i) => rank.set(name, i));
+    sortStore.getSortNames().forEach((name, i) => rank.set(name, i));
     return rank;
 }
 
 /**
- * Order artefacts by their sort's position in `sortEmissionOrder`, keeping the
- * given order among artefacts of the same sort.
+ * Order artefacts by their sort's position in `SortStore.getSortNames()`, keeping
+ * the given order among artefacts of the same sort.
  *
  * This is enough to satisfy the one requirement the pattern matcher has on
  * ordering: when an artefact is filled in, the artefacts it depends on are already
  * assigned, because any dependency's sort is declared before this artefact's sort.
- * Sorts cannot depend on themselves, so there is no ordering to fail here and
- * unlike a topological sort this needs no cycle check.
+ * Sorts cannot depend on themselves, so there is no ordering to fail here.
  */
 export function orderPatternBySort(pattern: Artefact[], rank: Map<string, number>): Artefact[] {
     const rankOf = (a: Artefact): number => {

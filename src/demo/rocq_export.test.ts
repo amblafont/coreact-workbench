@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { exportDrawingsToRocq, ruleParamBaseName, ruleTypeInfo, newExportRegistry, orderLayerElements } from '../rocq_export';
 import type { LayerElement } from '../rocq_export';
 import { RocqRecorder } from '../rocq_recording.svelte.ts';
-import { Drawing, DrawingStore, findFirstOrderRuleApplications, applyFirstOrderRule, findSecondOrderRuleApplications, applySecondOrderRule, filterNoProgressRuleApplications, getFirstOrderStatementChildLayer, sortEmissionOrder } from '../index.svelte.ts';
+import { Drawing, DrawingStore, findFirstOrderRuleApplications, applyFirstOrderRule, findSecondOrderRuleApplications, applySecondOrderRule, filterNoProgressRuleApplications, getFirstOrderStatementChildLayer } from '../index.svelte.ts';
 import { newSortStore, makeVertex, makeEdge, makeDrawing, buildComposableHost, buildIsMonoInChildLayerRule, buildIsMonoOnlyConclusionRule, buildSecondOrderRule } from './helpers';
 
 describe('rocq export', () => {
@@ -369,7 +369,7 @@ describe('rocq export', () => {
     it('orders sorts for the binders by the same order it declares their Parameters', () => {
         const sortStore = newSortStore();
 
-        expect(sortEmissionOrder(sortStore)).toEqual([
+        expect(sortStore.getSortNames()).toEqual([
             'Vertex', 'Edge', 'Pullback', 'Triangle', 'Square', 'isMono', 'isId', 'EqEdges'
         ]);
 
@@ -378,7 +378,47 @@ describe('rocq export', () => {
             .split('\n')
             .filter(line => line.startsWith('Parameter '))
             .map(line => line.slice('Parameter '.length).split(' ')[0]);
-        expect(declared).toEqual(sortEmissionOrder(sortStore));
+        expect(declared).toEqual(sortStore.getSortNames());
+    });
+
+    // The exporters and the rule matcher both treat `getSortNames()` as a
+    // dependency-respecting order without running a topological sort, so this
+    // invariant is what makes that sound. It holds because `newSort` refuses a
+    // forward reference; the two tests pin both halves.
+    it('lists every sort after the sorts it depends on', () => {
+        const sortStore = newSortStore();
+        const rank = new Map(sortStore.getSortNames().map((name, i) => [name, i] as const));
+
+        const misordered: string[] = [];
+        for (const name of sortStore.getSortNames()) {
+            for (const depSortName of Object.values(sortStore.getSort(name)!.dependencies)) {
+                if ((rank.get(depSortName) ?? -1) >= rank.get(name)!) {
+                    misordered.push(
+                        `'${name}' is declared at ${rank.get(name)} but depends on '${depSortName}' at ${rank.get(depSortName)}`
+                    );
+                }
+            }
+        }
+
+        expect(misordered).toEqual([]);
+    });
+
+    it('refuses to declare a sort before a sort it depends on', () => {
+        const sortStore = newSortStore();
+        const noop = () => null;
+
+        // 'Ends' names 'Middle', which has not been declared yet.
+        expect(() => sortStore.newSort('Ends', { from: 'Middle' }, {}, noop)).toThrow(
+            /Dependency sort 'Middle'/
+        );
+        expect(sortStore.getSortNames()).not.toContain('Ends');
+
+        // Declared after its dependency, the same sort is accepted.
+        sortStore.newSort('Middle', {}, {}, noop);
+        sortStore.newSort('Ends', { from: 'Middle' }, {}, noop);
+        const names = sortStore.getSortNames();
+        expect(names).toContain('Middle');
+        expect(names.indexOf('Middle')).toBeLessThan(names.indexOf('Ends'));
     });
 
     it('rejects a sort order that would emit a dependency after its dependent', () => {

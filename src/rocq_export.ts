@@ -1,4 +1,3 @@
-import { sortEmissionOrder } from "./index.svelte.ts";
 import type { Artefact, Drawing, Layer, SortDefinition, SortStore } from "./index.svelte.ts";
 
 export interface RocqDrawingRef {
@@ -409,8 +408,8 @@ function assertDependenciesPrecede(items: FieldItem[]): void {
  * artefacts before the equalities over them. Order inside a group is the
  * incoming order, i.e. the drawing's artefact order.
  *
- * `sortOrder` must be dependency-respecting (see `sortEmissionOrder`), which is
- * what makes the result a valid topological order: a sort's same-layer
+ * `sortOrder` must be dependency-respecting (see `SortStore.getSortNames()`),
+ * which is what makes the result a valid topological order: a sort's same-layer
  * dependencies are always sorts declared before it, and an equality is grouped
  * after the latest of its children. `SortStore.newSort` enforces that invariant
  * by refusing to declare a sort before its dependencies, so the grouping is
@@ -605,7 +604,7 @@ export function ruleTypeInfo(
 ): RuleTypeInfo {
     const model = buildDrawingModel(drawing, name, registry);
     const proofNames = computeProofFieldNames(drawing, model, registry);
-    const sortOrder = sortEmissionOrder(sortStore);
+    const sortOrder = sortStore.getSortNames();
 
     const rootLayers = drawing.getAllLayers().filter(l => l.parentId === null);
     if (rootLayers.length !== 1) {
@@ -689,9 +688,8 @@ export function ruleTypeInfo(
 
 export function newExportRegistry(sortStore: SortStore): NameRegistry {
     const registry = new NameRegistry();
-    const sortDefs = sortStore.getAllSorts().filter(def => def.name !== "Equality");
-    for (const def of sortDefs) {
-        registry.reserve(def.name);
+    for (const sortName of sortStore.getSortNames()) {
+        registry.reserve(sortName);
     }
     registry.reserve("Equality");
     return registry;
@@ -728,7 +726,7 @@ export function exportDrawingsToRocq(drawings: Array<{ name: string; drawing: Dr
     lines.push("");
     lines.push("");
 
-    for (const sortName of sortEmissionOrder(sortStore)) {
+    for (const sortName of sortStore.getSortNames()) {
         const def = getSort(sortStore, sortName);
         lines.push(`Parameter ${def.name} : ${sortHeaderType(sortStore, def)}.`);
     }
@@ -765,10 +763,9 @@ export interface DrawingExportNames {
 
 export function drawingExportNames(drawing: Drawing, name: string, sortStore: SortStore): DrawingExportNames {
     const registry = new NameRegistry();
-    const sortDefs = sortStore.getAllSorts().filter(def => def.name !== "Equality");
 
-    for (const def of sortDefs) {
-        registry.reserve(def.name);
+    for (const sortName of sortStore.getSortNames()) {
+        registry.reserve(sortName);
     }
     registry.reserve("Equality");
     if (drawing.isRule) {

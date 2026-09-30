@@ -29,9 +29,9 @@ function escapeRegExp(s: string): string {
 }
 
 function substituteKindNames(s: string, sortStore: SortStore): string {
-    const sorts = sortStore.getAllSorts()
-        .filter(def => def.name !== "Equality" && /^[A-Z]/.test(def.name))
-        .map(def => ({ from: def.name, to: toAbellaKindName(def.name) }))
+    const sorts = sortStore.getSortNames()
+        .filter(name => /^[A-Z]/.test(name))
+        .map(name => ({ from: name, to: toAbellaKindName(name) }))
         .sort((a, b) => b.from.length - a.from.length);
     if (sorts.length === 0) {
         return s;
@@ -103,27 +103,13 @@ export function exportDrawingsToAbella(
 
     const lines: string[] = [];
 
-    const sortDefs = sortStore.getAllSorts().filter(def => def.name !== "Equality");
-    const emittedSorts = new Set<string>();
-    const emitSort = (name: string): void => {
-        if (emittedSorts.has(name)) {
-            return;
-        }
-        const def = getSort(sortStore, name);
-        for (const [, depSortName] of Object.entries(def.dependencies)) {
-            if (depSortName !== "Equality") {
-                emitSort(depSortName);
-            }
-        }
-        emittedSorts.add(name);
+    for (const sortName of sortStore.getSortNames()) {
+        const def = getSort(sortStore, sortName);
         const deps = Object.entries(def.dependencies).map(([, depSortName]) => toAbellaKindName(depSortName));
         const kindName = toAbellaKindName(def.name);
         const argKinds = deps.length === 0 ? [kindName] : [...deps, kindName];
         lines.push(`Kind ${kindName} type.`);
         lines.push(`Type ${kindName} ${argKinds.join(" -> ")} -> prop.`);
-    };
-    for (const def of sortDefs) {
-        emitSort(def.name);
     }
 
     const rules = drawings.filter(ref => ref.drawing.isRule);
