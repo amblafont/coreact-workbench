@@ -7,6 +7,7 @@
         setLayerColor,
         toggleLayerColorEnabled,
         addChildLayer,
+        duplicateLayer,
         renameLayer,
         deleteLayer,
         checkLayerProvable
@@ -76,6 +77,11 @@
             <button class="layer-btn" title={`Add a child layer above '${layer.name}'`} onclick={() => addChildLayer(layer)}>
                 + Child
             </button>
+            <button
+                class="layer-btn"
+                title={`Duplicate '${layer.name}' as a new sibling layer, together with all its child layers and artefacts`}
+                onclick={() => duplicateLayer(layer)}
+            >Dup</button>
             <button
                 class="layer-btn"
                 style="color: #e74c3c;"

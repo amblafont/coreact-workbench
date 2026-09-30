@@ -1409,6 +1409,24 @@ export function deleteLayer(layer: { id: string; name: string }): void {
     }
 }
 
+export function duplicateLayer(layer: { id: string; name: string }): void {
+    const descendants = drawing.getDescendants(layer.id);
+    const artefactCount = drawing.getArtefacts().filter(art => descendants.has(art.layerId)).length;
+    const scope = descendants.size > 1
+        ? `${descendants.size - 1} child layer(s) and ${artefactCount} artefact(s)`
+        : `${artefactCount} artefact(s)`;
+    const newName = prompt(
+        `Enter name for the copy of '${layer.name}' (its ${scope} are copied too):`,
+        `${layer.name} (copy)`
+    );
+    if (!newName || !newName.trim()) return;
+    try {
+        drawing.duplicateLayerSubtree(layer.id, newName.trim());
+    } catch (err) {
+        pushToast('error', (err as Error).message);
+    }
+}
+
 export function toggleLayerVisibility(layer: { id: string; visible: boolean }): void {
     layer.visible = !layer.visible;
 

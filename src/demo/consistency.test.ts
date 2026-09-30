@@ -537,3 +537,120 @@ describe('layer provability', () => {
         expect(drawing.checkLayerProvable('prov-child').provable).toBe(false);
     });
 });
+
+describe('Drawing.duplicateLayerSubtree', () => {
+    it('copies a single layer as a sibling and preserves its presentation', () => {
+        const drawing = makeDrawing();
+        drawing.addLayer('mid', 'Mid', 'root', '#ff0000', true, false);
+        drawing.newArtefact('Vertex', {}, { position: [1, 2], label: 'v0' }, 'mid');
+
+        const copy = drawing.duplicateLayerSubtree('mid', 'Mid copy');
+
+        expect(copy.id).not.toBe('mid');
+        expect(copy.parentId).toBe('root');
+        expect(copy.name).toBe('Mid copy');
+        expect(copy.color).toBe('#ff0000');
+        expect(copy.colorEnabled).toBe(true);
+        expect(copy.visible).toBe(false);
+
+        expect(drawing.getLayer('mid')?.name).toBe('Mid');
+        expect(drawing.getAllLayers().map(l => l.id)).toEqual(['root', 'mid', copy.id]);
+    });
+
+    it('copies descendants and remaps dependencies inside the subtree to the copies', () => {
+        const drawing = makeDrawing();
+        drawing.addLayer('mid', 'Mid', 'root');
+        drawing.addLayer('leaf', 'Leaf', 'mid');
+        const a = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'a' }, 'leaf');
+        const b = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'b' }, 'leaf');
+        const edge = makeEdge(drawing, 'e', a, b, 'leaf');
+
+        const copy = drawing.duplicateLayerSubtree('mid');
+
+        const copyLeaf = drawing.getAllLayers().find(l => l.name === 'Leaf (copy)')!;
+        expect(copyLeaf).toBeDefined();
+        expect(copyLeaf.parentId).toBe(copy.id);
+
+        const copyEdge = drawing.getArtefacts().find(x => x.layerId === copyLeaf.id && x.sortName === 'Edge')!;
+        expect(copyEdge).not.toBe(edge);
+        expect(copyEdge.layerId).toBe(copyLeaf.id);
+        expect(copyEdge.dependencies.source.layerId).toBe(copyLeaf.id);
+        expect(copyEdge.dependencies.target.layerId).toBe(copyLeaf.id);
+        expect(copyEdge.dependencies.source).not.toBe(a);
+        expect(copyEdge.dependencies.target).not.toBe(b);
+
+        expect(edge.dependencies.source).toBe(a);
+        expect(edge.dependencies.target).toBe(b);
+    });
+
+    it('keeps dependencies reaching outside the subtree pointing at the original', () => {
+        const drawing = makeDrawing();
+        drawing.addLayer('mid', 'Mid', 'root');
+        const outside = makeVertex(drawing, 'outside');
+        const inside = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'inside' }, 'mid');
+        const cross = drawing.newArtefact(
+            'Edge',
+            { source: outside, target: inside },
+            { width: 2, bend: 0, label: 'cross' },
+            'mid'
+        );
+
+        const copy = drawing.duplicateLayerSubtree('mid');
+
+        const copyCross = drawing.getArtefacts().find(x => x.layerId === copy.id && x.sortName === 'Edge')!;
+        expect(copyCross.dependencies.source).toBe(outside);
+        expect(copyCross.dependencies.target).not.toBe(inside);
+        expect(cross.dependencies.target).toBe(inside);
+    });
+
+    it('copies equality artefacts with their children remapped to the copies', () => {
+        const drawing = makeDrawing();
+        drawing.addLayer('mid', 'Mid', 'root');
+        const a = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'a' }, 'mid');
+        const b = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'b' }, 'mid');
+        const eq = drawing.addEqualityArtefactUnchecked([a, b], 'mid');
+
+        const copy = drawing.duplicateLayerSubtree('mid');
+
+        const copyEq = drawing.getArtefacts().find(x => x.layerId === copy.id && x.sortName === 'Equality') as EqualityArtefact;
+        expect(copyEq).toBeDefined();
+        expect(copyEq).not.toBe(eq);
+        expect(copyEq.children).toHaveLength(2);
+        expect(copyEq.children.every(c => c.layerId === copy.id)).toBe(true);
+        expect(copyEq.children).not.toContain(a);
+        expect(copyEq.children).not.toContain(b);
+        expect(eq.children).toEqual([a, b]);
+    });
+
+    it('deep-copies artefact data', () => {
+        const drawing = makeDrawing();
+        drawing.addLayer('mid', 'Mid', 'root');
+        const original = drawing.newArtefact('Vertex', {}, { position: [1, 2], label: 'v0' }, 'mid');
+
+        const copy = drawing.duplicateLayerSubtree('mid');
+
+        const copied = drawing.getArtefacts().find(x => x.layerId === copy.id)!;
+        copied.data.position = [9, 9];
+        copied.data.label = 'renamed';
+
+        expect(original.data.position).toEqual([1, 2]);
+        expect(original.data.label).toBe('v0');
+    });
+
+    it('mints layer ids that do not collide with existing ones', () => {
+        const drawing = makeDrawing();
+        drawing.addLayer('layer-1', 'Take One', 'root');
+
+        const first = drawing.duplicateLayerSubtree('layer-1');
+        const second = drawing.duplicateLayerSubtree('layer-1');
+
+        expect(first.id).not.toBe('layer-1');
+        expect(second.id).not.toBe(first.id);
+        expect(drawing.getAllLayers().filter(l => l.id === first.id)).toHaveLength(1);
+    });
+
+    it('rejects an unknown layer', () => {
+        expect(() => makeDrawing().duplicateLayerSubtree('nope'))
+            .toThrowError(/Consistency Check Failed/);
+    });
+});

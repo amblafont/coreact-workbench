@@ -457,6 +457,7 @@ export class Drawing {
     private rocqProofStr = $state<string | null>(null);
     private abellaProofStr = $state<string | null>(null);
     private nextArtefactId: number = 1;
+    private nextLayerId: number = 1;
 
     constructor(sortStore: SortStore) {
         this.sortStore = sortStore;
@@ -734,6 +735,78 @@ export class Drawing {
         if (this.layers.size === 0) {
             this.addLayer("root", "Root Layer", null, "#3498db", false);
         }
+    }
+
+    // Deep-copy a layer together with all of its descendants (see
+    // getDescendants) as a sibling of the original: the new subtree mirrors the
+    // shape, colours and visibility of the source and has the same ancestor
+    // chain, so every copied artefact still satisfies the layer rules that its
+    // original satisfied.
+    //
+    // Artefacts are copied structurally rather than as "provably equal"
+    // duplicates: dependencies that stay inside the subtree are remapped to the
+    // copies, dependencies reaching outside keep pointing at the originals.
+    // Nothing outside the subtree can depend on a subtree artefact, because a
+    // dependency may only target the artefact's own layer or an ancestor, so the
+    // subtree is already the full reverse-dependency closure.
+    public duplicateLayerSubtree(layerId: string, name?: string): Layer {
+        const original = this.layers.get(layerId);
+        if (!original) {
+            throw new Error(`Consistency Check Failed: Layer '${layerId}' does not exist.`);
+        }
+
+        const subtree = this.getDescendants(layerId);
+        const idMap = new Map<string, string>();
+        let newRoot: Layer | null = null;
+
+        for (const layer of this.getLayersTopological()) {
+            if (!subtree.has(layer.id)) continue;
+            const isCopyRoot = layer.id === layerId;
+            const newId = this.mintLayerId();
+            idMap.set(layer.id, newId);
+            const copy = this.addLayer(
+                newId,
+                isCopyRoot ? (name ?? `${original.name} (copy)`) : `${layer.name} (copy)`,
+                // Descendant parents are always in the subtree and already
+                // mapped (topological order); the copy root keeps the original's.
+                layer.parentId === null ? null : (idMap.get(layer.parentId) ?? layer.parentId),
+                layer.color,
+                layer.colorEnabled,
+                layer.visible
+            );
+            if (isCopyRoot) newRoot = copy;
+        }
+
+        // Copy artefacts parents-first so that a copy's remapped dependencies
+        // are themselves copies by the time they are needed.
+        const copies = new Map<Artefact, Artefact>();
+        let pending = this.artefacts.filter(art => subtree.has(art.layerId));
+        while (pending.length > 0) {
+            const nextIndex = pending.findIndex(art =>
+                Object.values(art.dependencies)
+                    .every(dep => !subtree.has(dep.layerId) || copies.has(dep))
+            );
+            if (nextIndex === -1) {
+                throw new Error(`Consistency Check Failed: Cyclic dependencies among the artefacts of layer '${original.name}'.`);
+            }
+            const [art] = pending.splice(nextIndex, 1);
+
+            const dependencies: Record<string, Artefact> = {};
+            for (const [depKey, dep] of Object.entries(art.dependencies)) {
+                dependencies[depKey] = copies.get(dep) ?? dep;
+            }
+            const data = JSON.parse(JSON.stringify(art.data));
+            const targetLayerId = idMap.get(art.layerId)!;
+
+            copies.set(
+                art,
+                (art.sortName === "Equality" || art instanceof EqualityArtefact)
+                    ? this.newEqualityArtefact(Object.values(dependencies), targetLayerId, data)
+                    : this.newArtefact(art.sortName, dependencies, data, targetLayerId)
+            );
+        }
+
+        return newRoot!;
     }
 
     public setArtefactLayer(artefact: Artefact, targetLayerId: string): void {
@@ -1192,6 +1265,14 @@ export class Drawing {
 
     private mintId(): string {
         return `a${this.nextArtefactId++}`;
+    }
+
+    private mintLayerId(): string {
+        let candidate = `layer-${this.nextLayerId++}`;
+        while (this.layers.has(candidate)) {
+            candidate = `layer-${this.nextLayerId++}`;
+        }
+        return candidate;
     }
 
     // Restore a persisted artefact carrying its own stable id (e.g. legacy
