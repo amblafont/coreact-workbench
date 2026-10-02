@@ -1,0 +1,87 @@
+To get an idea of what a script for declaring sorts could look like, you can generate `default_sorts.js` with `npm run build:sorts`:
+this is the one loaded by default in the web app.
+
+# Initial description
+
+This is a description of a JS library for drawing SVG shapes, with data. The API is based on d3.js. The library is implemented in TypeScript.
+
+The library provides a class called SortStore. An object of type SortStore has a method newSort with 4 required arguments (and an optional 5th, `initContext`):
+1. The name of the sort, as a string.
+2. a dictionary whose keys are the names of the dependencies, and the values are the corresponding sort names. 
+3. a dictionary, whose fields are names of data attributes used to draw the shape, and the values are the type of the attribute (e.g., "number", "string", "boolean", "position")
+4. a function that takes a data object and some drawing context and draws the shape based on the data attributes. The data object has the same fields as specified in the second argument, except that it also has a field for each dependency, whose values is the corresponding data object, as well as field "label", of type string.
+
+The SortStore.newSort returns the same 
+sort store (useful for chaining) but it first checks consistency (e.g, dependencies are already defined sorts, and the data attributes are of some meaningful type). If the check fails, an error is thrown.
+
+Consistency checks are performed in the newArtefact method, and an error is thrown if the data object or the dependency object do not match the expected structure (for the dependency).
+
+Therefore, there is a class artefact.
+It supports a method draw.
+
+Then there is a class Drawing. The constructor takes a SortStore object as 
+an argument. It has a method newArtefact that takes the following arguments:
+1. a sort name, as a string
+2. a dictionary, whose keys are the names of the dependencies, and the values are the corresponding artefacts,
+3. a data dictionary, whose fields are names of data attributes used to draw the shape, and the values are the corresponding values for those attributes, possibly including an additional field "label", of type string.
+
+Of course there is some consistency check.
+
+The Drawing class has a method draw that 
+draws all the artefacts in the drawing, by calling the draw method of each artefact. It takes some arguments that specify the drawing context (e.g., a d3 selection of an SVG element).
+
+As an example, we could describe graphs as follows.
+
+```javascript
+const sortStore = new SortStore();
+sortStore.newSort("Vertex",
+  {}, {position: "position"}, (data, context) => {
+    // draw a vertex at data.position
+    //...
+  })
+  .newSort("Edge",
+  {source: "Vertex", target: "Vertex"}, {width: "number"}, (data, context) => {
+    // draw an edge from data.source to data.target with weight data.weight
+    //...
+  });
+
+const drawing = new Drawing(sortStore);
+const v0 = drawing.newArtefact("Vertex", {}, {position: [0, 0], label: "v0"});
+const v1 = drawing.newArtefact("Vertex", {}, {position: [2, 0], label: "v1"});
+drawing.newArtefact("Edge", {source: v0, target: v1}, {width: 1, label: "e0"});
+drawing.draw(...);
+```
+
+
+# Modelling tags as artefacts
+
+Properties that used to be modelled as boolean "flags" are now modelled as first-class artefacts of their own sort. For example, a "mono" tag on an edge is defined by an `isMono` sort that depends on an edge:
+
+```javascript
+sortStore.newSort("Edge",
+  {source: "Vertex", target: "Vertex"}, 
+  {width: "number"}, 
+  (data, context) => {
+    // draw an arrow
+  })
+  .newSort("isMono",
+  {arrow: "Edge"}, 
+  {}, 
+  (data, context) => {
+    // data.arrow is the Edge artefact; draw a small indicator hook/circle
+  });
+```
+
+When instantiating the artefact, the tag is just another artefact whose dependency points at the tagged artefact:
+```javascript
+const e0 = drawing.newArtefact("Edge", {source: v0, target: v1}, {width: 1, label: "e0"});
+drawing.newArtefact("isMono", {arrow: e0}, {}, "root");
+```
+
+Tag artefacts obey the same rules as any other sort:
+- **Layer Hierarchy Rule**: an `isMono` artefact in layer `L` may reference an edge in `L` or any of its lower ancestor layers.
+- **Rule matching**: an `isMono` artefact in the rule's root layer is part of the pattern and must be matched in the host; an `isMono` in a child/conclusion layer is rule structure and is created in the host root when the rule is applied.
+- **Layer focus styling**: tag artefacts in the focused layer are not dimmed.
+- **Reverse dependencies**: `getResolvedData()` (via `buildReverseDependencyInfo()`) injects `isMono: true` on an edge that has a visible `isMono` artefact, so draw functions can style the edge itself.
+
+I want rocq export feature for first-order rules. As an example, consider a rule named Comp whose root layer consists of two composable arrows f : a -> b and g : b -> c, and the child layer consists of one arrow h : a -> c together with a triangle artefact named T. The rocq export should yield: Comp : forall (a : Vertex)(b : Vertex)(c : Vertex)(f : Edge {| source := a, target := b |}) (g : Edge {| source := b, target := c |}), {|h : Edge {| source := a, target := c |}
