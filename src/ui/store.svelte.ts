@@ -30,7 +30,8 @@ import {
 } from '../index.svelte.ts';
 import { RocqRecorder } from '../rocq_recording.svelte.ts';
 import { AbellaRecorder } from '../abella_recording.svelte.ts';
-import { exportDrawingsToRocq, drawingExportNames, ruleTypeInfo, newExportRegistry } from '../rocq_export';
+import { exportDrawingsToRocq, drawingExportNames, ruleTypeInfo, newExportRegistry, NameRegistry } from '../rocq_export';
+import type { DrawingExportNames } from '../rocq_export';
 import { exportDrawingsToAbella, renderAbellaRuleType } from '../abella_export';
 
 // ---------------------------------------------------------------------------
@@ -605,12 +606,93 @@ export function selectMergeArtefact(artefact: Artefact): void {
 
 }
 
+export interface FieldRename {
+    from: string;
+    to: string;
+}
+
+// The layers whose artefacts are binders of the recorded lemma type: the root
+// layer and the statement's conclusion layer. Premise layers are inlined as
+// `assert`s instead, so their artefacts have no binder to rename.
+function isRecordedLayer(layerId: string): boolean {
+    if (drawing.getLayer(layerId)?.parentId === null) {
+        return true;
+    }
+    return layerId === getFirstOrderStatementChildLayer(drawing)?.id;
+}
+
+// The `rename` steps that bring a recorded proof back in sync with the exported
+// names of a drawing whose artefacts changed. Every field name in the proof is a
+// binder the script already holds, so a rename is only legal once its target is
+// free: the removed artefact's name is gone from the export registry but still
+// taken in the script, hence the move aside before the renames that want it.
+function planFieldRenames(before: DrawingExportNames, after: DrawingExportNames, removedId: string): FieldRename[] {
+    const occupied = new Set<string>(before.fieldNames.values());
+    for (const names of before.equalityFieldNames.values()) {
+        for (const name of names) {
+            occupied.add(name);
+        }
+    }
+
+    const pending: FieldRename[] = [];
+    for (const [id, to] of after.fieldNames) {
+        const from = before.fieldNames.get(id);
+        if (from && from !== to) {
+            pending.push({ from, to });
+        }
+    }
+
+    const renames: FieldRename[] = [];
+    const removedName = before.fieldNames.get(removedId);
+    if (removedName && pending.some(rename => rename.to === removedName)) {
+        const aside = new NameRegistry(occupied).unique('Hmerged');
+        renames.push({ from: removedName, to: aside });
+        occupied.delete(removedName);
+        occupied.add(aside);
+    }
+
+    // Every emitted rename frees its source, so emitting only the renames whose
+    // target is already free drains the queue; anything left would need a name
+    // that never frees up and is left unrecorded.
+    for (let progress = true; progress;) {
+        progress = false;
+        for (let i = 0; i < pending.length; i++) {
+            const rename = pending[i];
+            if (occupied.has(rename.to)) {
+                continue;
+            }
+            renames.push(rename);
+            occupied.delete(rename.from);
+            occupied.add(rename.to);
+            pending.splice(i, 1);
+            progress = true;
+            break;
+        }
+    }
+
+    return renames;
+}
+
 export function performMerge(): void {
     const first = ui.mergeFirstArtefact;
     const second = ui.mergeSecondArtefact;
     if (!first || !second || first === second || !drawing.areDependenciesEqual(first, second)) return;
     try {
+        const activeName = ui.activeDrawingName ?? 'Unsaved Drawing';
+        const before = activeRecorders().length > 0 && isRecordedLayer(second.layerId)
+            ? drawingExportNames(drawing, activeName, sortStore)
+            : null;
         const mergedResult = drawing.mergeArtefacts(first, second);
+        if (before) {
+            const renames = planFieldRenames(before, drawingExportNames(drawing, activeName, sortStore), first.id);
+            if (renames.length > 0) {
+                runRecorderStep(recorder => {
+                    for (const rename of renames) {
+                        recorder.recordRename(rename.from, rename.to, activeName);
+                    }
+                });
+            }
+        }
         ui.mergeMode = false;
         ui.mergeFirstArtefact = null;
         ui.mergeSecondArtefact = null;

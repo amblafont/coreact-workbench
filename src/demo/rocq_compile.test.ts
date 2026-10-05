@@ -14,7 +14,7 @@ import {
     type RuleApplication,
     type SortStore
 } from '../index.svelte.ts';
-import { exportDrawingsToRocq } from '../rocq_export';
+import { exportDrawingsToRocq, drawingExportNames } from '../rocq_export';
 import { RocqRecorder } from '../rocq_recording.svelte.ts';
 import { newSortStore, makeVertex, makeEdge, buildIsMonoOnlyConclusionRule } from './helpers';
 import { getFirstOrderStatementChildLayer } from '../index.svelte.ts';
@@ -448,6 +448,46 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         const script = recorder.stop();
 
         compile('duplicate_move', exportDrawingsToRocq(store.getAllDrawings(), sortStore) + '\n' + script);
+    });
+
+    it('compiles a host with a recorded artefact merge rename', () => {
+        const sortStore = newSortStore();
+        const store = new DrawingStore();
+
+        const host = new Drawing(sortStore);
+        const a = makeVertex(host, 'a');
+        const b = makeVertex(host, 'b');
+        const f = makeEdge(host, 'f', a, b);
+        const g = makeEdge(host, 'g', a, b);
+        host.addLayer('child', 'Child Layer', 'root');
+        makeEdge(host, 'c', a, b, 'child');
+        store.addDrawing('Main', host);
+
+        const recorder = new RocqRecorder();
+        recorder.start(host, 'Main', sortStore);
+
+        // Merging keeps `g` and relabels it "f, g", so the recorded proof has to
+        // follow the survivor's new field name for the closing `exact` to hold.
+        const before = drawingExportNames(host, 'Main', sortStore);
+        const survivorFieldBefore = before.fieldNames.get(g.id);
+        expect(survivorFieldBefore).toBe('g');
+        const merged = host.mergeArtefacts(f, g);
+        const after = drawingExportNames(host, 'Main', sortStore);
+        const survivorFieldAfter = after.fieldNames.get(merged.id);
+        expect(survivorFieldAfter).toBe('f__g');
+        recorder.recordRename(survivorFieldBefore!, survivorFieldAfter!, 'Main');
+
+        const prove = host.checkLayerProvable('child');
+        if (!prove.provable) {
+            throw new Error('child layer not provable: ' + (prove.reason ?? 'unknown'));
+        }
+        recorder.recordProveSuccess(host, 'child', prove.match ?? null, 'Main');
+        const script = recorder.stop();
+
+        expect(script).toContain('rename g into f__g.');
+        expect(script).toContain('exact f__g.');
+        expect(script).toContain('Qed.');
+        compile('merged_artefact_rename', exportDrawingsToRocq(store.getAllDrawings(), sortStore) + '\n' + script);
     });
 
     it('compiles an unfinished main with a goal conclusion exported as Admitted', () => {

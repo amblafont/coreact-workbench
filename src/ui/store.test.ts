@@ -5,7 +5,8 @@ import { getDrawing, drawingStore, ui, sortStore, rocqRecorder, abellaRecorder, 
     applyPickedPosition, startPositionPicker, selectArtefactToInspect, removeArtefactNode,
     toggleEqualityExtend, equalityChildren, onArtefactNodeClick, createDraftArtefact,
     splitFirstOrderRecording, openProofEditor, closeProofEditor, updateDrawingProof, removeDrawingProofs, suggestAdmittedProof, toggleProofRecording /* runRecorderStep */,
-    setActiveDrawing, checkLayerProvable, pendingProofCount, toggleAutoApplyEqualityRules, computeRuleApplications
+    setActiveDrawing, checkLayerProvable, pendingProofCount, toggleAutoApplyEqualityRules, computeRuleApplications,
+    startMergeMode, selectMergeArtefact, performMerge
 } from './store.svelte.ts';
 import { Artefact, Drawing, DrawingStore, getFirstOrderStatementChildLayer } from '../index.svelte.ts';
 import { registerDefaultSorts } from '../demo/buildDemo';
@@ -816,6 +817,146 @@ describe('rocq recording proof attachment', () => {
         closeProofEditor();
     });
     */
+});
+
+describe('merge recording', () => {
+    beforeEach(() => {
+        registerDefaultSorts(sortStore);
+        getDrawing().clear(true);
+        drawingStore.clear();
+        ui.activeDrawingName = null;
+        ui.recordingActive = false;
+        ui.toasts = [];
+        closeProofEditor();
+    });
+
+    afterEach(() => {
+        ui.activeDrawingName = null;
+        ui.recordingActive = false;
+        ui.toasts = [];
+        closeProofEditor();
+        if (rocqRecorder.isActive()) {
+            rocqRecorder.stop();
+        }
+    });
+
+    function startRecording(stmt: Drawing): void {
+        drawingStore.addDrawing('Statement', stmt);
+        ui.activeDrawingName = 'Statement';
+        toggleProofRecording();
+        expect(rocqRecorder.isActive()).toBe(true);
+    }
+
+    // A statement with two parallel edges `f` and `g`, i.e. a mergeable pair.
+    function buildLabelledStatement(): { stmt: Drawing; first: Artefact; second: Artefact } {
+        const stmt = getDrawing();
+        const a = makeVertex(stmt, 'a');
+        const b = makeVertex(stmt, 'b');
+        const first = makeEdge(stmt, 'f', a, b);
+        const second = makeEdge(stmt, 'g', a, b);
+        return { stmt, first, second };
+    }
+
+    it('records the automatic rename of the merged artefact', () => {
+        const { stmt, first, second } = buildLabelledStatement();
+        startRecording(stmt);
+
+        startMergeMode(first);
+        selectMergeArtefact(second);
+        performMerge();
+
+        // The merge keeps the second artefact and labels it "f, g".
+        expect(ui.inspectedArtefact).toBe(second);
+        expect(second.data.label).toBe('f, g');
+
+        const script = rocqRecorder.stop();
+        expect(script).toContain('rename g into f__g.');
+    });
+
+    it('frees the merged artefact name before renaming the survivor into it', () => {
+        // Two unlabelled isMonos: the removed one held "isMono_2" and the
+        // survivor inherits that name from the export registry, so its rename
+        // target is still taken in the proof unless the removed binder moves.
+        const stmt = getDrawing();
+        const a = makeVertex(stmt, 'a');
+        const b = makeVertex(stmt, 'b');
+        const e1 = makeEdge(stmt, 'e1', a, b);
+        const first = stmt.newArtefact('isMono', { arrow: e1 }, {}, 'root');
+        const second = stmt.newArtefact('isMono', { arrow: e1 }, {}, 'root');
+        startRecording(stmt);
+
+        startMergeMode(first);
+        selectMergeArtefact(second);
+        performMerge();
+
+        const script = rocqRecorder.stop();
+        const aside = script.indexOf('rename isMono_2 into Hmerged.');
+        const survivor = script.indexOf('rename isMono_3 into isMono_2.');
+        expect(aside).toBeGreaterThan(-1);
+        expect(survivor).toBeGreaterThan(aside);
+    });
+
+    it('records the renames of the artefacts the merge renames as a side effect', () => {
+        // Three unlabelled isMonos over one edge: dropping the first shifts the
+        // export names of the other two down, so both have to follow in the
+        // recorded script.
+        const stmt = getDrawing();
+        const a = makeVertex(stmt, 'a');
+        const b = makeVertex(stmt, 'b');
+        const e1 = makeEdge(stmt, 'e1', a, b);
+        const first = stmt.newArtefact('isMono', { arrow: e1 }, {}, 'root');
+        const second = stmt.newArtefact('isMono', { arrow: e1 }, {}, 'root');
+        stmt.newArtefact('isMono', { arrow: e1 }, {}, 'root');
+        startRecording(stmt);
+
+        startMergeMode(first);
+        selectMergeArtefact(second);
+        performMerge();
+
+        const script = rocqRecorder.stop();
+        expect(script.indexOf('rename isMono_2 into Hmerged.')).toBeGreaterThan(-1);
+        expect(script.indexOf('rename isMono_3 into isMono_2.')).toBeGreaterThan(
+            script.indexOf('rename isMono_2 into Hmerged.'));
+        expect(script.indexOf('rename isMono_4 into isMono_3.')).toBeGreaterThan(
+            script.indexOf('rename isMono_3 into isMono_2.'));
+    });
+
+    it('records nothing when the merge happens outside a recorded layer', () => {
+        const stmt = getDrawing();
+        const a = makeVertex(stmt, 'a');
+        const b = makeVertex(stmt, 'b');
+        const edge = makeEdge(stmt, 'e', a, b);
+        stmt.addLayer('premise', 'Premise', 'root');
+        stmt.addLayer('premise-child', 'Premise Child', 'premise');
+        const first = makeEdge(stmt, 'p1', a, b, 'premise');
+        const second = makeEdge(stmt, 'p2', a, b, 'premise');
+        startRecording(stmt);
+
+        startMergeMode(first);
+        selectMergeArtefact(second);
+        performMerge();
+
+        // A premise layer is inlined as an `assert`, so its artefacts have no
+        // binder to rename and the script stays untouched.
+        const script = rocqRecorder.stop();
+        expect(script).not.toContain('rename');
+        expect(ui.inspectedArtefact).toBe(second);
+        expect(edge.data.label).toBe('e');
+    });
+
+    it('records nothing when no recording is running', () => {
+        const { stmt, first, second } = buildLabelledStatement();
+        drawingStore.addDrawing('Statement', stmt);
+        ui.activeDrawingName = 'Statement';
+        expect(rocqRecorder.isActive()).toBe(false);
+
+        startMergeMode(first);
+        selectMergeArtefact(second);
+        expect(() => performMerge()).not.toThrow();
+
+        expect(ui.inspectedArtefact).toBe(second);
+        expect(second.data.label).toBe('f, g');
+    });
 });
 
 describe('proof recording subgoal navigation', () => {
