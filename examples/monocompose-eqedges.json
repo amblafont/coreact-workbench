@@ -111,7 +111,9 @@
             "2": "art_4",
             "o": "art_5"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_7",
@@ -142,8 +144,7 @@
         }
       ],
       "isRule": false,
-      "isFirstOrder": false,
-      "proved": false
+      "isFirstOrder": false
     },
     {
       "name": "Mono2",
@@ -309,7 +310,9 @@
             "2": "art_2",
             "o": "a1"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "a3",
@@ -344,11 +347,14 @@
             "2": "art_2",
             "o": "art_6"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         }
       ],
       "isRule": true,
-      "isFirstOrder": false
+      "isFirstOrder": false,
+      "proved": false
     },
     {
       "name": "Assoc",
@@ -488,7 +494,9 @@
             "2": "art_5",
             "o": "art_7"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_9",
@@ -513,7 +521,9 @@
             "2": "art_6",
             "o": "art_9"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_11",
@@ -538,7 +548,9 @@
             "2": "art_6",
             "o": "art_11"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "art_13",
@@ -563,7 +575,9 @@
             "2": "art_11",
             "o": "art_13"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "a1",
@@ -692,7 +706,9 @@
             "2": "art_4",
             "o": "art_5"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         }
       ],
       "isRule": true,
@@ -833,7 +849,8 @@
             "o": "a8"
           },
           "data": {
-            "label": "gm"
+            "label": "gm",
+            "bend": 0
           }
         },
         {
@@ -859,7 +876,9 @@
             "2": "a3",
             "o": "a10"
           },
-          "data": {}
+          "data": {
+            "bend": 0
+          }
         },
         {
           "id": "a12",
@@ -907,7 +926,7 @@
           "parentId": "root",
           "color": "#d0f8e8",
           "colorEnabled": true,
-          "visible": true
+          "visible": false
         },
         {
           "id": "layer-mub2yugu",
@@ -1005,7 +1024,8 @@
         }
       ],
       "isRule": true,
-      "isFirstOrder": false
+      "isFirstOrder": false,
+      "proved": false
     },
     {
       "name": "EqEdgeDef > Premise (reverse)",
@@ -1107,7 +1127,114 @@
       ],
       "isRule": true,
       "isFirstOrder": true,
-      "parentName": "EqEdgeDef"
+      "parentName": "EqEdgeDef",
+      "proved": false
+    },
+    {
+      "name": "Symmetry",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        },
+        {
+          "id": "layer-mub2yzm1",
+          "name": "Conclusion",
+          "parentId": "root",
+          "color": "#27c80c",
+          "colorEnabled": true,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "a1",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              205,
+              279
+            ],
+            "label": "a"
+          }
+        },
+        {
+          "id": "a2",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              354,
+              275
+            ],
+            "label": "b"
+          }
+        },
+        {
+          "id": "a3",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a1",
+            "target": "a2"
+          },
+          "data": {
+            "width": 2,
+            "bend": 66,
+            "label": "g"
+          }
+        },
+        {
+          "id": "a4",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a1",
+            "target": "a2"
+          },
+          "data": {
+            "width": 2,
+            "bend": -93,
+            "label": "f"
+          }
+        },
+        {
+          "id": "a5",
+          "sortName": "EqEdges",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a4",
+            "target": "a3"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a7",
+          "sortName": "EqEdges",
+          "layerId": "layer-mub2yzm1",
+          "dependencies": {
+            "source": "a3",
+            "target": "a4"
+          },
+          "data": {
+            "bend": 0
+          }
+        }
+      ],
+      "isRule": true,
+      "isFirstOrder": true,
+      "rocqProof": "Lemma Symmetry_rule : forall (a b : Vertex)(g f : Edge a b)(EqEdges_2 : EqEdges f g), EqEdges g f.\nintros_sigma ().\nassert (Hpremise1 : g = f). {\n  intros_sigma ().\n  destruct_sigma (@EqEdgeDef___Premise__reverse__rule a b g f EqEdges_2) as _.\n  exact eq_refl.\n}\ndestruct_sigma (@EqEdgeDef_rule a b f g Hpremise1) as EqEdges_4.\nexact EqEdges_4.\nQed.\n",
+      "abellaProof": "Theorem Symmetry_rule : forall a b g f EqEdges_2, vertex a -> vertex b -> edge a b g -> edge a b f -> eqEdges f g EqEdges_2 -> exists EqEdges_3, eqEdges g f EqEdges_3.\nskip.",
+      "proved": false
     }
   ]
 }
