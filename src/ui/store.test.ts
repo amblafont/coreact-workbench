@@ -6,7 +6,7 @@ import { getDrawing, drawingStore, ui, sortStore, rocqRecorder, abellaRecorder, 
     toggleEqualityExtend, equalityChildren, onArtefactNodeClick, createDraftArtefact,
     splitFirstOrderRecording, openProofEditor, closeProofEditor, updateDrawingProof, removeDrawingProofs, suggestAdmittedProof, toggleProofRecording /* runRecorderStep */,
     setActiveDrawing, checkLayerProvable, pendingProofCount, toggleAutoApplyEqualityRules, computeRuleApplications,
-    startMergeMode, selectMergeArtefact, performMerge
+    startMergeMode, selectMergeArtefact, performMerge, unmarkInvalidRules
 } from './store.svelte.ts';
 import { Artefact, Drawing, DrawingStore, getFirstOrderStatementChildLayer } from '../index.svelte.ts';
 import { registerDefaultSorts } from '../demo/buildDemo';
@@ -1545,5 +1545,50 @@ describe('auto-apply equality rules', () => {
         toggleAutoApplyEqualityRules();
 
         expect(getDrawing().getArtefacts().length).toBe(before);
+    });
+});
+
+describe('auto-unmark invalid rules', () => {
+    beforeEach(() => {
+        registerDefaultSorts(sortStore);
+        getDrawing().clear(true);
+        drawingStore.clear();
+        ui.activeDrawingName = null;
+        ui.toasts = [];
+    });
+
+    afterEach(() => {
+        ui.activeDrawingName = null;
+        ui.toasts = [];
+    });
+
+    it('unmarks a marked rule that becomes structurally invalid and pushes a toast', () => {
+        const rule = makeDrawing();
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        rule.setIsRule(true);
+        drawingStore.addDrawing('ValidRule', rule);
+        expect(rule.isRule).toBe(true);
+
+        rule.addLayer('extra', 'Extra', null);
+        expect(rule.checkRuleConditions().isRule).toBe(false);
+
+        unmarkInvalidRules();
+
+        expect(rule.isRule).toBe(false);
+        expect(ui.toasts).toHaveLength(1);
+        expect(ui.toasts[0].kind).toBe('info');
+        expect(ui.toasts[0].message).toContain("'ValidRule'");
+    });
+
+    it('leaves a valid rule marked and pushes no toast', () => {
+        const rule = makeDrawing();
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        rule.setIsRule(true);
+        drawingStore.addDrawing('ValidRule', rule);
+
+        unmarkInvalidRules();
+
+        expect(rule.isRule).toBe(true);
+        expect(ui.toasts).toHaveLength(0);
     });
 });

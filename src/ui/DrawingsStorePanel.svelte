@@ -5,18 +5,14 @@
     import {
         allDrawings,
         ui,
-        isCurrentDrawingRule,
-        pendingProofCount,
-        ruleTag
+        pendingProofCount
     } from './store.svelte.ts';
-    import type { RuleTag } from './store.svelte.ts';
     import {
         newDrawing,
         importDrawingsFile,
         downloadDrawingsJson,
         openCodeExport,
         deleteSelectedDrawings,
-        setCurrentDrawingRule,
         toggleProofRecording,
         setExportSelectionAll,
         getSelectedDrawingNames,
@@ -27,7 +23,6 @@
 
     let names = $derived(new Set(allDrawings().map(d => d.name)));
     let roots = $derived(allDrawings().filter(d => !d.parentName || !names.has(d.parentName)));
-    let tag: RuleTag | null = $derived(ruleTag());
     let collapsed = $derived(ui.drawingsStoreCollapsed);
 
     function toggleCollapsed(): void {
@@ -110,28 +105,6 @@
     </div>
 
     {#if !collapsed}
-    <div class="current-drawing-banner">
-        <span style="color: #555;">
-            Editing: <strong style="color: #2c3e50;">{ui.activeDrawingName ?? 'Unsaved Drawing'}</strong>
-        </span>
-        <label
-            class="rule-checkbox-label"
-            title="Explicitly mark the current drawing as a rule (must satisfy rule conditions)"
-        >
-            <input type="checkbox" checked={isCurrentDrawingRule()} onchange={(e) => setCurrentDrawingRule((e.currentTarget as HTMLInputElement).checked)} />
-            Rule
-        </label>
-        {#if tag}
-            {#if tag.kind === 'invalid'}
-                <span class="rule-badge rule-badge-invalid" title={tag.reason}>Invalid Rule</span>
-            {:else if tag.kind === 'first'}
-                <span class="first-order-badge" title="First-order rule: root layer has only one child">1<sup>st</sup>-Order</span>
-            {:else}
-                <span class="second-order-badge" title="Second-order rule: root layer has several child layers">2<sup>nd</sup>-Order</span>
-            {/if}
-        {/if}
-    </div>
-
     {#if allDrawings().length === 0}
         <div class="empty-msg">No drawings saved yet.</div>
     {:else}

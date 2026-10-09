@@ -15,7 +15,8 @@
         startMergeMode,
         cancelMergeMode,
         applyPersistedPanelWidths,
-        persistPanelWidths
+        persistPanelWidths,
+        unmarkInvalidRules
     } from './store.svelte.ts';
 
     const LEFT_MIN = 180;
@@ -33,6 +34,10 @@
         void ui.leftPanelWidth;
         void ui.rightPanelWidth;
         persistPanelWidths();
+    });
+
+    $effect(() => {
+        unmarkInvalidRules();
     });
 
     function onLoadScript(): void {

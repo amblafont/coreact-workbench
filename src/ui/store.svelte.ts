@@ -242,6 +242,18 @@ export function ruleTag(): RuleTag | null {
         : ({ kind: 'second' } satisfies RuleTag);
 }
 
+export function unmarkInvalidRules(): void {
+    for (const entry of drawingStore.getAllDrawings()) {
+        const target = entry.drawing;
+        if (!target.isRule) continue;
+        const check = target.checkRuleConditions();
+        if (!check.isRule) {
+            target.setIsRule(false);
+            pushToast('info', `Drawing '${entry.name}' is no longer a valid rule and has been unmarked: ${check.reason ?? 'unknown reason'}`);
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Position picker helpers
 // ---------------------------------------------------------------------------
@@ -1212,10 +1224,6 @@ export function onArtefactNodeClick(art: Artefact): void {
 // Drawing store / rule / recording app actions
 // ---------------------------------------------------------------------------
 
-export function isCurrentDrawingRule(): boolean {
-    return drawing.isRule;
-}
-
 export interface RecordedStatementInfo {
     drawingName: string;
     lemmaName: string;
@@ -1237,15 +1245,6 @@ export function recordedStatementByDrawing(): Map<string, RecordedStatementInfo>
 
 export function pendingProofCount(): number {
     return activeRecorder().getRecordedStatements().filter(s => !s.isMain && !s.proved).length;
-}
-
-export function setCurrentDrawingRule(checked: boolean): void {
-    try {
-        drawing.setIsRule(checked);
-
-    } catch (err) {
-        pushToast('error', (err as Error).message);
-    }
 }
 
 export function duplicateDrawing(name: string): void {
