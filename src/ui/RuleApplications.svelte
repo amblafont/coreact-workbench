@@ -32,12 +32,13 @@
     }
 
     function onApply(entry: (typeof entries)[number], index: number): void {
+        ui.ruleHoverArtefacts = null;
         applyRuleAt(entry.name, index);
     }
 
     function onHover(activeSet: Set<Artefact>): void {
         if (ui.mergeMode) return;
-        ui.ruleHoverArtefacts = activeSet;
+        ui.ruleHoverArtefacts = activeSet && activeSet.size > 0 ? activeSet : null;
     }
 
     function onLeave(): void {

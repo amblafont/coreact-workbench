@@ -787,6 +787,8 @@ export function resetInteractionState(): void {
     ui.mergeSecondArtefact = null;
     ui.mergePickingFor = null;
     ui.mergeHoverArtefact = null;
+    ui.menuHoverArtefact = null;
+    ui.ruleHoverArtefacts = null;
     stopPositionPicker();
 }
 
@@ -1833,6 +1835,7 @@ export function runEqualityRuleAutoApply(): void {
 }
 
 export function applyRuleAt(savedRuleName: string, appIndex: number): void {
+    ui.ruleHoverArtefacts = null;
     const entry = computeRuleApplications().find(e => e.name === savedRuleName);
     const app = entry?.applications[appIndex];
     if (!entry || !app) return;
@@ -1848,6 +1851,7 @@ export function applyRuleAt(savedRuleName: string, appIndex: number): void {
  * used to tell success from failure.
  */
 function applyRuleEntry(entry: RuleAppEntry, app: RuleApplication): boolean {
+    ui.ruleHoverArtefacts = null;
     const { name, drawing: ruleDrawing } = entry;
     const activeName = ui.activeDrawingName ?? 'Unsaved Drawing';
     const goalWasProved = computeProved(drawing);

@@ -33,10 +33,11 @@
     const inspected = $derived(ui.inspectedArtefact);
     const menuHover = $derived(ui.menuHoverArtefact);
     const ruleHover = $derived(ui.ruleHoverArtefacts);
+    const hasRuleHover = $derived(!!ruleHover && ruleHover.size > 0);
 
     $effect(() => {
         if (!svgReady) return;
-        if (mergeOn || ruleHover || menuHover || inspected || focusedId) {
+        if (mergeOn || hasRuleHover || menuHover || inspected || focusedId) {
             applyOverlays();
         } else {
             redraw();
@@ -67,7 +68,7 @@
             }
             return mergeBaseOpacityFor(art);
         }
-        if (ruleHover) {
+        if (ruleHover && ruleHover.size > 0) {
             return ruleHover.has(art) ? 1 : 0.5;
         }
         const target = menuHover ?? inspected;

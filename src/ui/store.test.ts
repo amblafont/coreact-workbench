@@ -294,6 +294,25 @@ describe('goal solved toast on rule application', () => {
 
         expect(ui.toasts.some(t => t.kind === 'success')).toBe(false);
     });
+
+    it('clears ruleHoverArtefacts when applying a rule', () => {
+        const { rule } = buildComposableEdgesRule();
+        drawingStore.addDrawing('CompRule', rule);
+
+        const v0 = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'v0' }, 'root');
+        const v1 = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'v1' }, 'root');
+        const v2 = getDrawing().newArtefact('Vertex', {}, { position: [0, 0], label: 'v2' }, 'root');
+        getDrawing().newArtefact('Edge', { source: v0, target: v1 }, { width: 2, bend: 0, label: 'he1' }, 'root');
+        getDrawing().newArtefact('Edge', { source: v1, target: v2 }, { width: 2, bend: 0, label: 'he2' }, 'root');
+
+        drawingStore.addDrawing('Statement', getDrawing());
+        ui.activeDrawingName = 'Statement';
+
+        ui.ruleHoverArtefacts = new Set([v0, v1]);
+        applyRuleAt('CompRule', 0);
+
+        expect(ui.ruleHoverArtefacts).toBeNull();
+    });
 });
 
 describe('position picker', () => {
@@ -500,6 +519,17 @@ describe('equality extend picking', () => {
 
         resetInteractionState();
         expect(ui.equalityExtendTarget).toBeNull();
+    });
+
+    it('resetInteractionState clears rule and menu hover state', () => {
+        const [v0] = makeVertices('v0');
+        ui.ruleHoverArtefacts = new Set([v0]);
+        ui.menuHoverArtefact = v0;
+
+        resetInteractionState();
+
+        expect(ui.ruleHoverArtefacts).toBeNull();
+        expect(ui.menuHoverArtefact).toBeNull();
     });
 
     it('keeps an equality draft open to pick more than two children until validated', () => {
