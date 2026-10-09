@@ -5,7 +5,7 @@ import { getDrawing, drawingStore, ui, sortStore, rocqRecorder, abellaRecorder, 
     applyPickedPosition, startPositionPicker, selectArtefactToInspect, removeArtefactNode,
     toggleEqualityExtend, equalityChildren, onArtefactNodeClick, createDraftArtefact,
     splitFirstOrderRecording, openProofEditor, closeProofEditor, updateDrawingProof, removeDrawingProofs, suggestAdmittedProof, toggleProofRecording /* runRecorderStep */,
-    setActiveDrawing, checkLayerProvable, pendingProofCount, toggleAutoApplyEqualityRules, computeRuleApplications,
+    setActiveDrawing, pendingProofCount, toggleAutoApplyEqualityRules, computeRuleApplications,
     startMergeMode, selectMergeArtefact, performMerge, unmarkInvalidRules
 } from './store.svelte.ts';
 import { Artefact, Drawing, DrawingStore, getFirstOrderStatementChildLayer } from '../index.svelte.ts';
@@ -1098,7 +1098,7 @@ describe('proof recording subgoal navigation', () => {
             );
             expect(getDrawing().checkLayerProvable(goal!.id).provable).toBe(true);
         }
-        checkLayerProvable(goalLayerOfCurrentDrawing()!.id);
+        syncProvedStatus();
     }
 
     it('loads the next pending subgoal as soon as a subgoal is solved', () => {
@@ -1161,7 +1161,7 @@ describe('proof recording subgoal navigation', () => {
         host.newArtefact('Edge', { source: byLabel(host, 'b'), target: byLabel(host, 'a') }, { width: 2, bend: 0, label: 'back' }, 'root');
         expect(host.checkLayerProvable(goal.id).provable).toBe(true);
 
-        checkLayerProvable(goal.id);
+        syncProvedStatus();
 
         expect(rocqRecorder.isActive()).toBe(true);
         expect(ui.activeDrawingName).toBe(subA);
@@ -1176,7 +1176,7 @@ describe('proof recording subgoal navigation', () => {
         const goal = goalLayerOfCurrentDrawing()!;
         expect(stmt.checkLayerProvable(goal.id).provable).toBe(true);
 
-        checkLayerProvable(goal.id);
+        syncProvedStatus();
 
         expect(rocqRecorder.isActive()).toBe(false);
         expect(ui.recordingActive).toBe(false);
@@ -1223,7 +1223,7 @@ describe('proof recording subgoal navigation', () => {
         expect(ui.activeDrawingName).toBe(subB);
 
         setActiveDrawing(subA);
-        checkLayerProvable(goalLayerOfCurrentDrawing()!.id);
+        syncProvedStatus();
         expect(ui.activeDrawingName).toBe(subA);
         expect(rocqRecorder.isActive()).toBe(true);
         expect(pendingProofCount()).toBe(1);
@@ -1257,7 +1257,7 @@ describe('proof recording subgoal navigation', () => {
         const [subA] = applyRule();
 
         setActiveDrawing('Other');
-        checkLayerProvable(goalLayerOfCurrentDrawing()!.id);
+        syncProvedStatus();
 
         expect(ui.activeDrawingName).toBe('Other');
         expect(rocqRecorder.isActive()).toBe(true);
@@ -1271,8 +1271,7 @@ describe('proof recording subgoal navigation', () => {
         setActiveDrawing('Host');
         expect(rocqRecorder.isActive()).toBe(false);
 
-        const goal = goalLayerOfCurrentDrawing()!;
-        expect(() => checkLayerProvable(goal.id)).not.toThrow();
+        expect(() => syncProvedStatus()).not.toThrow();
         expect(ui.activeDrawingName).toBe('Host');
         expect(ui.proofEditorName).toBeNull();
     });

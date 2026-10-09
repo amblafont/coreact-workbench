@@ -9,8 +9,7 @@
         addChildLayer,
         duplicateLayer,
         renameLayer,
-        deleteLayer,
-        checkLayerProvable
+        deleteLayer
     } from './store.svelte.ts';
     import LayerNode from './LayerNode.svelte';
 
@@ -18,7 +17,6 @@
 
     let childLayers = $derived(allLayers().filter(l => l.parentId === layer.id));
     let isEffectivelyVisible = $derived(getDrawing().isLayerVisible(layer.id));
-    let provableResult = $derived(ui.layerProvability.get(layer.id));
 </script>
 
 <div class="layer-item {layer.parentId === null ? 'root-layer' : ''}">
@@ -29,14 +27,6 @@
             <span class="layer-title" title="ID: {layer.id}{!isEffectivelyVisible ? ' (hidden)' : ''}">
                 {layer.name}
             </span>
-            {#if provableResult}
-                <span
-                    class="provable-badge {provableResult.provable ? 'provable-ok' : 'provable-fail'}"
-                    title={provableResult.provable
-                        ? 'Provable: all artefacts in this layer are already in its parent layer'
-                        : `Not provable: ${provableResult.reason}`}
-                >{provableResult.provable ? '✓' : '✗'}</span>
-            {/if}
         </div>
         <div class="layer-row-actions">
             <button
@@ -54,13 +44,6 @@
             <button class="layer-btn" title={`Rename layer '${layer.name}'`} onclick={() => renameLayer(layer)}>
                 Rename
             </button>
-            {#if layer.parentId !== null}
-                <button
-                    class="layer-btn provable-btn"
-                    title="Check if all artefacts in this layer are already in its parent layer"
-                    onclick={() => checkLayerProvable(layer.id)}
-                >Prove</button>
-            {/if}
             <input
                 type="checkbox"
                 checked={layer.colorEnabled}

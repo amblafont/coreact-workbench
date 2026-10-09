@@ -1,5 +1,5 @@
 import { untrack } from 'svelte';
-import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+import { SvelteSet } from 'svelte/reactivity';
 import * as d3 from 'd3';
 import {
     SortStore,
@@ -132,7 +132,6 @@ export const ui = $state({
     mergeHoverArtefact: null as Artefact | null,
     menuHoverArtefact: null as Artefact | null,
     ruleHoverArtefacts: null as Set<Artefact> | null,
-    layerProvability: new SvelteMap<string, { provable: boolean; reason: string }>(),
     exportSelection: new SvelteSet<string>(),
     toasts: [] as Toast[],
     recordingActive: false,
@@ -783,7 +782,6 @@ export function resetInteractionState(): void {
     ui.draftArtefact = null;
     ui.dependencyPickingFor = null;
     ui.equalityExtendTarget = null;
-    ui.layerProvability.clear();
     ui.mergeMode = false;
     ui.mergeFirstArtefact = null;
     ui.mergeSecondArtefact = null;
@@ -1532,20 +1530,6 @@ export function setLayerColor(layer: { id: string; color: string; colorEnabled: 
 export function toggleLayerColorEnabled(layer: { id: string; colorEnabled: boolean }, checked: boolean): void {
     layer.colorEnabled = checked;
 
-}
-
-export function checkLayerProvable(layerId: string): void {
-    try {
-        const result = drawing.checkLayerProvable(layerId);
-        ui.layerProvability.set(layerId, { provable: result.provable, reason: result.reason ?? '' });
-        if (result.provable) {
-            const activeName = ui.activeDrawingName ?? 'Unsaved Drawing';
-            recordProve(layerId, result.match ?? null, activeName);
-        }
-
-    } catch (err) {
-        pushToast('error', (err as Error).message);
-    }
 }
 
 export function syncProvedStatus(): void {
