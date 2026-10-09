@@ -1428,15 +1428,6 @@ export function setExportSelectionAll(checked: boolean): void {
     ui.exportSelection = checked ? new SvelteSet(drawingStore.getAllNames()) : new SvelteSet();
 }
 
-export function clearAll(): void {
-    if (!confirm('Are you sure you want to clear all artefacts and layers of the current drawing?')) {
-        return;
-    }
-    drawing.clear();
-    resetInteractionState();
-
-}
-
 export async function loadSortScript(file: File): Promise<void> {
     const code = await file.text();
     try {

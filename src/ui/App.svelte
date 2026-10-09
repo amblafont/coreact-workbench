@@ -10,7 +10,6 @@
     import Toasts from './Toasts.svelte';
     import {
         loadSortScript,
-        clearAll,
         ui,
         startMergeMode,
         cancelMergeMode,
@@ -73,12 +72,6 @@
                     title="Load JS script to define sorts"
                     onclick={onLoadScript}
                 >Load Sorts</button>
-                <button
-                    class="btn btn-cancel"
-                    id="clear-btn"
-                    title="Clear all artefacts and layers"
-                    onclick={() => clearAll()}
-                >Clear All</button>
                 <input bind:this={scriptUpload} type="file" id="script-upload" accept=".js" style="display: none;" onchange={onScriptChange} />
             </div>
         </div>
