@@ -83,8 +83,8 @@
                 onchange={(e) => setExportSelectionAll((e.currentTarget as HTMLInputElement).checked)}
             />
             <button class="layer-btn new-btn" title="Start a new blank drawing" onclick={newDrawing}>New</button>
-            <button class="layer-btn import-btn" title="Import one or more drawings from a JSON file" onclick={() => importInput!.click()}>Import</button>
-            <button class="layer-btn export-btn" title="Export the checked drawings to a JSON file" onclick={onExportJson}>Export</button>
+            <button class="layer-btn import-btn" title="Import one or more drawings from a JSON file" onclick={() => importInput!.click()}>Load</button>
+            <button class="layer-btn export-btn" title="Export the checked drawings to a JSON file" onclick={onExportJson}>Save</button>
             <button class="layer-btn rocq-btn" title="Show the checked drawings exported as Rocq and Abella code" onclick={onCodeExport}>Export Proofs</button>
             <button
                 class="layer-btn rocq-rec-btn"
@@ -125,9 +125,9 @@
             {#if tag.kind === 'invalid'}
                 <span class="rule-badge rule-badge-invalid" title={tag.reason}>Invalid Rule</span>
             {:else if tag.kind === 'first'}
-                <span class="first-order-badge" title="First-order rule: root layer has only one child">First-Order</span>
+                <span class="first-order-badge" title="First-order rule: root layer has only one child">1<sup>st</sup>-Order</span>
             {:else}
-                <span class="second-order-badge" title="Second-order rule: root layer has several child layers">Second-Order</span>
+                <span class="second-order-badge" title="Second-order rule: root layer has several child layers">2<sup>nd</sup>-Order</span>
             {/if}
         {/if}
     </div>

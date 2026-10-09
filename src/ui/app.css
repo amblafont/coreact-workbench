@@ -681,6 +681,10 @@ body {
     letter-spacing: 0.5px;
     margin-left: 4px;
 }
+.first-order-badge sup,
+.second-order-badge sup {
+    font-size: 0.7em;
+}
 .equality-badge {
     font-size: 0.7em;
     font-weight: bold;

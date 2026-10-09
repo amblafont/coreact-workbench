@@ -86,9 +86,9 @@
             <div class="rule-app-name">
                 {entry.name}
                 {#if entry.isFirstOrder}
-                    <span class="first-order-badge" title="First-order rule: root layer has only one child">First-Order</span>
+                    <span class="first-order-badge" title="First-order rule: root layer has only one child">1<sup>st</sup>-Order</span>
                 {:else}
-                    <span class="second-order-badge" title="Second-order rule: root layer has several child layers">Second-Order</span>
+                    <span class="second-order-badge" title="Second-order rule: root layer has several child layers">2<sup>nd</sup>-Order</span>
                 {/if}
                 {#if entry.isEqualityRule}
                     <span class="equality-badge" title="Equality rule: the child layer holds only equality artefacts, so applying it asserts equalities only">Equality</span>
