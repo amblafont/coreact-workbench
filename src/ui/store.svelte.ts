@@ -1248,24 +1248,27 @@ export function setCurrentDrawingRule(checked: boolean): void {
     }
 }
 
-export function duplicateCurrentDrawing(): void {
-    const activeName = ui.activeDrawingName;
-    const suggested = activeName ? `${activeName} copy` : 'Drawing copy';
-    const input = prompt('Enter a name for the duplicate drawing:', suggested);
+export function duplicateDrawing(name: string): void {
+    const source = drawingStore.getDrawing(name);
+    if (!source) {
+        pushToast('error', `Drawing '${name}' does not exist.`);
+        return;
+    }
+    const input = prompt('Enter a name for the duplicate drawing:', `${name} copy`);
     if (!input || !input.trim()) return;
-    const name = input.trim();
-    if (drawingStore.getDrawing(name)) {
-        pushToast('error', `A drawing named '${name}' already exists.`);
+    const newName = input.trim();
+    if (drawingStore.getDrawing(newName)) {
+        pushToast('error', `A drawing named '${newName}' already exists.`);
         return;
     }
     try {
-        const copy = DrawingStore.cloneDrawing(drawing, sortStore);
-        drawing.forgetSvgRefs();
-        drawingStore.addDrawing(name, copy);
+        const copy = DrawingStore.cloneDrawing(source.drawing, sortStore);
+        source.drawing.forgetSvgRefs();
+        drawingStore.addDrawing(newName, copy);
         drawing = copy;
-        ui.activeDrawingName = name;
+        ui.activeDrawingName = newName;
         resetInteractionState();
-        pushToast('info', `Duplicated drawing as '${name}'.`);
+        pushToast('info', `Duplicated drawing as '${newName}'.`);
     } catch (err) {
         pushToast('error', (err as Error).message);
     }

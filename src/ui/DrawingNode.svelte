@@ -11,6 +11,7 @@
         markDrawingAsRule,
         deleteSelectedDrawings,
         generateReverseRulesFor,
+        duplicateDrawing,
         toggleExportSelection,
         openProofEditor,
         suggestAdmittedProof
@@ -36,6 +37,10 @@
 
     function onDelete(entry: StoreDrawing): void {
         deleteSelectedDrawings([entry.name]);
+    }
+
+    function onDuplicate(entry: StoreDrawing): void {
+        duplicateDrawing(entry.name);
     }
 
     function onGenerateReverseRules(entry: StoreDrawing): void {
@@ -114,6 +119,7 @@
         <button class="layer-btn" title={drawing.isRule ? 'Remove the explicit rule marking from this drawing' : 'Explicitly mark this drawing as a rule (must satisfy rule conditions)'} onclick={() => onToggleRule(drawing)}>
             {drawing.isRule ? 'Unmark Rule' : 'Mark Rule'}
         </button>
+        <button class="layer-btn dup-btn" title="Duplicate drawing '{drawing.name}'" onclick={() => onDuplicate(drawing)}>⧉</button>
         <button class="layer-btn row-delete-btn" title="Delete drawing '{drawing.name}'" onclick={() => onDelete(drawing)}>×</button>
     </div>
     {#if children.length > 0}
