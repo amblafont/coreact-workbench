@@ -1403,6 +1403,10 @@ export function toggleProofRecording(): void {
                 pushToast('error', `Proof Recording Error:\n${(err as Error).message}`);
             }
         } else {
+            if (getFirstOrderStatementChildLayer(drawing) === null) {
+                pushToast('error', 'Cannot start proof recording: the drawing is not a first-order statement (expected exactly one root layer and one child layer).');
+                return;
+            }
             const name = ui.activeDrawingName ?? 'Unsaved Drawing';
             rocqRecorder.start(drawing, name, sortStore);
             ui.recordingActive = true;

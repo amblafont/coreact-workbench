@@ -769,6 +769,22 @@ describe('rocq recording proof attachment', () => {
         closeProofEditor();
     });
 
+    it('refuses to start proof recording when the drawing is not a first-order statement', () => {
+        buildStatement();
+        getDrawing().addLayer('extra', 'Extra', 'root');
+        drawingStore.addDrawing('NotStatement', getDrawing());
+        ui.activeDrawingName = 'NotStatement';
+
+        toggleProofRecording();
+
+        expect(rocqRecorder.isActive()).toBe(false);
+        expect(ui.recordingActive).toBe(false);
+        const toast = ui.toasts[ui.toasts.length - 1];
+        expect(toast.kind).toBe('error');
+        expect(String(toast.message)).toContain('not a first-order statement');
+        ui.toasts = [];
+    });
+
     /*
     it('toggleProofRecording records for both provers when the export target is Abella', () => {
         const stmt = buildStatement();
@@ -843,7 +859,10 @@ describe('merge recording', () => {
     function startRecording(stmt: Drawing): void {
         drawingStore.addDrawing('Statement', stmt);
         ui.activeDrawingName = 'Statement';
-        toggleProofRecording();
+        // These tests exercise the recorder's merge steps, not the Start Proof
+        // gate (which requires a first-order statement), so start directly.
+        rocqRecorder.start(stmt, 'Statement', sortStore);
+        ui.recordingActive = true;
         expect(rocqRecorder.isActive()).toBe(true);
     }
 
