@@ -47,6 +47,7 @@
     class:active={isActive}
     class:proved={drawing.proved}
     class:first-order={!isChild && drawing.isFirstOrder}
+    class:second-order={!isChild && drawing.isRule && !drawing.isFirstOrder}
     class:drawing-child-row={isChild}
     class="drawing-row"
 >
