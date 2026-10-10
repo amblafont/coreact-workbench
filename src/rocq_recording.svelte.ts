@@ -104,9 +104,17 @@ export class RocqRecorder {
     private sortStore = $state<SortStore | null>(null);
     private statements = new SvelteMap<string, RecordedStatement>();
     private snapshot: Drawing | null = null;
+    // Store names of the rules applied during the recording, in first-use order.
+    // Used when the recording stops to offer the recorded proof together with
+    // every rule it references.
+    private usedRuleNames = new Set<string>();
 
     public isActive(): boolean {
         return this.active;
+    }
+
+    public getUsedRuleNames(): string[] {
+        return [...this.usedRuleNames];
     }
 
     public getRecordedDrawingName(): string | null {
@@ -123,6 +131,7 @@ export class RocqRecorder {
         this.mainName = activeDrawingName;
         this.sortStore = sortStore;
         this.statements.clear();
+        this.usedRuleNames.clear();
 
         const exportNames = drawingExportNames(drawing, activeDrawingName, sortStore);
         const moduleName = exportNames.moduleName;
@@ -238,6 +247,7 @@ export class RocqRecorder {
         if (!stmt) {
             return;
         }
+        this.usedRuleNames.add(savedRuleName);
         this.revertProof(stmt);
 
         const ruleNames = drawingExportNames(ruleDrawing, savedRuleName, sortStore);

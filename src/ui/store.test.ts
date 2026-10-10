@@ -5,6 +5,7 @@ import { getDrawing, drawingStore, ui, sortStore, rocqRecorder, syncProvedStatus
     applyPickedPosition, startPositionPicker, selectArtefactToInspect, removeArtefactNode,
     toggleEqualityExtend, equalityChildren, onArtefactNodeClick, createDraftArtefact,
     splitFirstOrderRecording, openProofEditor, closeProofEditor, updateDrawingProof, removeDrawingProofs, suggestAdmittedProof, toggleProofRecording /* runRecorderStep */,
+    closeCodeExport,
     setActiveDrawing, pendingProofCount, toggleAutoApplyEqualityRules, computeRuleApplications,
     startMergeMode, selectMergeArtefact, performMerge, unmarkInvalidRules
 } from './store.svelte.ts';
@@ -564,6 +565,8 @@ describe('rocq recording proof attachment', () => {
         getDrawing().clear(true);
         drawingStore.clear();
         ui.activeDrawingName = null;
+        ui.exportSelection = new SvelteSet();
+        closeCodeExport();
         vi.stubGlobal('confirm', () => true);
     });
 
@@ -571,6 +574,8 @@ describe('rocq recording proof attachment', () => {
         vi.unstubAllGlobals();
         ui.activeDrawingName = null;
         ui.exportTarget = 'rocq';
+        ui.exportSelection = new SvelteSet();
+        closeCodeExport();
         if (rocqRecorder.isActive()) {
             rocqRecorder.stop();
         }
@@ -734,7 +739,7 @@ describe('rocq recording proof attachment', () => {
         ui.toasts = [];
     });
 
-    it('toggleProofRecording records and opens the proof editor with the Rocq proof', () => {
+    it('toggleProofRecording records and opens the proof export window with the Rocq proof', () => {
         const stmt = buildStatement();
         drawingStore.addDrawing('Statement', stmt);
         ui.activeDrawingName = 'Statement';
@@ -742,7 +747,7 @@ describe('rocq recording proof attachment', () => {
         toggleProofRecording();
         expect(rocqRecorder.isActive()).toBe(true);
         // Solving the main goal with no subgoal pending stops the recording by
-        // itself and opens the proof editor, so no manual stop is needed.
+        // itself and opens the export window, so no manual stop is needed.
         syncProvedStatus();
         expect(rocqRecorder.isActive()).toBe(false);
 
@@ -753,9 +758,38 @@ describe('rocq recording proof attachment', () => {
         const working = drawingStore.getDrawing('Statement (proof)');
         expect(working?.drawing).toBe(stmt);
 
-        expect(ui.proofEditorName).toBe('Statement');
-        expect(ui.proofEditorRocqDraft).toContain('Lemma Statement_rule :');
-        closeProofEditor();
+        expect(ui.proofEditorName).toBeNull();
+        expect(ui.codeExport?.names).toEqual(['Statement']);
+        expect(ui.codeExport?.rocq).toContain('Lemma Statement_rule :');
+        expect(ui.exportSelection.has('Statement')).toBe(true);
+        closeCodeExport();
+    });
+
+    it('discards a recording whose drawing stopped being a first-order statement', () => {
+        const stmt = buildStatement();
+        drawingStore.addDrawing('Statement', stmt);
+        ui.activeDrawingName = 'Statement';
+
+        toggleProofRecording();
+        expect(rocqRecorder.isActive()).toBe(true);
+
+        // Break the first-order shape mid-recording by adding a second child of
+        // the root layer.
+        stmt.addLayer('extra', 'Extra', 'root');
+
+        toggleProofRecording();
+
+        expect(rocqRecorder.isActive()).toBe(false);
+        expect(ui.recordingActive).toBe(false);
+        expect(ui.codeExport).toBeNull();
+        expect(ui.exportSelection.size).toBe(0);
+        // Nothing was attached: the drawing keeps its name and is not a rule.
+        expect(drawingStore.getDrawing('Statement')?.drawing).toBe(stmt);
+        expect(stmt.isRule).toBe(false);
+        const toast = ui.toasts[ui.toasts.length - 1];
+        expect(toast.kind).toBe('error');
+        expect(String(toast.message)).toContain('no longer a first-order statement');
+        ui.toasts = [];
     });
 
     it('refuses to start proof recording when the drawing is not a first-order statement', () => {
@@ -927,7 +961,9 @@ describe('proof recording subgoal navigation', () => {
         ui.activeDrawingName = null;
         ui.recordingActive = false;
         ui.toasts = [];
+        ui.exportSelection = new SvelteSet();
         closeProofEditor();
+        closeCodeExport();
         vi.stubGlobal('confirm', () => true);
     });
 
@@ -936,7 +972,9 @@ describe('proof recording subgoal navigation', () => {
         ui.activeDrawingName = null;
         ui.recordingActive = false;
         ui.toasts = [];
+        ui.exportSelection = new SvelteSet();
         closeProofEditor();
+        closeCodeExport();
         if (rocqRecorder.isActive()) {
             rocqRecorder.stop();
         }
@@ -1058,7 +1096,7 @@ describe('proof recording subgoal navigation', () => {
         expect(pendingProofCount()).toBe(1);
     });
 
-    it('stops the recording and opens the proof modal when the last subgoal is solved', () => {
+    it('stops the recording and opens the export window when the last subgoal is solved', () => {
         const host = buildHost();
         drawingStore.addDrawing('Host', host);
         buildSecondOrderRule(['Premise A']);
@@ -1072,7 +1110,10 @@ describe('proof recording subgoal navigation', () => {
 
         expect(rocqRecorder.isActive()).toBe(false);
         expect(ui.recordingActive).toBe(false);
-        expect(ui.proofEditorName).toBe('Host');
+        expect(ui.codeExport?.names).toEqual(['SO', 'Host']);
+        expect(ui.codeExport?.rocq).toContain('Parameter SO_rule :');
+        expect(ui.exportSelection.has('SO')).toBe(true);
+        expect(ui.exportSelection.has('Host')).toBe(true);
         const rule = drawingStore.getDrawing('Host');
         expect(rule?.drawing.isRule).toBe(true);
         // The solved subgoal is inlined as a complete proof (no `admit.`); the
@@ -1106,7 +1147,7 @@ describe('proof recording subgoal navigation', () => {
         expect(pendingProofCount()).toBe(1);
     });
 
-    it('solving the main goal with no subgoal pending stops the recording and opens the modal', () => {
+    it('solving the main goal with no subgoal pending stops the recording and opens the export window', () => {
         const stmt = buildSolvableStatement('Statement');
         setActiveDrawing('Statement');
 
@@ -1118,7 +1159,8 @@ describe('proof recording subgoal navigation', () => {
 
         expect(rocqRecorder.isActive()).toBe(false);
         expect(ui.recordingActive).toBe(false);
-        expect(ui.proofEditorName).toBe('Statement');
+        expect(ui.codeExport?.names).toEqual(['Statement']);
+        expect(ui.exportSelection.has('Statement')).toBe(true);
         const rule = drawingStore.getDrawing('Statement');
         expect(rule?.drawing.isRule).toBe(true);
         // The main goal is closed too, so the script ends with `Qed.`.
@@ -1145,7 +1187,8 @@ describe('proof recording subgoal navigation', () => {
         applyRuleAt('FO', 0);
 
         expect(rocqRecorder.isActive()).toBe(false);
-        expect(ui.proofEditorName).toBe('Host');
+        expect(ui.codeExport?.names).toEqual(['FO', 'Host']);
+        expect(ui.exportSelection.has('FO')).toBe(true);
     });
 
     it('re-solving an already solved subgoal does not skip the queue', () => {
@@ -1182,7 +1225,7 @@ describe('proof recording subgoal navigation', () => {
         solveCurrentSubgoal();
 
         expect(rocqRecorder.isActive()).toBe(false);
-        expect(ui.proofEditorName).toBe('Host');
+        expect(ui.codeExport?.names).toEqual(['SO', 'Host']);
     });
 
     it('proving an unregistered drawing advances nothing while recording is on', () => {

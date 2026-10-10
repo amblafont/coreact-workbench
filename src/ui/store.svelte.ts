@@ -1353,41 +1353,42 @@ export function toggleProofRecording(): void {
     try {
         const recorder = activeRecorder();
         if (recorder.isActive()) {
-            const stmts = recorder.getRecordedStatements();
             const mainName = recorder.getRecordedDrawingName();
             const snapshot = recorder.takeSnapshot();
+            const usedRuleNames = recorder.getUsedRuleNames();
             const rocqScript = rocqRecorder.isActive() ? rocqRecorder.stop() : null;
             ui.recordingActive = false;
 
             const entry = mainName ? drawingStore.getDrawing(mainName) : undefined;
-            const splittable = !!entry && snapshot !== null && getFirstOrderStatementChildLayer(snapshot) !== null;
+            // The recording is tied to the drawing's first-order shape, which can
+            // have changed mid-recording (a layer added or removed); the live
+            // drawing, not the start-of-recording snapshot, decides this.
+            const splittable = !!entry && snapshot !== null && getFirstOrderStatementChildLayer(entry.drawing) !== null;
             if (!splittable) {
-                const script = rocqScript;
-                if (!script) {
-                    pushToast('error', 'Proof Recording Error:\nNo recording was produced.');
-                    return;
-                }
-                navigator.clipboard
-                    .writeText(script)
-                    .then(() => {
-                        const proved = stmts.filter(s => s.proved).length;
-                        const admittedStmts = stmts.filter(s => !s.proved);
-                        const admitted = admittedStmts.length;
-                        const admittedNames = admitted > 0 ? ` (admitted: ${admittedStmts.map(s => `'${s.drawingName}'`).join(', ')})` : '';
-                        pushToast('info', `Proof recording script copied to clipboard (${stmts.length} lemma${stmts.length === 1 ? '' : 's'}: ${proved} proved, ${admitted} admitted${admittedNames}).`);
-                    })
-                    .catch(() => {
-                        pushToast('error', 'Error copying recording:\nClipboard access failed.');
-                    });
+                // Recording only starts on a first-order statement, so reaching
+                // here means the drawing stopped being one mid-recording. The
+                // recording is discarded rather than offered anywhere.
+                pushToast('error', 'Proof Recording Error:\nThe recorded drawing is no longer a first-order statement; the recording was discarded.');
                 return;
             }
 
             try {
                 const { proofName } = splitFirstOrderRecording(mainName!, snapshot!, rocqScript);
                 pushToast('info', `Proof recording saved: '${mainName}' is now a rule carrying its proof; the proof-working drawing is '${proofName}'.`);
-                const rule = drawingStore.getDrawing(mainName!)?.drawing;
-                const rocqDraft = rocqScript ?? (rule ? buildAdmittedProof(rule, mainName!, sortStore, 'rocq') : '');
-                openProofEditor(mainName!, { rocq: rocqDraft });
+                // Open the proof export window with the recorded proof checked
+                // together with every rule it used, so the exported code is
+                // self-contained. Used rules come first: the recorded proof
+                // references their parameters, which Rocq requires to be declared
+                // before use.
+                const exportNames: string[] = [];
+                for (const name of usedRuleNames) {
+                    if (name !== mainName && !exportNames.includes(name) && drawingStore.getDrawing(name)) {
+                        exportNames.push(name);
+                    }
+                }
+                exportNames.push(mainName!);
+                ui.exportSelection = new SvelteSet(exportNames);
+                openCodeExport(exportNames);
             } catch (err) {
                 pushToast('error', `Proof Recording Error:\n${(err as Error).message}`);
             }
