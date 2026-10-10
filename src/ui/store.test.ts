@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SvelteSet } from 'svelte/reactivity';
-import { getDrawing, drawingStore, ui, sortStore, rocqRecorder, abellaRecorder, syncProvedStatus, getSelectedDrawingNames, deleteSelectedDrawings, renameDrawingName, pushToast, dismissToast, applyRuleAt,
+import { getDrawing, drawingStore, ui, sortStore, rocqRecorder, syncProvedStatus, getSelectedDrawingNames, deleteSelectedDrawings, renameDrawingName, pushToast, dismissToast, applyRuleAt,
     resetInteractionState, togglePositionPicker, isPositionPickerActive, isDraftPickerActive,
     applyPickedPosition, startPositionPicker, selectArtefactToInspect, removeArtefactNode,
     toggleEqualityExtend, equalityChildren, onArtefactNodeClick, createDraftArtefact,
@@ -571,9 +571,6 @@ describe('rocq recording proof attachment', () => {
         vi.unstubAllGlobals();
         ui.activeDrawingName = null;
         ui.exportTarget = 'rocq';
-        if (abellaRecorder.isActive()) {
-            abellaRecorder.stop();
-        }
         if (rocqRecorder.isActive()) {
             rocqRecorder.stop();
         }
@@ -597,7 +594,7 @@ describe('rocq recording proof attachment', () => {
 
         const snapshot = DrawingStore.cloneDrawing(stmt, sortStore);
         const script = 'Lemma Statement_rule : Type.\\nintros_sigma ().\\nAbort.\\n';
-        const { proofName } = splitFirstOrderRecording('Statement', snapshot, script, null);
+        const { proofName } = splitFirstOrderRecording('Statement', snapshot, script);
 
         expect(proofName).toBe('Statement (proof)');
         expect(drawingStore.getDrawing('Statement (proof)')?.drawing).toBe(stmt);
@@ -605,7 +602,6 @@ describe('rocq recording proof attachment', () => {
         expect(rule?.drawing).toBe(snapshot);
         expect(rule!.drawing.isRule).toBe(true);
         expect(rule!.drawing.rocqProof).toBe(script);
-        expect(rule!.drawing.abellaProof).toBeNull();
         expect(getFirstOrderStatementChildLayer(rule!.drawing)).not.toBeNull();
         expect(ui.activeDrawingName).toBe('Statement (proof)');
         expect(ui.exportSelection.has('Statement (proof)')).toBe(true);
@@ -618,7 +614,7 @@ describe('rocq recording proof attachment', () => {
         const snapshot = DrawingStore.cloneDrawing(stmt, sortStore);
         drawingStore.addDrawing('Statement (proof)', new Drawing(sortStore));
 
-        const { proofName } = splitFirstOrderRecording('Statement', snapshot, 'Lemma Statement_rule : True.\\nexact I.\\nQed.\\n', null);
+        const { proofName } = splitFirstOrderRecording('Statement', snapshot, 'Lemma Statement_rule : True.\\nexact I.\\nQed.\\n');
         expect(proofName).toBe('Statement (proof) (2)');
         expect(drawingStore.getDrawing('Statement')?.drawing).toBe(snapshot);
         expect(drawingStore.getDrawing('Statement (proof) (2)')?.drawing).toBe(stmt);
@@ -631,13 +627,13 @@ describe('rocq recording proof attachment', () => {
         drawingStore.addDrawing('NotStatement', nonStatement);
 
         const snapshot = DrawingStore.cloneDrawing(nonStatement, sortStore);
-        expect(() => splitFirstOrderRecording('NotStatement', snapshot, 'script', null)).toThrow(/not a first-order statement/);
+        expect(() => splitFirstOrderRecording('NotStatement', snapshot, 'script')).toThrow(/not a first-order statement/);
     });
 
     it('rejects a recording whose drawing is no longer in the store', () => {
         const stmt = buildStatement();
         const snapshot = DrawingStore.cloneDrawing(stmt, sortStore);
-        expect(() => splitFirstOrderRecording('Missing', snapshot, 'script', null)).toThrow(/does not exist/);
+        expect(() => splitFirstOrderRecording('Missing', snapshot, 'script')).toThrow(/does not exist/);
     });
 
     it('round-trips the attached proof through drawing JSON export and import', () => {
@@ -664,7 +660,6 @@ describe('rocq recording proof attachment', () => {
         closeProofEditor();
         expect(ui.proofEditorName).toBeNull();
         expect(ui.proofEditorRocqDraft).toBeNull();
-        expect(ui.proofEditorAbellaDraft).toBeNull();
     });
 
     it('openProofEditor with a draft prefills the editor without attaching', () => {
@@ -675,7 +670,6 @@ describe('rocq recording proof attachment', () => {
         openProofEditor('Statement', { rocq: 'draft script' });
         expect(ui.proofEditorName).toBe('Statement');
         expect(ui.proofEditorRocqDraft).toBe('draft script');
-        expect(ui.proofEditorAbellaDraft).toBeNull();
         expect(drawingStore.getDrawing('Statement')?.drawing.rocqProof).toBeNull();
         closeProofEditor();
     });
@@ -699,15 +693,6 @@ describe('rocq recording proof attachment', () => {
         expect(drawingStore.getDrawing('Statement')?.drawing.rocqProof).toBeNull();
     });
 
-    it('updateDrawingProof stores the Abella proof in the Abella field', () => {
-        const stmt = buildStatement();
-        drawingStore.addDrawing('Statement', stmt);
-
-        updateDrawingProof('Statement', 'abella', 'Theorem Statement_rule : ...\nskip.');
-        expect(drawingStore.getDrawing('Statement')?.drawing.abellaProof).toBe('Theorem Statement_rule : ...\nskip.');
-        expect(drawingStore.getDrawing('Statement')?.drawing.rocqProof).toBeNull();
-    });
-
     it('updateDrawingProof reports a missing drawing', () => {
         updateDrawingProof('DoesNotExist', 'rocq', 'script');
         const toast = ui.toasts[ui.toasts.length - 1];
@@ -716,18 +701,16 @@ describe('rocq recording proof attachment', () => {
         ui.toasts = [];
     });
 
-    it('removeDrawingProofs clears both attached proofs', () => {
+    it('removeDrawingProofs clears the attached proof', () => {
         const stmt = buildStatement();
         stmt.setRocqProof('Lemma Statement_rule : True.\\nexact I.\\nQed.');
-        stmt.setAbellaProof('Theorem Statement_rule : ...\\nskip.');
         drawingStore.addDrawing('Statement', stmt);
 
         removeDrawingProofs('Statement');
         expect(drawingStore.getDrawing('Statement')?.drawing.rocqProof).toBeNull();
-        expect(drawingStore.getDrawing('Statement')?.drawing.abellaProof).toBeNull();
     });
 
-    it('suggestAdmittedProof opens the editor with generated admitted drafts for both provers without attaching them', () => {
+    it('suggestAdmittedProof opens the editor with a generated admitted draft without attaching it', () => {
         const stmt = buildStatement();
         stmt.setRocqProof(null);
         drawingStore.addDrawing('Statement', stmt);
@@ -739,11 +722,7 @@ describe('rocq recording proof attachment', () => {
         expect(rocqDraft).toContain('Lemma Statement_rule :');
         expect(rocqDraft).toContain('admit.');
         expect(rocqDraft).toContain('Admitted.');
-        const abellaDraft = ui.proofEditorAbellaDraft;
-        expect(abellaDraft).toContain('Theorem Statement_rule :');
-        expect(abellaDraft).toContain('skip.');
         expect(drawingStore.getDrawing('Statement')?.drawing.rocqProof).toBeNull();
-        expect(drawingStore.getDrawing('Statement')?.drawing.abellaProof).toBeNull();
         closeProofEditor();
     });
 
@@ -755,47 +734,27 @@ describe('rocq recording proof attachment', () => {
         ui.toasts = [];
     });
 
-    it('round-trips the attached Abella proof through drawing JSON export and import', () => {
-        const stmt = buildStatement();
-        stmt.setIsRule(true);
-        stmt.setAbellaProof('Theorem Statement_rule : ...\nskip.');
-        drawingStore.addDrawing('Statement', stmt);
-
-        const json = drawingStore.exportDrawingsJSON(['Statement']);
-        const freshStore = new DrawingStore();
-        freshStore.importDrawingsJSON(json, sortStore);
-
-        const restored = freshStore.getDrawing('Statement');
-        expect(restored?.drawing.abellaProof).toBe('Theorem Statement_rule : ...\nskip.');
-        expect(restored?.drawing.isRule).toBe(true);
-    });
-
-    it('toggleProofRecording records for all provers and opens the proof editor with both tabs completed', () => {
+    it('toggleProofRecording records and opens the proof editor with the Rocq proof', () => {
         const stmt = buildStatement();
         drawingStore.addDrawing('Statement', stmt);
         ui.activeDrawingName = 'Statement';
 
         toggleProofRecording();
         expect(rocqRecorder.isActive()).toBe(true);
-        // expect(abellaRecorder.isActive()).toBe(true);
         // Solving the main goal with no subgoal pending stops the recording by
         // itself and opens the proof editor, so no manual stop is needed.
         syncProvedStatus();
         expect(rocqRecorder.isActive()).toBe(false);
-        expect(abellaRecorder.isActive()).toBe(false);
 
         const rule = drawingStore.getDrawing('Statement');
         expect(rule?.drawing.isRule).toBe(true);
         expect(rule!.drawing.rocqProof).not.toBeNull();
         expect(rule!.drawing.rocqProof).toContain('Lemma Statement_rule :');
-        // expect(rule!.drawing.abellaProof).not.toBeNull();
-        // expect(rule!.drawing.abellaProof).toContain('Theorem Statement_rule :');
         const working = drawingStore.getDrawing('Statement (proof)');
         expect(working?.drawing).toBe(stmt);
 
         expect(ui.proofEditorName).toBe('Statement');
         expect(ui.proofEditorRocqDraft).toContain('Lemma Statement_rule :');
-        // expect(ui.proofEditorAbellaDraft).toContain('Theorem Statement_rule :');
         closeProofEditor();
     });
 
@@ -815,54 +774,6 @@ describe('rocq recording proof attachment', () => {
         ui.toasts = [];
     });
 
-    /*
-    it('toggleProofRecording records for both provers when the export target is Abella', () => {
-        const stmt = buildStatement();
-        drawingStore.addDrawing('Statement', stmt);
-        ui.activeDrawingName = 'Statement';
-        ui.exportTarget = 'abella';
-
-        toggleProofRecording();
-        expect(abellaRecorder.isActive()).toBe(true);
-        expect(rocqRecorder.isActive()).toBe(true);
-        syncProvedStatus();
-        toggleProofRecording();
-        expect(abellaRecorder.isActive()).toBe(false);
-        expect(rocqRecorder.isActive()).toBe(false);
-
-        const rule = drawingStore.getDrawing('Statement');
-        expect(rule?.drawing.isRule).toBe(true);
-        expect(rule!.drawing.abellaProof).toContain('Theorem Statement_rule :');
-        expect(rule!.drawing.rocqProof).toContain('Lemma Statement_rule :');
-        const working = drawingStore.getDrawing('Statement (proof)');
-        expect(working?.drawing).toBe(stmt);
-
-        expect(ui.proofEditorName).toBe('Statement');
-        closeProofEditor();
-    });
-    */
-
-    /*
-    it('runRecorderStep reports the failing prover and keeps the other recorders recording', () => {
-        const stmt = buildStatement();
-        drawingStore.addDrawing('Statement', stmt);
-        ui.activeDrawingName = 'Statement';
-
-        toggleProofRecording();
-        runRecorderStep(recorder => {
-            if (recorder === abellaRecorder) {
-                throw new Error('step rejected');
-            }
-            recorder.recordRename('a', 'b', 'Statement');
-        });
-        const toast = ui.toasts[ui.toasts.length - 1];
-        expect(toast.kind).toBe('error');
-        expect(String(toast.message)).toBe('Abella recording failed: step rejected');
-        expect(rocqRecorder.isActive()).toBe(true);
-        expect(abellaRecorder.isActive()).toBe(true);
-        closeProofEditor();
-    });
-    */
 });
 
 describe('merge recording', () => {
@@ -1026,9 +937,6 @@ describe('proof recording subgoal navigation', () => {
         ui.recordingActive = false;
         ui.toasts = [];
         closeProofEditor();
-        if (abellaRecorder.isActive()) {
-            abellaRecorder.stop();
-        }
         if (rocqRecorder.isActive()) {
             rocqRecorder.stop();
         }

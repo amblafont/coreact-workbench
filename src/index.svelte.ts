@@ -455,7 +455,6 @@ export class Drawing {
     private focusedLayerId = $state<string | null>(null);
     private ruleFlag = $state(false);
     private rocqProofStr = $state<string | null>(null);
-    private abellaProofStr = $state<string | null>(null);
     private nextArtefactId: number = 1;
     private nextLayerId: number = 1;
 
@@ -484,14 +483,6 @@ export class Drawing {
 
     public setRocqProof(proof: string | null): void {
         this.rocqProofStr = proof;
-    }
-
-    public get abellaProof(): string | null {
-        return this.abellaProofStr;
-    }
-
-    public setAbellaProof(proof: string | null): void {
-        this.abellaProofStr = proof;
     }
 
     public checkRuleConditions(): { isRule: boolean; reason?: string } {
@@ -1646,7 +1637,6 @@ export interface SavedDrawing {
     parentName?: string;
     proved?: boolean;
     rocqProof?: string;
-    abellaProof?: string;
 }
 
 export interface DrawingStoreEntry {
@@ -1756,8 +1746,7 @@ export class DrawingStore {
             artefacts: artefactsData,
             isRule: markedAsRule,
             isFirstOrder: markedAsRule && DrawingStore.firstOrderFromLayers(layersData),
-            rocqProof: drawing.rocqProof ?? undefined,
-            abellaProof: drawing.abellaProof ?? undefined
+            rocqProof: drawing.rocqProof ?? undefined
         };
     }
 
@@ -1808,7 +1797,6 @@ export class DrawingStore {
 
         drawing.setIsRule(savedDrawing.isRule);
         drawing.setRocqProof(savedDrawing.rocqProof ?? null);
-        drawing.setAbellaProof(savedDrawing.abellaProof ?? null);
         return drawing;
     }
 
@@ -1925,8 +1913,7 @@ export class DrawingStore {
             isFirstOrder: markedAsRule && DrawingStore.firstOrderFromLayers(p.layers),
             parentName: typeof p.parentName === 'string' ? p.parentName : undefined,
             proved: p.proved === true,
-            rocqProof: typeof p.rocqProof === 'string' ? p.rocqProof : undefined,
-            abellaProof: typeof p.abellaProof === 'string' ? p.abellaProof : undefined
+            rocqProof: typeof p.rocqProof === 'string' ? p.rocqProof : undefined
         };
     }
 

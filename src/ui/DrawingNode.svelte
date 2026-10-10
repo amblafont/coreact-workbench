@@ -68,10 +68,10 @@
             class="drawing-title"
             title="Drawing: {drawing.name} ({drawing.drawing.getAllLayers().length} layers, {drawing.drawing.getArtefacts().length} artefacts){drawing.isRule ? (drawing.isFirstOrder ? ' [First-Order Rule]' : ' [Rule]') : ''}{drawing.proved ? ' [Proved]' : ''}"
         >{drawing.name}</span>
-        {#if drawing.drawing.rocqProof || drawing.drawing.abellaProof}
+        {#if drawing.drawing.rocqProof}
             <button
                 class="rocq-copy-btn"
-                title="View and edit the attached proofs of rule '{drawing.name}' (Rocq and Abella)"
+                title="View and edit the attached proof of rule '{drawing.name}'"
                 aria-label="View and edit the attached proofs of '{drawing.name}'"
                 onclick={() => openProofEditor(drawing.name)}
             >
@@ -80,7 +80,7 @@
         {:else if drawing.isFirstOrder}
             <button
                 class="rocq-copy-btn rocq-copy-btn-greyed"
-                title="No proof attached to first-order rule '{drawing.name}': generate admitted lemmas for both Rocq and Abella"
+                title="No proof attached to first-order rule '{drawing.name}': generate an admitted lemma"
                 aria-label="Generate admitted lemmas for first-order rule '{drawing.name}'"
                 onclick={() => suggestAdmittedProof(drawing.name)}
             >

@@ -4,8 +4,7 @@
     let { active, onSelect }: { active: ExportTarget; onSelect: (target: ExportTarget) => void } = $props();
 
     const tabs: Array<{ target: ExportTarget; label: string }> = [
-        { target: 'rocq', label: 'Rocq' },
-        { target: 'abella', label: 'Abella' }
+        { target: 'rocq', label: 'Rocq' }
     ];
 </script>
 

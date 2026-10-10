@@ -80,7 +80,7 @@
             <button class="layer-btn new-btn" title="Start a new blank drawing" onclick={newDrawing}>New</button>
             <button class="layer-btn import-btn" title="Import one or more drawings from a JSON file" onclick={() => importInput!.click()}>Load</button>
             <button class="layer-btn export-btn" title="Export the checked drawings to a JSON file" onclick={onExportJson}>Save</button>
-            <button class="layer-btn rocq-btn" title="Show the checked drawings exported as Rocq and Abella code" onclick={onCodeExport}>Export Proofs</button>
+            <button class="layer-btn rocq-btn" title="Show the checked drawings exported as Rocq code" onclick={onCodeExport}>Export Proofs</button>
             <button
                 class="layer-btn rocq-rec-btn"
                 title="Start or stop proof recording for the active drawing"

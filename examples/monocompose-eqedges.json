@@ -1233,7 +1233,6 @@
       "isRule": true,
       "isFirstOrder": true,
       "rocqProof": "Lemma Symmetry_rule : forall (a b : Vertex)(g f : Edge a b)(EqEdges_2 : EqEdges f g), EqEdges g f.\nintros_sigma ().\nassert (Hpremise1 : g = f). {\n  intros_sigma ().\n  destruct_sigma (@EqEdgeDef___Premise__reverse__rule a b g f EqEdges_2) as _.\n  exact eq_refl.\n}\ndestruct_sigma (@EqEdgeDef_rule a b f g Hpremise1) as EqEdges_4.\nexact EqEdges_4.\nQed.\n",
-      "abellaProof": "Theorem Symmetry_rule : forall a b g f EqEdges_2, vertex a -> vertex b -> edge a b g -> edge a b f -> eqEdges f g EqEdges_2 -> exists EqEdges_3, eqEdges g f EqEdges_3.\nskip.",
       "proved": false
     }
   ]

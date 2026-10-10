@@ -5,7 +5,7 @@
 
     let data = $derived(ui.codeExport);
     let activeTab = $state<ExportTarget>(ui.exportTarget);
-    let activeCode = $derived(data ? (activeTab === 'abella' ? data.abella : data.rocq) : '');
+    let activeCode = $derived(data ? data.rocq : '');
 
     function onSelectTab(target: ExportTarget): void {
         activeTab = target;

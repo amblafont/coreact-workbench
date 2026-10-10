@@ -7,11 +7,10 @@
     let entry = $derived(name ? drawingStore.getDrawing(name) : undefined);
     let activeTab = $state<ExportTarget>(ui.exportTarget);
     let rocqDraft = $state('');
-    let abellaDraft = $state('');
     let ta = $state<HTMLTextAreaElement | undefined>(undefined);
     let openedFor = $state<string | null>(null);
 
-    let activeDraft = $derived(activeTab === 'abella' ? abellaDraft : rocqDraft);
+    let activeDraft = $derived(rocqDraft);
 
     $effect(() => {
         const current = name;
@@ -23,7 +22,6 @@
         openedFor = current;
         activeTab = ui.exportTarget;
         rocqDraft = ui.proofEditorRocqDraft ?? entry?.drawing.rocqProof ?? '';
-        abellaDraft = ui.proofEditorAbellaDraft ?? entry?.drawing.abellaProof ?? '';
         requestAnimationFrame(() => {
             ta?.focus();
             ta?.select();
@@ -37,17 +35,12 @@
 
     function onInput(event: Event): void {
         const value = (event.currentTarget as HTMLTextAreaElement).value;
-        if (activeTab === 'abella') {
-            abellaDraft = value;
-        } else {
-            rocqDraft = value;
-        }
+        rocqDraft = value;
     }
 
     function onSave(): void {
         if (!name) return;
         updateDrawingProof(name, 'rocq', rocqDraft);
-        updateDrawingProof(name, 'abella', abellaDraft);
         closeProofEditor();
     }
 
@@ -88,7 +81,7 @@
                 spellcheck="false"
             ></textarea>
             <div class="modal-actions">
-                <button class="layer-btn" title="Remove the attached proof of this rule (both Rocq and Abella)" onclick={onRemove}>Remove</button>
+                <button class="layer-btn" title="Remove the attached proof of this rule" onclick={onRemove}>Remove</button>
                 <button class="layer-btn" onclick={onCancel}>Cancel</button>
                 <button class="layer-btn" onclick={onSave}>Save</button>
             </div>
