@@ -112,7 +112,7 @@
     </div>
     <div class="drawing-row-actions">
         <button class="layer-btn" title="Open drawing '{drawing.name}' to edit further" onclick={() => setActiveDrawing(drawing.name)}>Open</button>
-        <button class="layer-btn" title="Rename drawing '{drawing.name}'" onclick={() => onRename(drawing)}>Rename</button>
+        <button class="layer-btn" title="Rename drawing '{drawing.name}'" aria-label="Rename drawing '{drawing.name}'" onclick={() => onRename(drawing)}>✎</button>
         {#if drawing.isRule && !drawing.isFirstOrder && !isChild}
             <button class="layer-btn gen-reverse-btn" title="Generate a first-order reverse rule for each premise layer of this second-order rule" onclick={() => onGenerateReverseRules(drawing)}>Gen Reverse</button>
         {/if}

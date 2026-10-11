@@ -64,8 +64,8 @@
                 title="Focus on this layer (dims other layers to 50% opacity)"
                 onclick={() => toggleLayerFocus(layer.id)}
             >{ui.focusedLayerId === layer.id ? 'Focusing' : 'Focus'}</button>
-            <button class="layer-btn" title={`Rename layer '${layer.name}'`} onclick={() => renameLayer(layer)}>
-                Rename
+            <button class="layer-btn" title={`Rename layer '${layer.name}'`} aria-label={`Rename layer '${layer.name}'`} onclick={() => renameLayer(layer)}>
+                ✎
             </button>
             <input
                 type="checkbox"
