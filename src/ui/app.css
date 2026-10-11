@@ -396,6 +396,9 @@ body {
     border-color: #c0392b;
     font-weight: bold;
 }
+.hide-btn .eye-icon {
+    display: block;
+}
 .layer-color-input {
     width: 18px;
     height: 18px;

@@ -34,8 +34,31 @@
                 title={layer.visible
                     ? (isEffectivelyVisible ? 'Hide this layer on canvas' : 'Hide layer (hidden by parent)')
                     : 'Show this layer on canvas'}
+                aria-label={layer.visible ? 'Hide layer' : 'Show layer'}
                 onclick={() => toggleLayerVisibility(layer)}
-            >{layer.visible ? 'Hide' : 'Show'}</button>
+            >
+                <svg class="eye-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                    <path
+                        d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linejoin="round"
+                    />
+                    <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2" />
+                    {#if !layer.visible}
+                        <line
+                            x1="2"
+                            y1="2"
+                            x2="22"
+                            y2="22"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                        />
+                    {/if}
+                </svg>
+            </button>
             <button
                 class="layer-btn focus-btn {ui.focusedLayerId === layer.id ? 'active' : ''}"
                 title="Focus on this layer (dims other layers to 50% opacity)"
@@ -63,8 +86,9 @@
             <button
                 class="layer-btn"
                 title={`Duplicate '${layer.name}' as a new sibling layer, together with all its child layers and artefacts`}
+                aria-label="Duplicate layer"
                 onclick={() => duplicateLayer(layer)}
-            >Dup</button>
+            >⧉</button>
             <button
                 class="layer-btn"
                 style="color: #e74c3c;"
