@@ -13,7 +13,9 @@
         ui,
         applyPersistedPanelWidths,
         persistPanelWidths,
-        unmarkInvalidRules
+        unmarkInvalidRules,
+        toggleProofRecording,
+        pendingProofCount
     } from './store.svelte.ts';
 
     const LEFT_MIN = 180;
@@ -98,14 +100,23 @@
     <div id="right-panel" style:width={`${ui.rightPanelWidth}px`}>
         <div id="rules-panel">
             <div class="rules-header">
+                <div class="rules-title-row">
+                    <button
+                        class="panel-toggle-btn"
+                        class:collapsed={ui.rulesPanelCollapsed}
+                        title={ui.rulesPanelCollapsed ? 'Expand Applicable Rules panel' : 'Collapse Applicable Rules panel'}
+                        aria-label={ui.rulesPanelCollapsed ? 'Expand panel' : 'Collapse panel'}
+                        onclick={() => { ui.rulesPanelCollapsed = !ui.rulesPanelCollapsed; }}
+                    ></button>
+                    <h2>Applicable Rules</h2>
+                </div>
                 <button
-                    class="panel-toggle-btn"
-                    class:collapsed={ui.rulesPanelCollapsed}
-                    title={ui.rulesPanelCollapsed ? 'Expand Applicable Rules panel' : 'Collapse Applicable Rules panel'}
-                    aria-label={ui.rulesPanelCollapsed ? 'Expand panel' : 'Collapse panel'}
-                    onclick={() => { ui.rulesPanelCollapsed = !ui.rulesPanelCollapsed; }}
-                ></button>
-                <h2>Applicable Rules</h2>
+                    class="layer-btn rocq-rec-btn"
+                    title="Start or stop proof recording for the active drawing"
+                    onclick={toggleProofRecording}
+                >
+                    {ui.recordingActive ? (pendingProofCount() > 0 ? `Stop Proof (${pendingProofCount()} pending)` : 'Stop Proof') : 'Start Proof'}
+                </button>
             </div>
             {#if !ui.rulesPanelCollapsed}
                 <div id="rules-content">

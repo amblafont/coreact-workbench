@@ -1400,6 +1400,9 @@ export function toggleProofRecording(): void {
             const name = ui.activeDrawingName ?? 'Unsaved Drawing';
             rocqRecorder.start(drawing, name, sortStore);
             ui.recordingActive = true;
+            // Open the Applicable Rules panel so the rules available for the
+            // proof are visible right away.
+            ui.rulesPanelCollapsed = false;
         }
 
     } catch (err) {

@@ -4,8 +4,7 @@
     import ExportModal from './ExportModal.svelte';
     import {
         allDrawings,
-        ui,
-        pendingProofCount
+        ui
     } from './store.svelte.ts';
     import {
         newDrawing,
@@ -13,7 +12,6 @@
         downloadDrawingsJson,
         openCodeExport,
         deleteSelectedDrawings,
-        toggleProofRecording,
         setExportSelectionAll,
         getSelectedDrawingNames,
         pushToast
@@ -81,13 +79,6 @@
             <button class="layer-btn import-btn" title="Import one or more drawings from a JSON file" onclick={() => importInput!.click()}>Load</button>
             <button class="layer-btn export-btn" title="Export the checked drawings to a JSON file" onclick={onExportJson}>Save</button>
             <button class="layer-btn rocq-btn" title="Show the checked drawings exported as Rocq code" onclick={onCodeExport}>Export Proofs</button>
-            <button
-                class="layer-btn rocq-rec-btn"
-                title="Start or stop proof recording for the active drawing"
-                onclick={toggleProofRecording}
-            >
-                {ui.recordingActive ? (pendingProofCount() > 0 ? `Stop Proof (${pendingProofCount()} pending)` : 'Stop Proof') : 'Start Proof'}
-            </button>
             <button
                 class="layer-btn delete-btn"
                 title="Delete the checked drawings"
