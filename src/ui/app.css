@@ -949,12 +949,6 @@ body {
     margin-top: 10px;
     margin-bottom: 5px;
 }
-.merge-btn {
-    background-color: #9b59b6;
-    color: white;
-    border: none;
-    font-weight: bold;
-}
 .drawings-header {
     margin-top: 0;
 }
@@ -1033,9 +1027,6 @@ body {
 }
 .layer-btn.rocq-rec-btn:hover {
     background-color: #a04000;
-}
-.layer-btn.merge-btn:hover {
-    background-color: #8e44ad;
 }
 .rule-app-row {
     padding-right: 60px;

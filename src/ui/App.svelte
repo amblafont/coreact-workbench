@@ -11,8 +11,6 @@
     import {
         loadSortScript,
         ui,
-        startMergeMode,
-        cancelMergeMode,
         applyPersistedPanelWidths,
         persistPanelWidths,
         unmarkInvalidRules
@@ -51,14 +49,6 @@
         }
         target.value = '';
     }
-
-    function onMergeClick(): void {
-        if (ui.mergeMode) {
-            cancelMergeMode();
-        } else {
-            startMergeMode(ui.inspectedArtefact);
-        }
-    }
 </script>
 
 <div id="app">
@@ -82,12 +72,6 @@
 
         <div class="artefacts-header">
             <h3 class="panel-subtitle">Artefacts</h3>
-            <button
-                class="layer-btn merge-btn"
-                id="merge-artefacts-btn"
-                title="Merge two artefacts with identical dependencies"
-                onclick={onMergeClick}
-            >Merge</button>
         </div>
         <ArtefactMenu />
     </div>
