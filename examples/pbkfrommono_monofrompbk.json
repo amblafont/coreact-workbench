@@ -3410,8 +3410,8 @@
           "data": {}
         }
       ],
-      "isRule": true,
-      "isFirstOrder": true,
+      "isRule": false,
+      "isFirstOrder": false,
       "rocqProof": "Lemma PbkFromMono_rule : forall (a a_2 a_3 d : Vertex)(eq_a_a_a : a = a_3)(eq_a_a_a_2 : a_3 = a_2), ltac:(subst_all_in (forall (e1 : Edge a a_2)(e2 : Edge a a_3)(f1 : Edge a_2 d)(f2 : Edge a_3 d)(eq_f1_f2 : f1 = f2), ltac:(subst_all_in (forall (isMono_2 : isMono f1)(isMono_3 : isMono f2)(isId_2 : isId e1)(isId_3 : isId e2), Pullback e1 e2 f2 f1)))).\nintros_sigma ().\nassert (Hpremise1 : Square e1 e2 f2 f1). {\n  intros_sigma ().\n  destruct_sigma (@IdLeftComp_rule a a_2 d eq_refl e1 f1 isId_2) as f _ Triangle_2.\n  destruct_sigma (@IdLeft_rule a a_3 d eq_refl e2 f2 f eq_refl isId_3) as Triangle_3.\n  destruct_sigma (@Square_rule a a_2 a_3 d e1 e2 f2 f1 f Triangle_2 Triangle_3) as Square_3.\n  exact Square_3.\n}\nassert (Hpremise2 : forall (x : Vertex)(Edge_2 : Edge x a_3)(Edge_3 : Edge x a_2)(Square_2 : Square Edge_3 Edge_2 f2 f1), Σ (Edge_4 : Edge x a)(Triangle_2 : Triangle Edge_4 e2 Edge_2), Triangle Edge_4 e1 Edge_3). {\n  intros_sigma ().\n  destruct_sigma (@Square___Def__reverse__rule x a_2 a_3 d Edge_3 f1 Edge_2 f2 Square_2) as Edge_5 Triangle_4 Triangle_5.\n  destruct_sigma (@Mono2___Premise__reverse__rule a d x f1 Edge_2 Edge_3 Edge_5 Triangle_5 Triangle_4 isMono_2) as _.\n  destruct_sigma (@UniqueCompo_rule x a d Edge_2 f1 Edge_5 Edge_5 Triangle_4 Triangle_5) as _ _.\n  destruct_sigma (@IdRightComp2_rule x a a_3 eq_refl e2 Edge_2 isId_3) as f _ Triangle_6.\n  destruct_sigma (@IdRight_rule x a a_2 eq_refl f e1 Edge_3 eq_refl isId_2) as Triangle_7.\n  exact (Edge_2, Triangle_6, Triangle_7).\n}\nassert (Hpremise3 : forall (y : Vertex)(Edge_2 : Edge y a_3)(Edge_3 : Edge y a_2)(i j : Edge y a)(ju : Triangle j e2 Edge_2)(iu : Triangle i e2 Edge_2)(jf : Triangle j e1 Edge_3)(xif : Triangle i e1 Edge_3), i = j). {\n  intros_sigma ().\n  destruct_sigma (@IdRightComp_rule y a a_2 eq_refl i e1 isId_2) as f _ Triangle_2.\n  destruct_sigma (@UniqueCompo_rule y a a i e1 Edge_3 i xif Triangle_2) as _ _.\n  destruct_sigma (@IdRightComp_rule y a a_2 eq_refl j e1 isId_2) as f_2 _ Triangle_3.\n  destruct_sigma (@UniqueCompo_rule y a a j e1 Edge_3 j jf Triangle_3) as _ _.\n  exact eq_refl.\n}\ndestruct_sigma (@Pullback_rule a a_2 a_3 d e1 e2 f2 f1 Hpremise1 Hpremise2 Hpremise3) as Pullback_3.\nexact Pullback_3.\nQed.\n"
     },
     {
@@ -3604,8 +3604,8 @@
           "data": {}
         }
       ],
-      "isRule": true,
-      "isFirstOrder": true,
+      "isRule": false,
+      "isFirstOrder": false,
       "rocqProof": "Lemma MonoFromPullback_rule : forall (a a_2 a_3 d : Vertex)(eq_a_a_a : a = a_3)(eq_a_a_a_2 : a_3 = a_2), ltac:(subst_all_in (forall (e1 : Edge a a_2)(e2 : Edge a a_3)(f1 : Edge a_2 d)(f2 : Edge a_3 d)(eq_f1_f2 : f1 = f2), ltac:(subst_all_in (forall (Pullback_2 : Pullback e1 e2 f2 f1)(isId_2 : isId e1)(isId_3 : isId e2), isMono f1)))).\nintros_sigma ().\nassert (Hpremise1 : forall (x : Vertex)(f g : Edge x a_2)(h : Edge x d)(fm : Triangle f f1 h)(gm : Triangle g f1 h), f = g). {\n  intros_sigma ().\n  set (g_2 := g : Edge x a_3).\n  set (gm_2 := gm : Triangle g_2 f2 h).\n  destruct_sigma (@Square_rule x a_3 a_2 d g_2 f f1 f2 h gm_2 fm) as Square_2.\n  destruct_sigma (@Square_rule x a_2 a_3 d f g_2 f2 f1 h fm gm_2) as Square_3.\n  destruct_sigma (@Pullback___Exist__reverse__rule a a_2 a_3 d x e1 e2 f2 f1 g_2 f Pullback_2 Square_3) as Edge_2 Triangle_2 Triangle_3.\n  destruct_sigma (@IdRightComp_rule x a a_2 eq_refl Edge_2 e1 isId_2) as f_2 _ Triangle_4.\n  destruct_sigma (@UniqueCompo_rule x a a Edge_2 e1 f Edge_2 Triangle_3 Triangle_4) as _ _.\n  destruct_sigma (@IdRightComp_rule x a a_3 eq_refl Edge_2 e2 isId_3) as f_3 _ Triangle_5.\n  destruct_sigma (@UniqueCompo_rule x a a f e2 f g Triangle_5 Triangle_2) as _ _.\n  exact eq_refl.\n}\ndestruct_sigma (@Mono2_rule a_2 d f1 Hpremise1) as isMono_3.\nexact isMono_3.\nQed.\n"
     }
   ]
