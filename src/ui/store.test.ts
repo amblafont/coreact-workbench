@@ -841,13 +841,15 @@ describe('merge recording', () => {
         expect(rocqRecorder.isActive()).toBe(true);
     }
 
-    // A statement with two parallel edges `f` and `g`, i.e. a mergeable pair.
+    // A statement with two parallel edges `f` and `g`, related by an equality so
+    // that the pair is provably equal and may be merged while recording.
     function buildLabelledStatement(): { stmt: Drawing; first: Artefact; second: Artefact } {
         const stmt = getDrawing();
         const a = makeVertex(stmt, 'a');
         const b = makeVertex(stmt, 'b');
         const first = makeEdge(stmt, 'f', a, b);
         const second = makeEdge(stmt, 'g', a, b);
+        stmt.newEqualityArtefact([first, second], 'root');
         return { stmt, first, second };
     }
 
@@ -867,6 +869,30 @@ describe('merge recording', () => {
         expect(script).toContain('rename g into f__g.');
     });
 
+    it('refuses to merge non-provably-equal artefacts on a recorded layer while recording', () => {
+        const stmt = getDrawing();
+        const a = makeVertex(stmt, 'a');
+        const b = makeVertex(stmt, 'b');
+        const first = makeEdge(stmt, 'f', a, b);
+        const second = makeEdge(stmt, 'g', a, b);
+        startRecording(stmt);
+
+        startMergeMode(first);
+        selectMergeArtefact(second);
+
+        // The pair is not provably equal, so the second pick is refused and the
+        // merge would be recorded as a rename without any equality to justify it.
+        expect(ui.mergeSecondArtefact).toBeNull();
+        const toast = ui.toasts[ui.toasts.length - 1];
+        expect(toast.kind).toBe('error');
+        expect(String(toast.message)).toContain('not provably equal');
+
+        performMerge();
+        expect(second.data.label).toBe('g');
+        expect(stmt.getArtefacts()).toContain(first);
+        expect(rocqRecorder.stop()).not.toContain('rename');
+    });
+
     it('frees the merged artefact name before renaming the survivor into it', () => {
         // Two unlabelled isMonos: the removed one held "isMono_2" and the
         // survivor inherits that name from the export registry, so its rename
@@ -877,6 +903,7 @@ describe('merge recording', () => {
         const e1 = makeEdge(stmt, 'e1', a, b);
         const first = stmt.newArtefact('isMono', { arrow: e1 }, {}, 'root');
         const second = stmt.newArtefact('isMono', { arrow: e1 }, {}, 'root');
+        stmt.newEqualityArtefact([first, second], 'root');
         startRecording(stmt);
 
         startMergeMode(first);
@@ -901,6 +928,7 @@ describe('merge recording', () => {
         const first = stmt.newArtefact('isMono', { arrow: e1 }, {}, 'root');
         const second = stmt.newArtefact('isMono', { arrow: e1 }, {}, 'root');
         stmt.newArtefact('isMono', { arrow: e1 }, {}, 'root');
+        stmt.newEqualityArtefact([first, second], 'root');
         startRecording(stmt);
 
         startMergeMode(first);

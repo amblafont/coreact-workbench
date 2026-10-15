@@ -22,6 +22,8 @@
         toggleDraftPicker,
         isDraftPickerActive,
         equalityChildren,
+        isRecordedMerge,
+        canMergeArtefacts,
         pushToast
     } from './store.svelte.ts';
 
@@ -38,6 +40,7 @@
         if (!first) return [];
         return getDrawing().getArtefacts().filter(art =>
             art !== first && getDrawing().areDependenciesEqual(first, art) && !getDrawing().areProvablyEqual(first, art)
+            && !isRecordedMerge(first, art)
         );
     });
     let orderedCandidates = $derived([...provablyEqualCandidates, ...otherCandidates]);
@@ -64,8 +67,7 @@
     let secondSelectIndex = $derived(ui.mergeSecondArtefact ? orderedCandidates.indexOf(ui.mergeSecondArtefact) : -1);
 
     let canMerge = $derived(!!(ui.mergeFirstArtefact && ui.mergeSecondArtefact
-        && ui.mergeFirstArtefact !== ui.mergeSecondArtefact
-        && getDrawing().areDependenciesEqual(ui.mergeFirstArtefact, ui.mergeSecondArtefact)));
+        && canMergeArtefacts(ui.mergeFirstArtefact, ui.mergeSecondArtefact)));
 
     function toggleMergeFirst(): void {
         ui.mergePickingFor = ui.mergePickingFor === 'first' ? null : 'first';
@@ -131,6 +133,9 @@
     <h3 style="margin-top: 0;">Merge Artefacts</h3>
     <p style="color: #666; font-size: 0.82rem; margin-top: 4px; margin-bottom: 12px;">
         Select two artefacts of the same sort with identical dependencies to merge them.
+        {#if ui.recordingActive}
+            While recording, a merge on a recorded layer is only allowed between artefacts that are provably equal.
+        {/if}
     </p>
 
     <div>

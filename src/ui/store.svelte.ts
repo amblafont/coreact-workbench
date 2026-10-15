@@ -609,6 +609,8 @@ export function selectMergeArtefact(artefact: Artefact): void {
             pushToast('error', 'Cannot merge an artefact with itself.');
         } else if (!drawing.areDependenciesEqual(first, artefact)) {
             pushToast('error', `Cannot merge: Artefact '${artefact.data.label || artefact.sortName}' does not have matching dependencies.`);
+        } else if (isRecordedMerge(first, artefact) && !drawing.areProvablyEqual(first, artefact)) {
+            pushToast('error', `Cannot merge during proof recording: Artefact '${artefact.data.label || artefact.sortName}' is not provably equal to '${first.data.label || first.sortName}'.`);
         } else {
             ui.mergeSecondArtefact = artefact;
             ui.mergePickingFor = null;
@@ -630,6 +632,23 @@ function isRecordedLayer(layerId: string): boolean {
         return true;
     }
     return layerId === getFirstOrderStatementChildLayer(drawing)?.id;
+}
+
+// A merge whose survivor sits on a recorded layer is written to the proof as
+// `rename` steps, which only make sense when the context already proves the two
+// artefacts equal.
+export function isRecordedMerge(_a: Artefact, b: Artefact): boolean {
+    return activeRecorders().length > 0 && isRecordedLayer(b.layerId);
+}
+
+// Whether `a` and `b` may be merged. Outside a recording (or on a layer that is
+// not recorded) any pair with matching dependencies may be merged; that asserts
+// a new equality. A merge that would emit `rename` steps additionally requires
+// the two artefacts to be already provably equal.
+export function canMergeArtefacts(a: Artefact, b: Artefact): boolean {
+    if (a === b || !drawing.areDependenciesEqual(a, b)) return false;
+    if (isRecordedMerge(a, b) && !drawing.areProvablyEqual(a, b)) return false;
+    return true;
 }
 
 // The `rename` steps that bring a recorded proof back in sync with the exported
@@ -687,10 +706,10 @@ function planFieldRenames(before: DrawingExportNames, after: DrawingExportNames,
 export function performMerge(): void {
     const first = ui.mergeFirstArtefact;
     const second = ui.mergeSecondArtefact;
-    if (!first || !second || first === second || !drawing.areDependenciesEqual(first, second)) return;
+    if (!first || !second || !canMergeArtefacts(first, second)) return;
     try {
         const activeName = ui.activeDrawingName ?? 'Unsaved Drawing';
-        const before = activeRecorders().length > 0 && isRecordedLayer(second.layerId)
+        const before = isRecordedMerge(first, second)
             ? drawingExportNames(drawing, activeName, sortStore)
             : null;
         const mergedResult = drawing.mergeArtefacts(first, second);
@@ -722,7 +741,12 @@ export function mergeBaseOpacityFor(art: Artefact): number {
         return 1.0;
     }
     if (first && drawing.areDependenciesEqual(first, art)) {
-        return drawing.areProvablyEqual(first, art) ? 1.0 : 0.85;
+        if (drawing.areProvablyEqual(first, art)) {
+            return 1.0;
+        }
+        // A merge that would be recorded requires provable equality, so such a
+        // candidate is not selectable and is dimmed like a non-candidate.
+        return isRecordedMerge(first, art) ? 0.35 : 0.85;
     }
     if (!first) {
         return 0.85;
