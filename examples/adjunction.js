@@ -1,0 +1,520 @@
+const VERTEX_RADIUS = 20;
+const HOOK_MARGIN = 4;
+const BEND_ATTR = { type: "slider", min: -500, max: 500, default: 0 };
+// Distance from the source vertex center to the beginning of the isMono
+// semi-circle hook, measured along the initial edge tangent.
+function hookStartOffset(width) {
+    const r = Math.max(3, width * 2.5);
+    return Math.sqrt(Math.pow(VERTEX_RADIUS + HOOK_MARGIN + r, 2) - r * r);
+}
+// Midpoint of the drawn quadratic Bézier edge at t = 0.5.
+// Accounts for the vertex-clearing offsets at both ends.
+function edgeMidpoint(srcPos, tgtPos, bend, width, isMono) {
+    const dx = tgtPos[0] - srcPos[0];
+    const dy = tgtPos[1] - srcPos[1];
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const nx = len > 0 ? -dy / len : 0;
+    const ny = len > 0 ? dx / len : 0;
+    const mx = (srcPos[0] + tgtPos[0]) / 2;
+    const my = (srcPos[1] + tgtPos[1]) / 2;
+    const cx = mx + bend * nx;
+    const cy = my + bend * ny;
+    // Initial tangent at t=0
+    let ux0 = cx - srcPos[0], uy0 = cy - srcPos[1];
+    const u0Len = Math.hypot(ux0, uy0);
+    ux0 = u0Len > 0 ? ux0 / u0Len : (len > 0 ? dx / len : 1);
+    uy0 = u0Len > 0 ? uy0 / u0Len : (len > 0 ? dy / len : 0);
+    // Final tangent at t=1
+    let ux1 = tgtPos[0] - cx, uy1 = tgtPos[1] - cy;
+    const u1Len = Math.hypot(ux1, uy1);
+    ux1 = u1Len > 0 ? ux1 / u1Len : (len > 0 ? dx / len : 1);
+    uy1 = u1Len > 0 ? uy1 / u1Len : (len > 0 ? dy / len : 0);
+    const R = 20;
+    const startDist = isMono ? hookStartOffset(width) : R;
+    const startX = srcPos[0] + ux0 * startDist;
+    const startY = srcPos[1] + uy0 * startDist;
+    const halfW = width * 2;
+    const L = halfW * 2.5;
+    const baseX = tgtPos[0] - ux1 * (R + L);
+    const baseY = tgtPos[1] - uy1 * (R + L);
+    const midX = 0.25 * startX + 0.5 * cx + 0.25 * baseX;
+    const midY = 0.25 * startY + 0.5 * cy + 0.25 * baseY;
+    return [midX, midY];
+}
+// Offset a quadratic Bézier sideways by d (signed), so that both ends of the
+// new curve stay square to the original curve's direction at that end.
+// u0/u1 are the unit tangents of the source curve at t=0 and t=1.
+function offsetQuadratic(startX, startY, cx, cy, endX, endY, u0x, u0y, u1x, u1y, d) {
+    // Normals to the tangents, pointing to the same side of the curve
+    const n0x = -u0y, n0y = u0x;
+    const n1x = -u1y, n1y = u1x;
+    // The offset ends are start + d*n0 and end + d*n1. Moving the control
+    // point to where the two shifted tangent lines cross keeps the curve
+    // parallel to the source curve: v = k*(n0 + n1) with v.n0 = v.n1 = d.
+    const denom = 1 + n0x * n1x + n0y * n1y;
+    const k = denom > 1e-3 ? d / denom : 0;
+    const vx = k * (n0x + n1x);
+    const vy = k * (n0y + n1y);
+    return {
+        startX: startX + n0x * d, startY: startY + n0y * d,
+        cx: cx + vx, cy: cy + vy,
+        endX: endX + n1x * d, endY: endY + n1y * d
+    };
+}
+// Draw a vertex (circle) at data.position, labelled with `label` when given.
+function drawVertex(data, context, label) {
+    const group = context.append("g")
+        .attr("transform", `translate(${data.position[0]}, ${data.position[1]})`);
+    group.append("circle")
+        .attr("r", 20)
+        .attr("fill", "#69b3a2")
+        .attr("stroke", "#333")
+        .attr("stroke-width", 2);
+    if (label) {
+        group.append("text")
+            .attr("text-anchor", "middle")
+            .attr("dy", ".3em") // Vertically center text
+            .attr("fill", "white")
+            .attr("font-family", "sans-serif")
+            .attr("font-size", "14px")
+            .text(label);
+    }
+    return group; // Return the group to store in Artefact
+}
+// Draw an arrow from data.source to data.target, labelled with `label`
+// when given. Double arrow when an isId mark sits on the edge.
+function drawEdge(data, context, label, isId) {
+    const srcPos = data.source.position;
+    const tgtPos = data.target.position;
+    const bend = typeof data.bend === "number" ? data.bend : 0;
+    const dx = tgtPos[0] - srcPos[0];
+    const dy = tgtPos[1] - srcPos[1];
+    const len = Math.sqrt(dx * dx + dy * dy);
+    // Perpendicular unit vector (-dy/len, dx/len)
+    const nx = len > 0 ? -dy / len : 0;
+    const ny = len > 0 ? dx / len : 0;
+    // Midpoint between source and target
+    const mx = (srcPos[0] + tgtPos[0]) / 2;
+    const my = (srcPos[1] + tgtPos[1]) / 2;
+    // Control point for quadratic Bézier curve
+    const cx = mx + bend * nx;
+    const cy = my + bend * ny;
+    const R = 20;
+    // Initial tangent at t=0
+    let ux0 = cx - srcPos[0], uy0 = cy - srcPos[1];
+    const u0Len = Math.hypot(ux0, uy0);
+    ux0 = u0Len > 0 ? ux0 / u0Len : (len > 0 ? dx / len : 1);
+    uy0 = u0Len > 0 ? uy0 / u0Len : (len > 0 ? dy / len : 0);
+    // Final tangent at t=1
+    let ux1 = tgtPos[0] - cx, uy1 = tgtPos[1] - cy;
+    const u1Len = Math.hypot(ux1, uy1);
+    ux1 = u1Len > 0 ? ux1 / u1Len : (len > 0 ? dx / len : 1);
+    uy1 = u1Len > 0 ? uy1 / u1Len : (len > 0 ? dy / len : 0);
+    const width = typeof data.width === "number" ? data.width : 2;
+    // When an isMono hook is drawn on this edge, shorten the tail so it
+    // ends exactly at the beginning of the hook's semi-circle.
+    const startDist = data.isMono ? hookStartOffset(width) : R;
+    const startX = srcPos[0] + ux0 * startDist;
+    const startY = srcPos[1] + uy0 * startDist;
+    // Arrowhead size scales with the edge width
+    const halfW = width * 2;
+    const L = halfW * 2.5;
+    const baseX = tgtPos[0] - ux1 * (R + L);
+    const baseY = tgtPos[1] - uy1 * (R + L);
+    // Midpoint of the drawn Bézier curve at t = 0.5
+    const [midX, midY] = edgeMidpoint(srcPos, tgtPos, bend, width, !!data.isMono);
+    const tipX = tgtPos[0] - ux1 * R;
+    const tipY = tgtPos[1] - uy1 * R;
+    // Perpendicular to the final tangent (for the arrow base half-width)
+    const px = -uy1, py = ux1;
+    const lineGroup = context.insert("g", ":first-child");
+    if (isId) {
+        const doubleOffset = 3;
+        for (const side of [-1, 1]) {
+            // Offset the tail-to-tip curve sideways along its own
+            // end normals, so both lines stay square to the
+            // vertex at the tail and to the arrow tip.
+            const o = offsetQuadratic(startX, startY, cx, cy, tipX, tipY, ux0, uy0, ux1, uy1, doubleOffset * side);
+            lineGroup.append("path")
+                .attr("d", `M ${o.startX},${o.startY} Q ${o.cx},${o.cy} ${o.endX},${o.endY}`)
+                .attr("fill", "none")
+                .attr("stroke", "#999")
+                .attr("stroke-width", data.width);
+        }
+    }
+    else {
+        lineGroup.append("path")
+            .attr("d", `M ${startX},${startY} Q ${cx},${cy} ${baseX},${baseY}`)
+            .attr("fill", "none")
+            .attr("stroke", "#999")
+            .attr("stroke-width", data.width);
+        // Manual arrowhead polygon
+        lineGroup.append("path")
+            .attr("d", `M ${baseX - px * halfW},${baseY - py * halfW} L ${tipX},${tipY} L ${baseX + px * halfW},${baseY + py * halfW} Z`)
+            .attr("fill", "#999")
+            .attr("stroke", "none");
+    }
+    if (label) {
+        context.append("text")
+            .attr("x", midX)
+            .attr("y", midY - 10) // slightly above the curve
+            .attr("text-anchor", "middle")
+            .attr("fill", "#333")
+            .attr("font-family", "sans-serif")
+            .attr("font-size", "12px")
+            .text(label);
+    }
+    return lineGroup; // Return the line group
+}
+function drawTriangle(data, context) {
+    // A triangle is composed of three edges: "1", "2", and "o".
+    // Draw it like a 2-cell: a double arrow from the target of edge
+    // "1" to the middle of edge "o".
+    const startPos = data["1"].target.position;
+    // Compute the middle of edge "o" using the same quadratic Bézier
+    // midpoint formula as the Edge sort.
+    const oSrcPos = data["o"].source.position;
+    const oTgtPos = data["o"].target.position;
+    const oBend = typeof data["o"].bend === "number" ? data["o"].bend : 0;
+    const oWidth = typeof data["o"].width === "number" ? data["o"].width : 2;
+    const [midX, midY] = edgeMidpoint(oSrcPos, oTgtPos, oBend, oWidth, !!data["o"].isMono);
+    const bend = typeof data.bend === "number" ? data.bend : 0;
+    // Chord from the target of edge "1" to the middle of edge "o"
+    const dx = midX - startPos[0];
+    const dy = midY - startPos[1];
+    const len = Math.sqrt(dx * dx + dy * dy);
+    // Perpendicular unit vector to the chord
+    const nx = len > 0 ? -dy / len : 0;
+    const ny = len > 0 ? dx / len : 0;
+    // Control point for the bent double arrow
+    const cx = (startPos[0] + midX) / 2 + bend * nx;
+    const cy = (startPos[1] + midY) / 2 + bend * ny;
+    // Initial tangent at t=0, for clearing the source vertex
+    let ux0 = cx - startPos[0], uy0 = cy - startPos[1];
+    const u0Len = Math.hypot(ux0, uy0);
+    ux0 = u0Len > 0 ? ux0 / u0Len : (len > 0 ? dx / len : 1);
+    uy0 = u0Len > 0 ? uy0 / u0Len : (len > 0 ? dy / len : 0);
+    // Final tangent at t=1, for orienting the chevron hat
+    let ux = midX - cx, uy = midY - cy;
+    const uLen = Math.hypot(ux, uy);
+    ux = uLen > 0 ? ux / uLen : (len > 0 ? dx / len : 1);
+    uy = uLen > 0 ? uy / uLen : (len > 0 ? dy / len : 0);
+    // Perpendicular to the final tangent
+    const px = -uy;
+    const py = ux;
+    const offset = 6;
+    const startGap = 24; // Clear the r=20 vertex circle
+    // Single open chevron (hat) at the tip
+    const hatWidth = 10;
+    const hatLength = 10;
+    // The two lines end on the hat's corner edges
+    const lineEndOffset = hatLength * (offset / hatWidth);
+    const lineStartX = startPos[0] + ux0 * startGap;
+    const lineStartY = startPos[1] + uy0 * startGap;
+    const lineEndX = midX - ux * lineEndOffset;
+    const lineEndY = midY - uy * lineEndOffset;
+    const group = context.append("g");
+    const w1X = midX - ux * hatLength - px * hatWidth;
+    const w1Y = midY - uy * hatLength - py * hatWidth;
+    const w2X = midX - ux * hatLength + px * hatWidth;
+    const w2Y = midY - uy * hatLength + py * hatWidth;
+    for (const side of [-1, 1]) {
+        // Offset sideways along the curve's own end normals, so
+        // both lines start at equal distance from the node and end
+        // exactly on the hat's corner edges.
+        const o = offsetQuadratic(lineStartX, lineStartY, cx, cy, lineEndX, lineEndY, ux0, uy0, ux, uy, offset * side);
+        group.append("path")
+            .attr("d", `M ${o.startX},${o.startY} Q ${o.cx},${o.cy} ${o.endX},${o.endY}`)
+            .attr("fill", "none")
+            .attr("stroke", "#8e44ad")
+            .attr("stroke-width", 2);
+    }
+    group.append("path")
+        .attr("d", `M ${w1X},${w1Y} L ${midX},${midY} L ${w2X},${w2Y}`)
+        .attr("fill", "none")
+        .attr("stroke", "#8e44ad")
+        .attr("stroke-width", 2)
+        .attr("stroke-linecap", "round")
+        .attr("stroke-linejoin", "round");
+}
+{
+    sortStore
+        .newSort("Vertex", {}, { position: "position" }, (data, context) =>
+        drawVertex(data, context, data.label))
+        .newSort("Edge", { source: "Vertex", target: "Vertex" }, // Dependencies 
+    { width: "number", bend: BEND_ATTR }, (data, context) =>
+        drawEdge(data, context, data.label, data.isId))
+        .newSort("Pullback", { p1: "Edge", p2: "Edge", q1: "Edge", q2: "Edge" }, {}, (data, context) => {
+        // Assume p1 and p2 share the pullback source vertex
+        const V = data.p1.source.position;
+        const T1 = data.p1.target.position;
+        const T2 = data.p2.target.position;
+        // Calculate normalized direction vectors
+        const dx1 = T1[0] - V[0];
+        const dy1 = T1[1] - V[1];
+        const len1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
+        const ux1 = len1 > 0 ? dx1 / len1 : 0;
+        const uy1 = len1 > 0 ? dy1 / len1 : 0;
+        const dx2 = T2[0] - V[0];
+        const dy2 = T2[1] - V[1];
+        const len2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+        const ux2 = len2 > 0 ? dx2 / len2 : 0;
+        const uy2 = len2 > 0 ? dy2 / len2 : 0;
+        // distance from the center of the vertex
+        const offset = 25;
+        // size of the pullback corner legs
+        const size = 15;
+        // Re-calculate points strictly using the unit vectors for arbitrary angles
+        const p1x = V[0] + ux1 * offset + ux2 * (offset + size);
+        const p1y = V[1] + uy1 * offset + uy2 * (offset + size);
+        const p2x = V[0] + ux1 * (offset + size) + ux2 * (offset + size);
+        const p2y = V[1] + uy1 * (offset + size) + uy2 * (offset + size); // The innermost corner
+        const p3x = V[0] + ux1 * (offset + size) + ux2 * offset;
+        const p3y = V[1] + uy1 * (offset + size) + uy2 * offset;
+        return (context.append("path")
+            .attr("d", `M ${p1x},${p1y} L ${p2x},${p2y} L ${p3x},${p3y}`)
+            .attr("fill", "none")
+            .attr("stroke", "#333")
+            .attr("stroke-width", 2)
+            .attr("stroke-linejoin", "miter"));
+    })
+        .newSort("Triangle", { "1": "Edge", "2": "Edge", o: "Edge" }, { bend: BEND_ATTR }, drawTriangle)
+        .newSort("Square", { p1: "Edge", p2: "Edge", q1: "Edge", q2: "Edge" }, { bend: BEND_ATTR }, (data, context) => {
+        // 2-cell between the midpoints of the opposite arrows p1 and q1.
+        const a = edgeMidpoint(data.p1.source.position, data.p1.target.position, typeof data.p1.bend === "number" ? data.p1.bend : 0, typeof data.p1.width === "number" ? data.p1.width : 2, !!data.p1.isMono);
+        const b = edgeMidpoint(data.q1.source.position, data.q1.target.position, typeof data.q1.bend === "number" ? data.q1.bend : 0, typeof data.q1.width === "number" ? data.q1.width : 2, !!data.q1.isMono);
+        const bend = typeof data.bend === "number" ? data.bend : 0;
+        const dx = b[0] - a[0];
+        const dy = b[1] - a[1];
+        const len = Math.sqrt(dx * dx + dy * dy);
+        // Perpendicular unit vector to the chord
+        const nx = len > 0 ? -dy / len : 0;
+        const ny = len > 0 ? dx / len : 0;
+        const mx = (a[0] + b[0]) / 2;
+        const my = (a[1] + b[1]) / 2;
+        // Control point for the bent 2-cell
+        const cx = mx + bend * nx;
+        const cy = my + bend * ny;
+        // Start tangent at t=0, for offsetting the two lines
+        let ux0 = cx - a[0], uy0 = cy - a[1];
+        const u0Len = Math.hypot(ux0, uy0);
+        ux0 = u0Len > 0 ? ux0 / u0Len : (len > 0 ? dx / len : 1);
+        uy0 = u0Len > 0 ? uy0 / u0Len : (len > 0 ? dy / len : 0);
+        // End tangent at t=1, for orienting the chevron hat
+        let ux = b[0] - cx, uy = b[1] - cy;
+        const uLen = Math.hypot(ux, uy);
+        ux = uLen > 0 ? ux / uLen : (len > 0 ? dx / len : 1);
+        uy = uLen > 0 ? uy / uLen : (len > 0 ? dy / len : 0);
+        // Perpendicular to the end tangent
+        const px = -uy;
+        const py = ux;
+        const offset = 6;
+        const hatWidth = 10;
+        const hatLength = 10;
+        // The two lines end on the hat's corner edges
+        const lineEndOffset = hatLength * (offset / hatWidth);
+        const lineEndX = b[0] - ux * lineEndOffset;
+        const lineEndY = b[1] - uy * lineEndOffset;
+        const w1X = b[0] - ux * hatLength - px * hatWidth;
+        const w1Y = b[1] - uy * hatLength - py * hatWidth;
+        const w2X = b[0] - ux * hatLength + px * hatWidth;
+        const w2Y = b[1] - uy * hatLength + py * hatWidth;
+        const group = context.append("g");
+        for (const side of [-1, 1]) {
+            // Offset sideways along the curve's own end normals, so
+            // both lines start at equal distance from a and end
+            // exactly on the hat's corner edges.
+            const o = offsetQuadratic(a[0], a[1], cx, cy, lineEndX, lineEndY, ux0, uy0, ux, uy, offset * side);
+            group.append("path")
+                .attr("d", `M ${o.startX},${o.startY} Q ${o.cx},${o.cy} ${o.endX},${o.endY}`)
+                .attr("fill", "none")
+                .attr("stroke", "#8e44ad")
+                .attr("stroke-width", 2);
+        }
+        group.append("path")
+            .attr("d", `M ${w1X},${w1Y} L ${b[0]},${b[1]} L ${w2X},${w2Y}`)
+            .attr("fill", "none")
+            .attr("stroke", "#8e44ad")
+            .attr("stroke-width", 2)
+            .attr("stroke-linecap", "round")
+            .attr("stroke-linejoin", "round");
+        return group;
+    })
+        .newSort("isMono", { arrow: "Edge" }, {}, (data, context) => {
+        const srcPos = data.arrow.source.position;
+        const tgtPos = data.arrow.target.position;
+        const bend = typeof data.arrow.bend === "number" ? data.arrow.bend : 0;
+        const strokeColor = "#999";
+        const baseWidth = typeof data.arrow.width === "number" ? data.arrow.width : 2;
+        const strokeWidth = baseWidth;
+        const dx = tgtPos[0] - srcPos[0];
+        const dy = tgtPos[1] - srcPos[1];
+        const len = Math.sqrt(dx * dx + dy * dy);
+        // Perpendicular unit vector (-dy/len, dx/len)
+        const nx = len > 0 ? -dy / len : 0;
+        const ny = len > 0 ? dx / len : 0;
+        // Midpoint between source and target
+        const mx = (srcPos[0] + tgtPos[0]) / 2;
+        const my = (srcPos[1] + tgtPos[1]) / 2;
+        // Control point for quadratic Bézier curve
+        const cx = mx + bend * nx;
+        const cy = my + bend * ny;
+        // Derivative at t=0 to find the initial tangent of the curve
+        const tx = cx - srcPos[0];
+        const ty = cy - srcPos[1];
+        const tLen = Math.sqrt(tx * tx + ty * ty);
+        const ux = tLen > 0 ? tx / tLen : 1;
+        const uy = tLen > 0 ? ty / tLen : 0;
+        // Perpendicular to the tangent (hook hangs on the right-hand side of travel)
+        const px = -uy;
+        const py = ux;
+        // Semi-circle radius grows with the arrow width
+        const r = Math.max(3, baseWidth * 2.5);
+        // Offset the hook along the tail so the semi-circle clears the
+        // source vertex boundary, matching the edge tail's start point
+        const offset = hookStartOffset(baseWidth);
+        const tailX = srcPos[0] + ux * offset;
+        const tailY = srcPos[1] + uy * offset;
+        // Center of the hook's circle, offset to the perpendicular side
+        const cX = tailX + px * r;
+        const cY = tailY + py * r;
+        // End of the semi-circle, diametrically opposite the tail point so the path ends backwards
+        const endX = cX + px * r;
+        const endY = cY + py * r;
+        const group = context.append("g");
+        // Semi-circle starting at the end of the tail and ending backwards
+        group.append("path")
+            .attr("d", `M ${tailX},${tailY} A ${r} ${r} 0 0 0 ${endX},${endY}`)
+            .attr("fill", "none")
+            .attr("stroke", strokeColor)
+            .attr("stroke-width", strokeWidth)
+            .attr("stroke-linecap", "round");
+        return group;
+    })
+        .newSort("isId", { arrow: "Edge" }, {}, (_data, context) => {
+        return context.append("g");
+    })
+        .newSort("EqEdges", { source: "Edge", target: "Edge" }, { bend: BEND_ATTR }, (data, context) => {
+        // Anchor points: midpoints of the dependency edges
+        const a = edgeMidpoint(data.source.source.position, data.source.target.position, typeof data.source.bend === "number" ? data.source.bend : 0, typeof data.source.width === "number" ? data.source.width : 2, !!data.source.isMono);
+        const b = edgeMidpoint(data.target.source.position, data.target.target.position, typeof data.target.bend === "number" ? data.target.bend : 0, typeof data.target.width === "number" ? data.target.width : 2, !!data.target.isMono);
+        const bend = typeof data.bend === "number" ? data.bend : 0;
+        const dx = b[0] - a[0];
+        const dy = b[1] - a[1];
+        const len = Math.hypot(dx, dy);
+        // Perpendicular unit vector to the chord
+        const nx = len > 0 ? -dy / len : 0;
+        const ny = len > 0 ? dx / len : 0;
+        const mx = (a[0] + b[0]) / 2;
+        const my = (a[1] + b[1]) / 2;
+        // Control point for the bent quadratic Bézier
+        const cx = mx + bend * nx;
+        const cy = my + bend * ny;
+        // Final tangent at t=1, for orienting the arrowhead
+        let ux = b[0] - cx, uy = b[1] - cy;
+        const uLen = Math.hypot(ux, uy);
+        ux = uLen > 0 ? ux / uLen : (len > 0 ? dx / len : 1);
+        uy = uLen > 0 ? uy / uLen : (len > 0 ? dy / len : 0);
+        const px = -uy;
+        const py = ux;
+        const width = 2;
+        const amp = 4.5;
+        // Arrowhead at the target end, width-scaled like the Edge sort.
+        // The squiggle terminates at the base of the head (baseX/baseY),
+        // L short of the tip, so it does not run to the arrow's middle.
+        const halfW = width * 2;
+        const L = halfW * 2.5;
+        const baseX = b[0] - ux * L;
+        const baseY = b[1] - uy * L;
+        // Approximate the arc length of the Bézier so wave count
+        // tracks the true curve length (which grows with the bend).
+        const ARC_SAMPLES = 200;
+        let arcLen = 0;
+        let prevX = a[0], prevY = a[1];
+        for (let i = 1; i <= ARC_SAMPLES; i++) {
+            const t = i / ARC_SAMPLES;
+            const b0 = (1 - t) * (1 - t);
+            const b1 = 2 * t * (1 - t);
+            const b2 = t * t;
+            const x = b0 * a[0] + b1 * cx + b2 * baseX;
+            const y = b0 * a[1] + b1 * cy + b2 * baseY;
+            arcLen += Math.hypot(x - prevX, y - prevY);
+            prevX = x;
+            prevY = y;
+        }
+        // Number of squiggle waves scales with the length (~1 per 30px)
+        const waves = Math.max(4, Math.round(arcLen / 30));
+        const segments = Math.max(40, waves * 20);
+        let d = "";
+        for (let i = 0; i <= segments; i++) {
+            const t = i / segments;
+            const b0 = (1 - t) * (1 - t);
+            const b1 = 2 * t * (1 - t);
+            const b2 = t * t;
+            const bx = b0 * a[0] + b1 * cx + b2 * baseX;
+            const by = b0 * a[1] + b1 * cy + b2 * baseY;
+            // Local tangent of the Bézier
+            const tanX = 2 * (1 - t) * (cx - a[0]) + 2 * t * (baseX - cx);
+            const tanY = 2 * (1 - t) * (cy - a[1]) + 2 * t * (baseY - cy);
+            const tanLen = Math.hypot(tanX, tanY);
+            const qx = tanLen > 0 ? -tanY / tanLen : (len > 0 ? -dy / len : 0);
+            const qy = tanLen > 0 ? tanX / tanLen : (len > 0 ? dx / len : 0);
+            const s = Math.sin(t * waves * 2 * Math.PI);
+            const x = bx + qx * amp * s;
+            const y = by + qy * amp * s;
+            d += i === 0 ? `M ${x},${y}` : ` L ${x},${y}`;
+        }
+        const group = context.append("g");
+        group.append("path")
+            .attr("d", d)
+            .attr("fill", "none")
+            .attr("stroke", "#999")
+            .attr("stroke-width", width);
+        group.append("path")
+            .attr("d", `M ${baseX - px * halfW},${baseY - py * halfW} L ${b[0]},${b[1]} L ${baseX + px * halfW},${baseY + py * halfW} Z`)
+            .attr("fill", "#999")
+            .attr("stroke", "none");
+        return group;
+    })
+        .newSort("Vertex2", {}, { position: "position" }, (data, context) =>
+        // The label of a vertex carrying an FOb mark is drawn by that
+        // mark instead, so it is hidden here.
+        drawVertex(data, context, data.FOb ? "" : data.label))
+        .newSort("Edge2", { source: "Vertex2", target: "Vertex2" }, { width: "number", bend: BEND_ATTR }, (data, context) =>
+            drawEdge(data, context, data.FMor ? "" : data.label, data.isId2))
+        .newSort("Triangle2", { "1": "Edge2", "2": "Edge2", o: "Edge2" }, { bend: BEND_ATTR }, drawTriangle)
+        .newSort("isId2", { arrow: "Edge2" }, {}, (_data, context) => {
+        return context.append("g");
+    })
+        .newSort("FOb", { source: "Vertex", target: "Vertex2" }, {}, (data, context) => {
+        // The image of the source vertex, labelled in the place of the
+        // label its Vertex2 target has just hidden.
+        const group = context.append("g")
+            .attr("transform", `translate(${data.target.position[0]}, ${data.target.position[1]})`);
+        group.append("text")
+            .attr("text-anchor", "middle")
+            .attr("dy", ".3em") // Vertically center text
+            .attr("fill", "white")
+            .attr("font-family", "sans-serif")
+            .attr("font-size", "14px")
+            .text(`F ${data.source.label}`);
+           // .text("F ");
+        return group;
+    })
+        .newSort("FMor", { source: "Edge", target: "Edge2" }, {}, (data, context) => {
+        // The image of the source edge, labelled where the label of its
+        // Edge2 target has just been hidden.
+        const [midX, midY] = edgeMidpoint(data.target.source.position, data.target.target.position, typeof data.target.bend === "number" ? data.target.bend : 0, typeof data.target.width === "number" ? data.target.width : 2, !!data.target.isMono);
+        const group = context.append("g");
+        group.append("text")
+            .attr("x", midX)
+            .attr("y", midY - 10) // slightly above the curve
+            .attr("text-anchor", "middle")
+            .attr("fill", "#333")
+            .attr("font-family", "sans-serif")
+            .attr("font-size", "12px")
+            .text(`F ${data.source.label}`);
+        return group;
+    })
+      .newSort("universal", { target : "Edge2" }, {}, (data, context) => context.append_g);
+}
