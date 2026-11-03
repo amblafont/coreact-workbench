@@ -130,7 +130,8 @@
         }
       ],
       "isRule": true,
-      "isFirstOrder": true
+      "isFirstOrder": true,
+      "proved": false
     },
     {
       "name": "FId",
@@ -280,7 +281,8 @@
         }
       ],
       "isRule": true,
-      "isFirstOrder": true
+      "isFirstOrder": true,
+      "proved": false
     },
     {
       "name": "FObEx",
@@ -609,7 +611,8 @@
         }
       ],
       "isRule": true,
-      "isFirstOrder": true
+      "isFirstOrder": true,
+      "proved": false
     },
     {
       "name": "UniversalDef",
@@ -628,7 +631,7 @@
           "parentId": "root",
           "color": "#45db2d",
           "colorEnabled": true,
-          "visible": true
+          "visible": false
         },
         {
           "id": "layer-muo5ys1d",
@@ -652,7 +655,7 @@
           "parentId": "root",
           "color": "#001c6d",
           "colorEnabled": true,
-          "visible": true
+          "visible": false
         },
         {
           "id": "layer-muo6fat4",
@@ -978,6 +981,103 @@
       ],
       "isRule": true,
       "isFirstOrder": false,
+      "proved": false
+    },
+    {
+      "name": "ExistsUniversal",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        },
+        {
+          "id": "layer-muo5yh5u",
+          "name": "Conclusion",
+          "parentId": "root",
+          "color": "#45db2d",
+          "colorEnabled": true,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "a1",
+          "sortName": "Vertex",
+          "layerId": "layer-muo5yh5u",
+          "dependencies": {},
+          "data": {
+            "position": [
+              477,
+              402
+            ],
+            "label": "La"
+          }
+        },
+        {
+          "id": "a2",
+          "sortName": "Vertex2",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              86,
+              419
+            ],
+            "label": "a"
+          }
+        },
+        {
+          "id": "a3",
+          "sortName": "Vertex2",
+          "layerId": "layer-muo5yh5u",
+          "dependencies": {},
+          "data": {
+            "position": [
+              341,
+              401
+            ]
+          }
+        },
+        {
+          "id": "a4",
+          "sortName": "FOb",
+          "layerId": "layer-muo5yh5u",
+          "dependencies": {
+            "source": "a1",
+            "target": "a3"
+          },
+          "data": {}
+        },
+        {
+          "id": "a5",
+          "sortName": "Edge2",
+          "layerId": "layer-muo5yh5u",
+          "dependencies": {
+            "source": "a2",
+            "target": "a3"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "universal"
+          }
+        },
+        {
+          "id": "a6",
+          "sortName": "universal",
+          "layerId": "layer-muo5yh5u",
+          "dependencies": {
+            "target": "a5"
+          },
+          "data": {}
+        }
+      ],
+      "isRule": true,
+      "isFirstOrder": true,
       "proved": false
     }
   ]
