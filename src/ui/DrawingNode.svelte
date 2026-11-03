@@ -14,7 +14,11 @@
         duplicateDrawing,
         toggleExportSelection,
         openProofEditor,
-        suggestAdmittedProof
+        suggestAdmittedProof,
+        canMoveDrawingUp,
+        canMoveDrawingDown,
+        moveDrawingUp,
+        moveDrawingDown
     } from './store.svelte.ts';
     import DrawingNode from './DrawingNode.svelte';
     import rocqIcon from './rocq-icon.svg';
@@ -24,6 +28,16 @@
     let isActive = $derived(drawing.name === ui.activeDrawingName);
     let children = $derived(allDrawings().filter(d => d.parentName === drawing.name && d.name !== drawing.name));
     let recStatus = $derived(recordedStatementByDrawing().get(drawing.name));
+    let canUp = $derived(canMoveDrawingUp(drawing.name));
+    let canDown = $derived(canMoveDrawingDown(drawing.name));
+
+    function onMoveUp(entry: StoreDrawing): void {
+        moveDrawingUp(entry.name);
+    }
+
+    function onMoveDown(entry: StoreDrawing): void {
+        moveDrawingDown(entry.name);
+    }
 
     function onRename(entry: StoreDrawing): void {
         const newName = prompt(`Enter new name for drawing '${entry.name}':`, entry.name);
@@ -111,6 +125,44 @@
         {/if}
     </div>
     <div class="drawing-row-actions">
+        <span
+            class="move-btn"
+            class:disabled={!canUp}
+            role="button"
+            tabindex="0"
+            title="Move drawing up"
+            aria-label="Move drawing '{drawing.name}' up"
+            onclick={(e) => {
+                e.stopPropagation();
+                if (canUp) onMoveUp(drawing);
+            }}
+            onkeydown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (canUp) onMoveUp(drawing);
+                }
+            }}
+        >↑</span>
+        <span
+            class="move-btn"
+            class:disabled={!canDown}
+            role="button"
+            tabindex="0"
+            title="Move drawing down"
+            aria-label="Move drawing '{drawing.name}' down"
+            onclick={(e) => {
+                e.stopPropagation();
+                if (canDown) onMoveDown(drawing);
+            }}
+            onkeydown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (canDown) onMoveDown(drawing);
+                }
+            }}
+        >↓</span>
         <button class="layer-btn" title="Open drawing '{drawing.name}' to edit further" onclick={() => setActiveDrawing(drawing.name)}>Open</button>
         <button class="layer-btn" title="Rename drawing '{drawing.name}'" aria-label="Rename drawing '{drawing.name}'" onclick={() => onRename(drawing)}>✎</button>
         {#if drawing.isRule && !drawing.isFirstOrder && !isChild}

@@ -1999,6 +1999,55 @@ export class DrawingStore {
         return Array.from(this.drawings.keys());
     }
 
+    // Drawings are displayed as a forest: roots first, then each drawing's
+    // children. Ordering therefore only makes sense among siblings, so a
+    // missing parent is treated as a root (matching the drawings panel).
+    private effectiveParentName(name: string): string | undefined {
+        const parentName = this.meta.get(name)?.parentName;
+        return parentName && this.drawings.has(parentName) ? parentName : undefined;
+    }
+
+    private siblingNames(name: string): string[] {
+        if (!this.drawings.has(name)) {
+            return [];
+        }
+        const parentName = this.effectiveParentName(name);
+        return Array.from(this.drawings.keys())
+            .filter(other => this.effectiveParentName(other) === parentName);
+    }
+
+    public canMoveDrawing(name: string, delta: -1 | 1): boolean {
+        if (!this.drawings.has(name)) {
+            return false;
+        }
+        const siblings = this.siblingNames(name);
+        const idx = siblings.indexOf(name);
+        return idx !== -1 && idx + delta >= 0 && idx + delta < siblings.length;
+    }
+
+    public moveDrawing(name: string, delta: -1 | 1): void {
+        if (!this.drawings.has(name)) {
+            throw new Error(`Consistency Check Failed: Drawing '${name}' does not exist.`);
+        }
+        const siblings = this.siblingNames(name);
+        const idx = siblings.indexOf(name);
+        const neighbourIdx = idx + delta;
+        if (idx === -1 || neighbourIdx < 0 || neighbourIdx >= siblings.length) {
+            return;
+        }
+        const names = Array.from(this.drawings.keys());
+        const a = names.indexOf(name);
+        const b = names.indexOf(siblings[neighbourIdx]);
+        [names[a], names[b]] = [names[b], names[a]];
+        // SvelteMap has no move operation: rebuild it in place so reactivity is
+        // preserved (reassigning the field would not notify its readers).
+        const entries = names.map(n => [n, this.drawings.get(n)!] as const);
+        this.drawings.clear();
+        for (const [n, drawing] of entries) {
+            this.drawings.set(n, drawing);
+        }
+    }
+
     public renameDrawing(oldName: string, newName: string): Drawing {
         const drawing = this.drawings.get(oldName);
         if (!drawing) {

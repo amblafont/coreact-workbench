@@ -485,6 +485,9 @@ body {
     opacity: 0;
     pointer-events: none;
 }
+.drawing-row:hover .move-btn:not(.disabled) {
+    opacity: 1;
+}
 
 /* Canvas transitions for smooth fading */
 #canvas * {

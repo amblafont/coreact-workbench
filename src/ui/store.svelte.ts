@@ -836,8 +836,9 @@ export function setActiveDrawing(name: string): boolean {
 }
 
 export function getSelectedDrawingNames(): string[] {
-    const existing = new Set(drawingStore.getAllNames());
-    return Array.from(ui.exportSelection).filter(name => existing.has(name));
+    // Keep the store order so reordering drawings in the panel is also the
+    // order used when saving/exporting them.
+    return drawingStore.getAllNames().filter(name => ui.exportSelection.has(name));
 }
 
 export function downloadDrawingsJson(names: string[]): void {
@@ -1211,6 +1212,30 @@ export function moveArtefactDown(artefact: Artefact): void {
     try {
         drawing.moveArtefact(artefact, 1);
 
+    } catch (err) {
+        pushToast('error', (err as Error).message);
+    }
+}
+
+export function canMoveDrawingUp(name: string): boolean {
+    return drawingStore.canMoveDrawing(name, -1);
+}
+
+export function canMoveDrawingDown(name: string): boolean {
+    return drawingStore.canMoveDrawing(name, 1);
+}
+
+export function moveDrawingUp(name: string): void {
+    try {
+        drawingStore.moveDrawing(name, -1);
+    } catch (err) {
+        pushToast('error', (err as Error).message);
+    }
+}
+
+export function moveDrawingDown(name: string): void {
+    try {
+        drawingStore.moveDrawing(name, 1);
     } catch (err) {
         pushToast('error', (err as Error).message);
     }
