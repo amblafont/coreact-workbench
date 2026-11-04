@@ -134,6 +134,172 @@
       "proved": false
     },
     {
+      "name": "FMorUnique",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        },
+        {
+          "id": "layer-muo53j0k",
+          "name": "Child of Root Layer",
+          "parentId": "root",
+          "color": "#04711b",
+          "colorEnabled": true,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "a1",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              125,
+              290
+            ],
+            "label": "a"
+          }
+        },
+        {
+          "id": "a2",
+          "sortName": "Vertex2",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              332,
+              308
+            ]
+          }
+        },
+        {
+          "id": "a3",
+          "sortName": "FOb",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a1",
+            "target": "a2"
+          },
+          "data": {}
+        },
+        {
+          "id": "a4",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              122,
+              407
+            ],
+            "label": "b"
+          }
+        },
+        {
+          "id": "a5",
+          "sortName": "Vertex2",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              328,
+              378
+            ]
+          }
+        },
+        {
+          "id": "a6",
+          "sortName": "FOb",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a4",
+            "target": "a5"
+          },
+          "data": {}
+        },
+        {
+          "id": "a7",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a1",
+            "target": "a4"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "f"
+          }
+        },
+        {
+          "id": "a8",
+          "sortName": "Edge2",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a2",
+            "target": "a5"
+          },
+          "data": {
+            "width": 2,
+            "bend": 35
+          }
+        },
+        {
+          "id": "a9",
+          "sortName": "FMor",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a7",
+            "target": "a8"
+          },
+          "data": {}
+        },
+        {
+          "id": "a10",
+          "sortName": "Edge2",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a2",
+            "target": "a5"
+          },
+          "data": {
+            "width": 2,
+            "bend": -44
+          }
+        },
+        {
+          "id": "a11",
+          "sortName": "Equality",
+          "layerId": "layer-muo53j0k",
+          "dependencies": {
+            "0": "a8",
+            "1": "a10"
+          },
+          "data": {}
+        },
+        {
+          "id": "a12",
+          "sortName": "FMor",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a7",
+            "target": "a10"
+          },
+          "data": {}
+        }
+      ],
+      "isRule": true,
+      "isFirstOrder": true,
+      "proved": false
+    },
+    {
       "name": "FId",
       "layers": [
         {
@@ -281,8 +447,7 @@
         }
       ],
       "isRule": true,
-      "isFirstOrder": true,
-      "proved": false
+      "isFirstOrder": true
     },
     {
       "name": "FObEx",
@@ -611,8 +776,7 @@
         }
       ],
       "isRule": true,
-      "isFirstOrder": true,
-      "proved": false
+      "isFirstOrder": true
     },
     {
       "name": "UniversalDef",
@@ -647,7 +811,7 @@
           "parentId": "layer-muo5ys1d",
           "color": "#c21ec9",
           "colorEnabled": true,
-          "visible": true
+          "visible": false
         },
         {
           "id": "layer-muo6awzb",
@@ -655,7 +819,7 @@
           "parentId": "root",
           "color": "#001c6d",
           "colorEnabled": true,
-          "visible": false
+          "visible": true
         },
         {
           "id": "layer-muo6fat4",
@@ -804,7 +968,7 @@
         {
           "id": "a12",
           "sortName": "Edge2",
-          "layerId": "layer-muo5ys1d",
+          "layerId": "layer-muo5z5b4",
           "dependencies": {
             "source": "a3",
             "target": "a8"
@@ -827,7 +991,7 @@
         {
           "id": "a14",
           "sortName": "Triangle2",
-          "layerId": "layer-muo5ys1d",
+          "layerId": "layer-muo5z5b4",
           "dependencies": {
             "1": "a5",
             "2": "a12",
