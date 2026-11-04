@@ -7,7 +7,8 @@ import { getDrawing, drawingStore, ui, sortStore, rocqRecorder, syncProvedStatus
     splitFirstOrderRecording, openProofEditor, closeProofEditor, updateDrawingProof, removeDrawingProofs, suggestAdmittedProof, toggleProofRecording /* runRecorderStep */,
     closeCodeExport,
     setActiveDrawing, pendingProofCount, toggleAutoApplyEqualityRules, computeRuleApplications,
-    startMergeMode, selectMergeArtefact, performMerge, unmarkInvalidRules
+    startMergeMode, selectMergeArtefact, performMerge, unmarkInvalidRules,
+    setArtefactLayer
 } from './store.svelte.ts';
 import { Artefact, Drawing, DrawingStore, getFirstOrderStatementChildLayer } from '../index.svelte.ts';
 import { registerDefaultSorts } from '../demo/buildDemo';
@@ -81,6 +82,49 @@ describe('toasts', () => {
         expect(ui.toasts).toHaveLength(1);
         vi.advanceTimersByTime(1);
         expect(ui.toasts).toEqual([]);
+    });
+});
+
+describe('setArtefactLayer toasts', () => {
+    beforeEach(() => {
+        vi.useFakeTimers();
+        registerDefaultSorts(sortStore);
+        getDrawing().clear(true);
+        ui.toasts = [];
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+        ui.toasts = [];
+    });
+
+    it('reports which artefacts were relocated to keep the layers consistent', () => {
+        const drawing = getDrawing();
+        drawing.addLayer('child', 'Child', 'root');
+        const v0 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v0' }, 'root');
+        const v1 = drawing.newArtefact('Vertex', {}, { position: [100, 100], label: 'v1' }, 'root');
+        const edge = drawing.newArtefact('Edge', { source: v0, target: v1 }, { width: 2, bend: 0, label: 'e' }, 'root');
+
+        setArtefactLayer(v0, 'child');
+
+        expect(ui.toasts).toHaveLength(1);
+        expect(ui.toasts[0].kind).toBe('info');
+        expect(ui.toasts[0].message).toContain("'e'");
+        expect(ui.toasts[0].message).toContain("'Child'");
+        expect(edge.layerId).toBe('child');
+    });
+
+    it('does not toast when the move is already consistent', () => {
+        const drawing = getDrawing();
+        drawing.addLayer('child', 'Child', 'root');
+        const v0 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v0' }, 'root');
+        const v1 = drawing.newArtefact('Vertex', {}, { position: [100, 100], label: 'v1' }, 'root');
+        const edge = drawing.newArtefact('Edge', { source: v0, target: v1 }, { width: 2, bend: 0, label: 'e' }, 'child');
+
+        setArtefactLayer(edge, 'root');
+
+        expect(ui.toasts).toHaveLength(0);
+        expect(edge.layerId).toBe('root');
     });
 });
 

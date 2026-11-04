@@ -48,6 +48,96 @@ describe('consistency checks', () => {
     });
 });
 
+describe('Drawing.setArtefactLayer automatic relocation', () => {
+    it('moves dependencies along when moving an artefact to an ancestor layer', () => {
+        const drawing = makeDrawing();
+        drawing.addLayer('sub', 'Sub', 'root');
+        drawing.addLayer('deep', 'Deep', 'sub');
+        const v0 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v0' }, 'deep');
+        const v1 = drawing.newArtefact('Vertex', {}, { position: [100, 100], label: 'v1' }, 'deep');
+        const edge = makeEdge(drawing, 'e', v0, v1, 'deep');
+
+        const moved = drawing.setArtefactLayer(edge, 'sub');
+
+        expect(moved).toEqual([v0, v1]);
+        expect(edge.layerId).toBe('sub');
+        expect(v0.layerId).toBe('sub');
+        expect(v1.layerId).toBe('sub');
+    });
+
+    it('moves dependents along when moving an artefact to a descendant layer', () => {
+        const drawing = makeDrawing();
+        drawing.addLayer('child', 'Child', 'root');
+        const v0 = makeVertex(drawing, 'v0');
+        const v1 = makeVertex(drawing, 'v1');
+        const edge = makeEdge(drawing, 'e', v0, v1);
+
+        const moved = drawing.setArtefactLayer(v0, 'child');
+
+        expect(moved).toEqual([edge]);
+        expect(v0.layerId).toBe('child');
+        expect(edge.layerId).toBe('child');
+        expect(v1.layerId).toBe('root');
+    });
+
+    it('moves both dependencies and dependents across branches and leaves unrelated artefacts alone', () => {
+        const drawing = makeDrawing();
+        drawing.addLayer('p', 'P', 'root');
+        drawing.addLayer('q', 'Q', 'root');
+        const unrelated = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'unrelated' }, 'q');
+        const v0 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v0' }, 'q');
+        const v1 = drawing.newArtefact('Vertex', {}, { position: [100, 100], label: 'v1' }, 'q');
+        const edge = makeEdge(drawing, 'e', v0, v1, 'q');
+        const mono = drawing.newArtefact('isMono', { arrow: edge }, { label: 'mono' }, 'q');
+
+        const moved = drawing.setArtefactLayer(edge, 'p');
+
+        expect(moved).toEqual([v0, v1, mono]);
+        expect(edge.layerId).toBe('p');
+        expect(v0.layerId).toBe('p');
+        expect(v1.layerId).toBe('p');
+        expect(mono.layerId).toBe('p');
+        expect(unrelated.layerId).toBe('q');
+    });
+
+    it('returns an empty list when the move is already consistent', () => {
+        const drawing = makeDrawing();
+        drawing.addLayer('child', 'Child', 'root');
+        const v0 = makeVertex(drawing, 'v0');
+        const v1 = makeVertex(drawing, 'v1');
+        const edge = makeEdge(drawing, 'e', v0, v1, 'child');
+
+        const moved = drawing.setArtefactLayer(edge, 'root');
+
+        expect(moved).toEqual([]);
+        expect(edge.layerId).toBe('root');
+        expect(v0.layerId).toBe('root');
+        expect(v1.layerId).toBe('root');
+    });
+
+    it('relocates the children of a moved equality artefact', () => {
+        const drawing = makeDrawing();
+        drawing.addLayer('sub', 'Sub', 'root');
+        drawing.addLayer('deep', 'Deep', 'sub');
+        const v0 = drawing.newArtefact('Vertex', {}, { position: [0, 0], label: 'v0' }, 'deep');
+        const v1 = drawing.newArtefact('Vertex', {}, { position: [100, 100], label: 'v1' }, 'deep');
+        const equality = drawing.newEqualityArtefact([v0, v1], 'deep');
+
+        const moved = drawing.setArtefactLayer(equality, 'sub');
+
+        expect(moved).toEqual([v0, v1]);
+        expect(equality.layerId).toBe('sub');
+        expect(equality.children).toEqual([v0, v1]);
+    });
+
+    it('still rejects an unknown target layer', () => {
+        const drawing = makeDrawing();
+        const v0 = makeVertex(drawing, 'v0');
+
+        expect(() => drawing.setArtefactLayer(v0, 'missing')).toThrowError(/Layer 'missing' does not exist/);
+    });
+});
+
 describe('Drawing.getBestLayerForDependencies', () => {
     it('returns null for no dependencies', () => {
         const drawing = makeDrawing();

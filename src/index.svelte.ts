@@ -800,75 +800,97 @@ export class Drawing {
         return newRoot!;
     }
 
-    public setArtefactLayer(artefact: Artefact, targetLayerId: string): void {
+    // Move `artefact` to `targetLayerId`, relocating any artefacts whose layer
+    // would otherwise violate the layer hierarchy. Dependencies that would no
+    // longer be at or above the target layer, and dependents that would no
+    // longer be at or below it, are moved to the target layer as well. The
+    // relocation is iterated to a fixed point so transitive conflicts are
+    // resolved too.
+    //
+    // Returns the additional artefacts whose layer changed (excluding
+    // `artefact` itself, and excluding equalities merged away), in drawing
+    // order. A move that is already consistent returns an empty list.
+    public setArtefactLayer(artefact: Artefact, targetLayerId: string): Artefact[] {
         if (!this.layers.has(targetLayerId)) {
             throw new Error(`Layer '${targetLayerId}' does not exist.`);
         }
+        if (artefact.layerId === targetLayerId) {
+            return [];
+        }
 
+        const moved = this.collectLayerRelocation(artefact, targetLayerId);
+
+        // Apply the relocation provisionally so equality validation sees the
+        // final layer assignment. Roll back if an equality cannot live there.
+        const previousLayers = new Map<Artefact, string>();
+        for (const art of moved) {
+            previousLayers.set(art, art.layerId);
+            art.layerId = targetLayerId;
+        }
+
+        try {
+            for (const art of moved) {
+                if (art.sortName === "Equality") {
+                    this.validateEqualityDependencies(artefactChildren(art), targetLayerId);
+                }
+            }
+        } catch (err) {
+            for (const [art, layerId] of previousLayers) {
+                art.layerId = layerId;
+            }
+            throw err;
+        }
+
+        // Merge equalities that now share children on the target layer, keeping
+        // the moved ones alive where possible.
+        const movedEqualities = new Set(moved.filter(art => art.sortName === "Equality"));
+        this.consolidateEqualities(targetLayerId, movedEqualities);
+
+        return moved.filter(art =>
+            art !== artefact && this.artefacts.includes(art)
+        );
+    }
+
+    // The set of artefacts that must join `artefact` on `targetLayerId` so that
+    // every dependency sits in the target layer or one of its ancestors, and
+    // every dependent sits in the target layer or one of its descendants.
+    private collectLayerRelocation(artefact: Artefact, targetLayerId: string): Artefact[] {
         const allowedAncestors = this.getAncestors(targetLayerId);
+        const allowedDescendants = this.getDescendants(targetLayerId);
 
-        // Check artefact's dependencies
-        for (const [depKey, depVal] of Object.entries(artefact.dependencies)) {
-            if (!allowedAncestors.has(depVal.layerId)) {
-                const depLayerName = this.layers.get(depVal.layerId)?.name || depVal.layerId;
-                const targetLayerName = this.layers.get(targetLayerId)?.name || targetLayerId;
-                throw new Error(`Consistency Check Failed: Dependency '${depKey}' (in layer '${depLayerName}') is not in layer '${targetLayerName}' or any of its lower ancestor layers.`);
-            }
-        }
-
-        // Check artefacts that depend on this artefact
-        for (const otherArt of this.artefacts) {
-            if (otherArt === artefact) continue;
-            for (const depVal of Object.values(otherArt.dependencies)) {
-                if (depVal === artefact) {
-                    const otherAllowed = this.getAncestors(otherArt.layerId);
-                    if (!otherAllowed.has(targetLayerId)) {
-                        const targetLayerName = this.layers.get(targetLayerId)?.name || targetLayerId;
-                        const otherLayerName = this.layers.get(otherArt.layerId)?.name || otherArt.layerId;
-                        throw new Error(`Consistency Check Failed: Artefact '${otherArt.data.label || otherArt.sortName}' (in layer '${otherLayerName}') depends on this artefact, but layer '${targetLayerName}' is not in its lower ancestor layers.`);
-                    }
+        const dependents = new Map<Artefact, Artefact[]>();
+        for (const art of this.artefacts) {
+            for (const dep of Object.values(art.dependencies)) {
+                const list = dependents.get(dep);
+                if (list) {
+                    list.push(art);
+                } else {
+                    dependents.set(dep, [art]);
                 }
             }
         }
 
-        if (artefact.sortName === "Equality") {
-            const children = artefactChildren(artefact);
-            
-            // Validate equality dependencies for the target layer
-            this.validateEqualityDependencies(children, targetLayerId);
+        const moving = new Set<Artefact>([artefact]);
+        const queue = [artefact];
+        while (queue.length > 0) {
+            const current = queue.shift()!;
 
-            artefact.layerId = targetLayerId;
-
-            // Trigger same-layer merging if there are overlapping equality artefacts on targetLayerId
-            const sameLayerEqualities = this.artefacts.filter(
-                art => art !== artefact && (art instanceof EqualityArtefact || art.sortName === "Equality") && art.layerId === targetLayerId
-            );
-
-            const childrenSet = new Set(children);
-            const overlapping = sameLayerEqualities.filter(art => {
-                const cList = artefactChildren(art);
-                return cList.some(c => childrenSet.has(c));
-            });
-
-            if (overlapping.length > 0) {
-                const combinedSet = new Set<Artefact>(children);
-                for (const ov of overlapping) {
-                    const cList = artefactChildren(ov);
-                    cList.forEach(c => combinedSet.add(c));
-                }
-                const combined = Array.from(combinedSet);
-                this.validateEqualityDependencies(combined, targetLayerId);
-
-                this.applyEqualityChildren(artefact, combined);
-                for (const ov of overlapping) {
-                    this.artefacts = this.artefacts.filter(a => a !== ov);
+            for (const dep of Object.values(current.dependencies)) {
+                if (!allowedAncestors.has(dep.layerId) && !moving.has(dep)) {
+                    moving.add(dep);
+                    queue.push(dep);
                 }
             }
 
-            this.consolidateEqualities(targetLayerId, new Set([artefact]));
-        } else {
-            artefact.layerId = targetLayerId;
+            for (const dependent of dependents.get(current) ?? []) {
+                if (!allowedDescendants.has(dependent.layerId) && !moving.has(dependent)) {
+                    moving.add(dependent);
+                    queue.push(dependent);
+                }
+            }
         }
+
+        return this.artefacts.filter(art => moving.has(art));
     }
 
     public getLayersTopological(): Layer[] {

@@ -1050,8 +1050,12 @@ export function setInspectedLabel(art: Artefact, rawLabel: string): void {
 }
 
 export function setArtefactLayer(art: Artefact, targetLayerId: string): void {
-    drawing.setArtefactLayer(art, targetLayerId);
+    const updated = drawing.setArtefactLayer(art, targetLayerId);
+    if (updated.length === 0) return;
 
+    const layerName = drawing.getLayer(targetLayerId)?.name ?? targetLayerId;
+    const labels = updated.map(a => `'${getArtefactLabel(a)}'`).join(', ');
+    pushToast('info', `Moved ${labels} to layer '${layerName}' as well, to keep the layers consistent.`);
 }
 
 function autoSelectLayerFromDependencies(): void {
