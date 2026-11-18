@@ -1,11 +1,24 @@
 <script lang="ts">
-    import type { Artefact } from '../index.svelte.ts';
-    import { computeRuleMatches, applyRuleFilters, applyRuleAt, ui, toggleFilterRedundantMatches, toggleFilterNoProgressMatches, toggleFilterInjectiveMatches, toggleFilterFlexibleMatches, toggleFilterSolvesGoalMatches, toggleAutoApplyEqualityRules, solvesGoalFilterApplicable } from './store.svelte.ts';
+    import type { Artefact, RuleApplication } from '../index.svelte.ts';
+    import {
+        computeRuleApplications,
+        applyRuleAt,
+        ui,
+        toggleFilterRedundantMatches,
+        toggleFilterNoProgressMatches,
+        toggleFilterInjectiveMatches,
+        toggleFilterFlexibleMatches,
+        toggleFilterSolvesGoalMatches,
+        toggleAutoApplyEqualityRules,
+        solvesGoalFilterApplicable,
+        setRuleGroupExpanded,
+        RULE_APPLICATION_GROUP_THRESHOLD,
+        type RuleAppEntry
+    } from './store.svelte.ts';
 
-    const matches = $derived(computeRuleMatches());
-    const entries = $derived(applyRuleFilters(matches));
+    const entries = $derived(computeRuleApplications());
 
-    function matchLabels(entry: (typeof entries)[number], app: (typeof entry.applications)[number]): string[] {
+    function matchLabels(entry: RuleAppEntry, app: RuleApplication): string[] {
         const ruleDrawing = entry.drawing;
         const ruleRootId = ruleDrawing.getAllLayers().find(l => l.parentId === null)?.id;
         const patternArts = ruleRootId
@@ -31,7 +44,7 @@
         return labels;
     }
 
-    function onApply(entry: (typeof entries)[number], index: number): void {
+    function onApply(entry: RuleAppEntry, index: number): void {
         ui.ruleHoverArtefacts = null;
         applyRuleAt(entry.name, index);
     }
@@ -44,7 +57,60 @@
     function onLeave(): void {
         ui.ruleHoverArtefacts = null;
     }
+
+    function applicationItemCount(entry: RuleAppEntry): number {
+        return entry.truncated ? entry.applicationCount : entry.applications.length;
+    }
+
+    function groupCountLabel(entry: RuleAppEntry): string {
+        if (entry.truncated) {
+            return `more than ${RULE_APPLICATION_GROUP_THRESHOLD} matches`;
+        }
+        const count = entry.applications.length;
+        return `${count} match${count === 1 ? '' : 'es'}`;
+    }
+
+    function onGroupToggle(entry: RuleAppEntry, event: Event): void {
+        setRuleGroupExpanded(entry.name, (event.currentTarget as HTMLDetailsElement).open);
+    }
 </script>
+
+{#snippet ruleTitle(entry: RuleAppEntry)}
+    {entry.name}
+    {#if entry.isFirstOrder}
+        <span class="first-order-badge" title="First-order rule: root layer has only one child">1<sup>st</sup>-Order</span>
+    {:else}
+        <span class="second-order-badge" title="Second-order rule: root layer has several child layers">2<sup>nd</sup>-Order</span>
+    {/if}
+    {#if entry.isEqualityRule}
+        <span class="equality-badge" title="Equality rule: the child layer holds only equality artefacts, so applying it asserts equalities only">Equality</span>
+    {/if}
+{/snippet}
+
+{#snippet applicationRow(entry: RuleAppEntry, app: RuleApplication, index: number, showName: boolean)}
+    {@const labels = matchLabels(entry, app)}
+    <div
+        role="group"
+        class:first-order={entry.isFirstOrder}
+        class:second-order={!entry.isFirstOrder}
+        class="rule-app-row"
+        onmouseenter={() => onHover(app.hostArtefacts)}
+        onmouseleave={onLeave}
+    >
+        {#if showName}
+            <div class="rule-app-name">{@render ruleTitle(entry)}</div>
+        {/if}
+        <div class="rule-app-match">{labels.length > 0 ? labels.join(', ') : '(no labelled artefacts)'}</div>
+        <button
+            class="apply-btn"
+            title={entry.isFirstOrder ? 'Apply this first-order rule to the matched artefacts' : 'Apply this second-order rule to the matched artefacts'}
+            onclick={(e) => {
+                e.stopPropagation();
+                onApply(entry, index);
+            }}
+        >Apply</button>
+    </div>
+{/snippet}
 
 <div class="rules-filter">
     <label class="rule-checkbox-label">
@@ -73,52 +139,49 @@
     </label>
 </div>
 
+{#snippet hiddenNotes(entry: RuleAppEntry)}
+    {#if !entry.truncated}
+        {#if entry.hiddenRedundant > 0}
+            <div class="rule-app-hidden-note">
+                {entry.hiddenRedundant} redundant match{entry.hiddenRedundant === 1 ? '' : 'es'} hidden
+            </div>
+        {/if}
+        {#if entry.hiddenNoProgress > 0}
+            <div class="rule-app-hidden-note">
+                {entry.hiddenNoProgress} no-progress match{entry.hiddenNoProgress === 1 ? '' : 'es'} hidden
+            </div>
+        {/if}
+        {#if entry.hiddenSolvesGoal > 0}
+            <div class="rule-app-hidden-note">
+                {entry.hiddenSolvesGoal} match{entry.hiddenSolvesGoal === 1 ? '' : 'es'} not solving the goal hidden
+            </div>
+        {/if}
+    {/if}
+{/snippet}
+
 {#each entries as entry (entry.name)}
-    {#each entry.applications as app, index (entry.name + '-' + index)}
-        {@const labels = matchLabels(entry, app)}
-        <div
-            role="group"
+    {@const itemCount = applicationItemCount(entry)}
+    {#if itemCount === 1}
+        {@render applicationRow(entry, entry.applications[0], 0, true)}
+        {@render hiddenNotes(entry)}
+    {:else if itemCount > 1}
+        <details
+            class="rule-app-group"
             class:first-order={entry.isFirstOrder}
             class:second-order={!entry.isFirstOrder}
-            class="rule-app-row"
-            onmouseenter={() => onHover(app.hostArtefacts)}
-            onmouseleave={onLeave}
+            open={ui.expandedRuleGroups.has(entry.name)}
+            ontoggle={(event) => onGroupToggle(entry, event)}
         >
-            <div class="rule-app-name">
-                {entry.name}
-                {#if entry.isFirstOrder}
-                    <span class="first-order-badge" title="First-order rule: root layer has only one child">1<sup>st</sup>-Order</span>
-                {:else}
-                    <span class="second-order-badge" title="Second-order rule: root layer has several child layers">2<sup>nd</sup>-Order</span>
-                {/if}
-                {#if entry.isEqualityRule}
-                    <span class="equality-badge" title="Equality rule: the child layer holds only equality artefacts, so applying it asserts equalities only">Equality</span>
-                {/if}
-            </div>
-            <div class="rule-app-match">{labels.length > 0 ? labels.join(', ') : '(no labelled artefacts)'}</div>
-            <button
-                class="apply-btn"
-                title={entry.isFirstOrder ? 'Apply this first-order rule to the matched artefacts' : 'Apply this second-order rule to the matched artefacts'}
-                onclick={(e) => {
-                    e.stopPropagation();
-                    onApply(entry, index);
-                }}
-            >Apply</button>
-        </div>
-    {/each}
-    {#if entry.hiddenRedundant > 0}
-        <div class="rule-app-hidden-note">
-            {entry.hiddenRedundant} redundant match{entry.hiddenRedundant === 1 ? '' : 'es'} hidden
-        </div>
-    {/if}
-    {#if entry.hiddenNoProgress > 0}
-        <div class="rule-app-hidden-note">
-            {entry.hiddenNoProgress} no-progress match{entry.hiddenNoProgress === 1 ? '' : 'es'} hidden
-        </div>
-    {/if}
-    {#if entry.hiddenSolvesGoal > 0}
-        <div class="rule-app-hidden-note">
-            {entry.hiddenSolvesGoal} match{entry.hiddenSolvesGoal === 1 ? '' : 'es'} not solving the goal hidden
-        </div>
+            <summary class="rule-app-group-summary">
+                <span class="rule-app-name">{@render ruleTitle(entry)}</span>
+                <span class="rule-app-group-count">{groupCountLabel(entry)}</span>
+            </summary>
+            {#if !entry.truncated}
+                {#each entry.applications as app, index (entry.name + '-' + index)}
+                    {@render applicationRow(entry, app, index, false)}
+                {/each}
+            {/if}
+            {@render hiddenNotes(entry)}
+        </details>
     {/if}
 {/each}

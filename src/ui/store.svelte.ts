@@ -144,6 +144,7 @@ export const ui = $state({
     leftPanelWidth: 270,
     rightPanelWidth: 270,
     rulesPanelCollapsed: true,
+    expandedRuleGroups: new SvelteSet<string>(),
     filterRedundantMatches: true,
     filterNoProgressMatches: true,
     filterInjectiveMatches: true,
@@ -826,6 +827,7 @@ export function setActiveDrawing(name: string): boolean {
         drawing.forgetSvgRefs();
         drawing = entry.drawing;
         ui.activeDrawingName = name;
+        ui.expandedRuleGroups.clear();
         resetInteractionState();
         syncProvedStatus();
         return true;
@@ -1704,23 +1706,48 @@ export function solvesGoalFilterApplicable(): boolean {
 // Applicable rules (computed reactively by RuleApplications.svelte)
 // ---------------------------------------------------------------------------
 
+// Rules with more possible applications than this preview only one more match
+// while collapsed, which is enough to know the full list cannot be shown yet.
+// The threshold controls lazy matching only; every rule with several matches is
+// collapsible.
+export const RULE_APPLICATION_GROUP_THRESHOLD = 10;
+export const RULE_APPLICATION_PREVIEW_LIMIT = RULE_APPLICATION_GROUP_THRESHOLD + 1;
+
 export interface RuleAppEntry {
     name: string;
     drawing: Drawing;
     isFirstOrder: boolean;
     isEqualityRule: boolean;
     applications: RuleApplication[];
+    /** Raw number of applications found, before panel filters. */
+    applicationCount: number;
+    /** True when the search stopped at the preview limit. */
+    truncated: boolean;
     hiddenRedundant: number;
     hiddenNoProgress: number;
     hiddenSolvesGoal: number;
+}
+
+export function setRuleGroupExpanded(name: string, expanded: boolean): void {
+    if (expanded) {
+        ui.expandedRuleGroups.add(name);
+    } else {
+        ui.expandedRuleGroups.delete(name);
+    }
 }
 
 /**
  * Matching options default to the panel's 'Injective match' / 'Flexible match'
  * checkboxes. The auto-apply pass passes its own options instead (see
  * `AUTO_APPLY_MATCH_OPTIONS`).
+ *
+ * `limitForRule` lets the panel ask for only a preview of the applications of
+ * a collapsed rule. Rules it returns `undefined` for are matched completely.
  */
-export function computeRuleMatches(matchOptions?: MatchOptions): RuleAppEntry[] {
+export function computeRuleMatches(
+    matchOptions?: MatchOptions,
+    limitForRule?: (name: string) => number | undefined
+): RuleAppEntry[] {
     // Tracked structural guard: the matcher below runs under `untrack`, so this
     // derived still invalidates when the host drawing changes. We deliberately
     // read each artefact's reactive fields (membership, sort, layer, dependency
@@ -1744,22 +1771,47 @@ export function computeRuleMatches(matchOptions?: MatchOptions): RuleAppEntry[] 
         if (!ruleDrawing.isRule) continue;
         let applications: RuleApplication[];
         const isFirstOrder = drawingStore.checkIsFirstOrder(ruleDrawing);
+        const requestedLimit = limitForRule?.(entry.name);
+        const maxApplications = requestedLimit !== undefined
+            && Number.isFinite(requestedLimit)
+            && requestedLimit > 0
+            ? requestedLimit
+            : undefined;
         try {
             applications = untrack(() => isFirstOrder
-                ? findFirstOrderRuleApplications(ruleDrawing, drawing, options)
-                : findSecondOrderRuleApplications(ruleDrawing, drawing, options));
+                ? findFirstOrderRuleApplications(ruleDrawing, drawing, options, maxApplications)
+                : findSecondOrderRuleApplications(ruleDrawing, drawing, options, maxApplications));
         } catch {
             continue;
         }
 
-        entries.push({ name: entry.name, drawing: ruleDrawing, isFirstOrder, isEqualityRule: isFirstOrder && isEqualityRule(ruleDrawing), applications, hiddenRedundant: 0, hiddenNoProgress: 0, hiddenSolvesGoal: 0 });
+        entries.push({
+            name: entry.name,
+            drawing: ruleDrawing,
+            isFirstOrder,
+            isEqualityRule: isFirstOrder && isEqualityRule(ruleDrawing),
+            applications,
+            applicationCount: applications.length,
+            truncated: maxApplications !== undefined && applications.length >= maxApplications,
+            hiddenRedundant: 0,
+            hiddenNoProgress: 0,
+            hiddenSolvesGoal: 0
+        });
     }
     return entries;
 }
 
 export function applyRuleFilters(entries: RuleAppEntry[]): RuleAppEntry[] {
     return entries.map(entry => {
-        const { name, drawing: ruleDrawing } = entry;
+        // A truncated preview is only used while the group is collapsed. Its
+        // rows and hidden-match counts are not shown, and filtering a partial
+        // list would produce misleading counts. Expanding the group recomputes
+        // the full match list and filters it normally.
+        if (entry.truncated) {
+            return { ...entry, hiddenRedundant: 0, hiddenNoProgress: 0, hiddenSolvesGoal: 0 };
+        }
+
+        const { drawing: ruleDrawing } = entry;
         let applications = entry.applications;
 
         let hiddenRedundant = 0;
@@ -1783,12 +1835,14 @@ export function applyRuleFilters(entries: RuleAppEntry[]): RuleAppEntry[] {
             hiddenSolvesGoal = total - applications.length;
         }
 
-        return { name, drawing: ruleDrawing, isFirstOrder: entry.isFirstOrder, isEqualityRule: entry.isEqualityRule, applications, hiddenRedundant, hiddenNoProgress, hiddenSolvesGoal };
+        return { ...entry, applications, hiddenRedundant, hiddenNoProgress, hiddenSolvesGoal };
     });
 }
 
 export function computeRuleApplications(): RuleAppEntry[] {
-    return applyRuleFilters(computeRuleMatches());
+    return applyRuleFilters(computeRuleMatches(undefined, (name) =>
+        ui.expandedRuleGroups.has(name) ? undefined : RULE_APPLICATION_PREVIEW_LIMIT
+    ));
 }
 
 // ---------------------------------------------------------------------------
@@ -1883,8 +1937,15 @@ export function runEqualityRuleAutoApply(): void {
 
 export function applyRuleAt(savedRuleName: string, appIndex: number): void {
     ui.ruleHoverArtefacts = null;
-    const entry = computeRuleApplications().find(e => e.name === savedRuleName);
-    const app = entry?.applications[appIndex];
+    let entry = computeRuleApplications().find(e => e.name === savedRuleName);
+    let app = entry?.applications[appIndex];
+    if (!entry || !app) {
+        // The panel may only have a preview of a collapsed rule. Fall back to
+        // the complete match list if the requested index is beyond it.
+        const fullEntry = applyRuleFilters(computeRuleMatches()).find(e => e.name === savedRuleName);
+        entry = fullEntry;
+        app = fullEntry?.applications[appIndex];
+    }
     if (!entry || !app) return;
     applyRuleEntry(entry, app);
 }

@@ -42,6 +42,31 @@ describe('first-order rule matching', () => {
         expect(apps.length).toBeGreaterThanOrEqual(1);
     });
 
+    it('can stop after a requested number of applications', () => {
+        const rule = makeDrawing();
+        makeVertex(rule, 'rv');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        rule.setIsRule(true);
+
+        const host = makeDrawing();
+        const count = 12;
+        for (let i = 0; i < count; i++) {
+            makeVertex(host, `v${i}`);
+        }
+
+        const all = findFirstOrderRuleApplications(rule, host);
+        expect(all).toHaveLength(count);
+
+        const limited = findFirstOrderRuleApplications(rule, host, {}, 11);
+        expect(limited).toHaveLength(11);
+
+        const key = (app: RuleApplication) => [...app.matchedArtefacts]
+            .map(([pattern, image]) => `${pattern.data.label}->${image.data.label}`)
+            .sort()
+            .join('|');
+        expect(limited.map(key)).toEqual(all.slice(0, 11).map(key));
+    });
+
     it('matches a rule whose isMono artefact leaves from a child layer without requiring isMono in the host', () => {
         const rule = buildIsMonoInChildLayerRule();
         const { host } = buildComposableHost();

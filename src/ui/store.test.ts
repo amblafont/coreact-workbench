@@ -8,7 +8,7 @@ import { getDrawing, drawingStore, ui, sortStore, rocqRecorder, syncProvedStatus
     closeCodeExport,
     setActiveDrawing, pendingProofCount, toggleAutoApplyEqualityRules, computeRuleApplications,
     startMergeMode, selectMergeArtefact, performMerge, unmarkInvalidRules,
-    setArtefactLayer
+    setArtefactLayer, setRuleGroupExpanded, RULE_APPLICATION_GROUP_THRESHOLD, RULE_APPLICATION_PREVIEW_LIMIT
 } from './store.svelte.ts';
 import { Artefact, Drawing, DrawingStore, getFirstOrderStatementChildLayer } from '../index.svelte.ts';
 import { registerDefaultSorts } from '../demo/buildDemo';
@@ -1597,6 +1597,111 @@ describe('auto-apply equality rules', () => {
         toggleAutoApplyEqualityRules();
 
         expect(getDrawing().getArtefacts().length).toBe(before);
+    });
+});
+
+describe('applicable rule grouping', () => {
+    beforeEach(() => {
+        registerDefaultSorts(sortStore);
+        getDrawing().clear(true);
+        drawingStore.clear();
+        ui.activeDrawingName = null;
+        ui.expandedRuleGroups.clear();
+        ui.filterRedundantMatches = false;
+        ui.filterNoProgressMatches = false;
+        ui.filterSolvesGoalMatches = false;
+    });
+
+    afterEach(() => {
+        ui.expandedRuleGroups.clear();
+        ui.activeDrawingName = null;
+        ui.filterRedundantMatches = true;
+        ui.filterNoProgressMatches = true;
+        ui.filterSolvesGoalMatches = false;
+    });
+
+    function buildManyVerticesHost(count: number): void {
+        for (let i = 0; i < count; i++) {
+            makeVertex(getDrawing(), `v${i}`);
+        }
+        drawingStore.addDrawing('Host', getDrawing());
+        setActiveDrawing('Host');
+    }
+
+    it('only previews collapsed groups and computes the full list when expanded', () => {
+        const rule = makeDrawing();
+        makeVertex(rule, 'rv');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        rule.setIsRule(true);
+        drawingStore.addDrawing('Comp', rule);
+        buildManyVerticesHost(RULE_APPLICATION_GROUP_THRESHOLD + 2);
+
+        const collapsed = computeRuleApplications().find(e => e.name === 'Comp');
+        expect(collapsed).toBeDefined();
+        expect(collapsed!.truncated).toBe(true);
+        expect(collapsed!.applicationCount).toBe(RULE_APPLICATION_PREVIEW_LIMIT);
+        expect(collapsed!.applicationCount).toBeGreaterThan(RULE_APPLICATION_GROUP_THRESHOLD);
+        expect(collapsed!.applications).toHaveLength(RULE_APPLICATION_PREVIEW_LIMIT);
+
+        setRuleGroupExpanded('Comp', true);
+
+        const expanded = computeRuleApplications().find(e => e.name === 'Comp');
+        expect(expanded).toBeDefined();
+        expect(expanded!.truncated).toBe(false);
+        expect(expanded!.applicationCount).toBe(RULE_APPLICATION_GROUP_THRESHOLD + 2);
+        expect(expanded!.applications).toHaveLength(RULE_APPLICATION_GROUP_THRESHOLD + 2);
+
+        setRuleGroupExpanded('Comp', false);
+
+        const recollapsed = computeRuleApplications().find(e => e.name === 'Comp');
+        expect(recollapsed).toBeDefined();
+        expect(recollapsed!.truncated).toBe(true);
+        expect(recollapsed!.applicationCount).toBe(RULE_APPLICATION_PREVIEW_LIMIT);
+    });
+
+    it('computes every application of a collapsed rule below the preview limit', () => {
+        const rule = makeDrawing();
+        makeVertex(rule, 'rv');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        rule.setIsRule(true);
+        drawingStore.addDrawing('Comp', rule);
+        buildManyVerticesHost(RULE_APPLICATION_GROUP_THRESHOLD - 2);
+
+        const entry = computeRuleApplications().find(e => e.name === 'Comp');
+        expect(entry).toBeDefined();
+        expect(entry!.truncated).toBe(false);
+        expect(entry!.applicationCount).toBe(RULE_APPLICATION_GROUP_THRESHOLD - 2);
+        expect(entry!.applications).toHaveLength(RULE_APPLICATION_GROUP_THRESHOLD - 2);
+    });
+
+    it('reports no applications for a rule that does not match the host', () => {
+        const rule = makeDrawing();
+        makeVertex(rule, 'rv');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        rule.setIsRule(true);
+        drawingStore.addDrawing('Comp', rule);
+        buildManyVerticesHost(0);
+
+        const entry = computeRuleApplications().find(e => e.name === 'Comp');
+        expect(entry).toBeDefined();
+        expect(entry!.truncated).toBe(false);
+        expect(entry!.applicationCount).toBe(0);
+        expect(entry!.applications).toHaveLength(0);
+    });
+
+    it('keeps a single application complete and untruncated', () => {
+        const rule = makeDrawing();
+        makeVertex(rule, 'rv');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        rule.setIsRule(true);
+        drawingStore.addDrawing('Comp', rule);
+        buildManyVerticesHost(1);
+
+        const entry = computeRuleApplications().find(e => e.name === 'Comp');
+        expect(entry).toBeDefined();
+        expect(entry!.truncated).toBe(false);
+        expect(entry!.applicationCount).toBe(1);
+        expect(entry!.applications).toHaveLength(1);
     });
 });
 

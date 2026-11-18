@@ -2157,10 +2157,13 @@ function findRuleApplicationsInternal(
     sortRank: Map<string, number>,
     patternArts: Artefact[],
     equalityConstraints: Array<{ children: Artefact[] }>,
-    options: Required<MatchOptions>
+    options: Required<MatchOptions>,
+    maxApplications = Infinity
 ): RuleApplication[] {
     const { injective, flexible } = options;
-    const results: RuleApplication[] = [];
+    const resultLimit = Number.isFinite(maxApplications) && maxApplications > 0
+        ? Math.floor(maxApplications)
+        : Infinity;
 
     if (patternArts.length === 0) {
         return [{ matchedArtefacts: new Map(), hostArtefacts: new Set() }];
@@ -2193,6 +2196,19 @@ function findRuleApplicationsInternal(
         return isEqualityConnected(adj, a, b);
     };
 
+    // Deduplicate as results are found, so the search can stop as soon as the
+    // caller's limit is reached without materialising the remaining matches.
+    // Keeping the first representative of each equivalence class preserves the
+    // order of the unbounded result list.
+    const uniqueResults: RuleApplication[] = [];
+    const addUniqueResult = (result: RuleApplication): boolean => {
+        if (!uniqueResults.some(u => applicationsEquivalent(hostAreEqual, patternSet, result, u, flexible))) {
+            uniqueResults.push(result);
+        }
+        return uniqueResults.length >= resultLimit;
+    };
+    let limitReached = false;
+
     const checkEqualityConstraints = (): boolean => {
         for (const c of applicableConstraints) {
             const imgs: Artefact[] = [];
@@ -2211,6 +2227,7 @@ function findRuleApplicationsInternal(
     };
 
     const backtrack = (i: number): void => {
+        if (limitReached) return;
         if (i === ordered.length) {
             if (checkEqualityConstraints()) {
                 const hostArtefacts = new Set<Artefact>(used);
@@ -2222,18 +2239,21 @@ function findRuleApplicationsInternal(
                         }
                     }
                 }
-                results.push({ matchedArtefacts: new Map(assignment), hostArtefacts });
+                if (addUniqueResult({ matchedArtefacts: new Map(assignment), hostArtefacts })) {
+                    limitReached = true;
+                }
             }
             return;
         }
 
         const a = ordered[i];
         // Candidates that are equality-connected for this slot produce duplicate
-        // applications (when flexible), and the final dedupe collapses them by
-        // equality anyway, so in flexible mode explore a single representative
-        // per equality class.
+        // applications (when flexible), and the dedupe collapses them by equality
+        // anyway, so in flexible mode explore a single representative per
+        // equality class.
         const triedCandidates: Artefact[] = [];
         for (const cand of hostCandidates) {
+            if (limitReached) break;
             if (cand.sortName !== a.sortName || (injective && used.has(cand))) continue;
 
             if (flexible) {
@@ -2290,17 +2310,11 @@ function findRuleApplicationsInternal(
             backtrack(i + 1);
             used.delete(cand);
             assignment.delete(a);
+            if (limitReached) return;
         }
     };
 
     backtrack(0);
-
-    const uniqueResults: RuleApplication[] = [];
-    for (const r of results) {
-        if (!uniqueResults.some(u => applicationsEquivalent(hostAreEqual, patternSet, r, u, flexible))) {
-            uniqueResults.push(r);
-        }
-    }
     return uniqueResults;
 }
 
@@ -2330,14 +2344,19 @@ function validateRuleDrawing(rule: Drawing): void {
     }
 }
 
-function findRootRuleApplications(rule: Drawing, host: Drawing, options: Required<MatchOptions>): RuleApplication[] {
+function findRootRuleApplications(
+    rule: Drawing,
+    host: Drawing,
+    options: Required<MatchOptions>,
+    maxApplications = Infinity
+): RuleApplication[] {
     const rootLayers = rule.getAllLayers().filter(l => l.parentId === null);
     if (rootLayers.length !== 1) {
         return [];
     }
     const root = rootLayers[0];
     const rootArts = rule.getArtefacts().filter(a => a.sortName !== "Equality" && a.layerId === root.id);
-    return findRuleApplicationsInternal(host, sortRankMap(rule.sortStore), rootArts, extractEqualityConstraints(rule), options);
+    return findRuleApplicationsInternal(host, sortRankMap(rule.sortStore), rootArts, extractEqualityConstraints(rule), options, maxApplications);
 }
 
 export function filterRedundantRuleApplications(rule: Drawing, host: Drawing, applications: RuleApplication[]): RuleApplication[] {
@@ -2804,13 +2823,23 @@ function normalizeMatchOptions(options: MatchOptions = {}): Required<MatchOption
     return { injective: options.injective ?? true, flexible: options.flexible ?? false };
 }
 
-export function findRuleApplications(rule: Drawing, host: Drawing, options: MatchOptions = {}): RuleApplication[] {
+export function findRuleApplications(
+    rule: Drawing,
+    host: Drawing,
+    options: MatchOptions = {},
+    maxApplications = Infinity
+): RuleApplication[] {
     validateRuleDrawing(rule);
 
-    return findRootRuleApplications(rule, host, normalizeMatchOptions(options));
+    return findRootRuleApplications(rule, host, normalizeMatchOptions(options), maxApplications);
 }
 
-export function findFirstOrderRuleApplications(rule: Drawing, host: Drawing, options: MatchOptions = {}): RuleApplication[] {
+export function findFirstOrderRuleApplications(
+    rule: Drawing,
+    host: Drawing,
+    options: MatchOptions = {},
+    maxApplications = Infinity
+): RuleApplication[] {
     validateRuleDrawing(rule);
 
     const layers = rule.getAllLayers();
@@ -2824,10 +2853,15 @@ export function findFirstOrderRuleApplications(rule: Drawing, host: Drawing, opt
         return [];
     }
 
-    return findRootRuleApplications(rule, host, normalizeMatchOptions(options));
+    return findRootRuleApplications(rule, host, normalizeMatchOptions(options), maxApplications);
 }
 
-export function findSecondOrderRuleApplications(rule: Drawing, host: Drawing, options: MatchOptions = {}): RuleApplication[] {
+export function findSecondOrderRuleApplications(
+    rule: Drawing,
+    host: Drawing,
+    options: MatchOptions = {},
+    maxApplications = Infinity
+): RuleApplication[] {
     validateRuleDrawing(rule);
 
     const layers = rule.getAllLayers();
@@ -2841,7 +2875,7 @@ export function findSecondOrderRuleApplications(rule: Drawing, host: Drawing, op
         return [];
     }
 
-    return findRootRuleApplications(rule, host, normalizeMatchOptions(options));
+    return findRootRuleApplications(rule, host, normalizeMatchOptions(options), maxApplications);
 }
 
 function resolveHostRootId(
