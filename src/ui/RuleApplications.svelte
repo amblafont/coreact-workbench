@@ -12,11 +12,17 @@
         toggleAutoApplyEqualityRules,
         solvesGoalFilterApplicable,
         setRuleGroupExpanded,
+        getArtefactLabel,
+        selectedRuleFilterArtefacts,
+        toggleRuleFilterPicking,
+        removeRuleFilterArtefact,
+        clearRuleFilterArtefacts,
         RULE_APPLICATION_GROUP_THRESHOLD,
         type RuleAppEntry
     } from './store.svelte.ts';
 
     const entries = $derived(computeRuleApplications());
+    const selectedArtefacts = $derived(selectedRuleFilterArtefacts());
 
     function matchLabels(entry: RuleAppEntry, app: RuleApplication): string[] {
         const ruleDrawing = entry.drawing;
@@ -137,6 +143,40 @@
         <input type="checkbox" checked={ui.autoApplyEqualityRules} onchange={toggleAutoApplyEqualityRules} />
         Auto-apply equality rules
     </label>
+    <div class="rule-artefact-filter">
+        <button
+            type="button"
+            class="pick-dep-btn {ui.ruleFilterPicking ? 'active' : ''}"
+            title="Pick artefacts in the left tree. Only matches involving every picked artefact are shown."
+            onclick={toggleRuleFilterPicking}
+        >
+            {#if ui.ruleFilterPicking}
+                Click artefacts in tree...
+            {:else if selectedArtefacts.length > 0}
+                + Pick Artefact ({selectedArtefacts.length})
+            {:else}
+                + Pick Artefact
+            {/if}
+        </button>
+        {#if ui.ruleFilterPicking}
+            <div class="rule-filter-hint">Click artefacts in the tree to add or remove them.</div>
+        {/if}
+        {#if selectedArtefacts.length > 0}
+            <div class="rule-filter-artefacts">
+                {#each selectedArtefacts as art (art.id)}
+                    <div class="rule-filter-artefact">
+                        <span>• {getArtefactLabel(art)} ({art.sortName})</span>
+                        <button
+                            type="button"
+                            title={`Remove ${getArtefactLabel(art)}`}
+                            onclick={() => removeRuleFilterArtefact(art)}
+                        >×</button>
+                    </div>
+                {/each}
+                <button type="button" class="rule-filter-clear" onclick={clearRuleFilterArtefacts}>Clear</button>
+            </div>
+        {/if}
+    </div>
 </div>
 
 {#snippet hiddenNotes(entry: RuleAppEntry)}

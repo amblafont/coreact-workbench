@@ -44,6 +44,7 @@ The optional `options` argument controls two independent aspects of the matcher:
 |---|---|---|
 | `injective` | `true` | Do **not** allow two different rule artefacts to be matched to the same host artefact. When `false`, distinct pattern artefacts may alias a single host artefact (e.g. a rule with two vertices matches a host with one vertex, mapping both to it). |
 | `flexible` | `false` | Allow the match to be **bigger than the rule root layer**. When `true`, a candidate's dependencies may be **provably equal** to (rather than identical with) the already-matched images, and applications whose images are provably equal are collapsed. For example, a rule root layer consisting of a looping arrow on a vertex `A` matches a host root layer with two provably equal vertices `B` and `C` and an edge between them: the edge `B → C` is a match for the loop `A → A`. |
+| `mustInvolve` | `[]` | Keep only applications whose `hostArtefacts` contain **every** listed host artefact (matched images or dependencies of them, by object identity). The Applicable Rules panel uses this for its artefact filter; it is checked before deduplication and before any application limit is applied. |
 
 The rule-root equality constraints (§2.1) are always required regardless of `flexible`: a root-layer equality in the rule demands that its matched images be provably equal in the host.
 
@@ -185,3 +186,4 @@ The options are fixed because they are the ones under which an equality rule mat
 - **Applying merges the conclusion into the host root**, including conclusion-layer tag artefacts (e.g. `isMono`).
 - **Second-order application builds one derived drawing per premise** that copies the host root (minus conclusion content) plus the premise layer and its child layer, without rule marking.
 - **Equality rules can be auto-applied**: an equality rule (first-order, child layer with only equalities) creates no artefact other than equalities, so the panel can apply all of them automatically, repeatedly, until no new equality follows. Auto-apply matches with injectivity off and flexible on and ignores the panel's other filters; the list in the panel still follows them.
+- **The artefact filter is a restriction, not a hide-count filter**: artefacts picked in the Applicable Rules panel become `mustInvolve`, so even a collapsed rule's preview/count contains only matches whose `hostArtefacts` include every picked artefact. Auto-apply ignores this filter too.

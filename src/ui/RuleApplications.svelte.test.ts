@@ -6,6 +6,7 @@ import {
     getDrawing,
     setActiveDrawing,
     setRuleGroupExpanded,
+    onArtefactNodeClick,
     sortStore,
     ui
 } from './store.svelte.ts';
@@ -45,6 +46,8 @@ describe('RuleApplications layout', () => {
         ui.filterRedundantMatches = false;
         ui.filterNoProgressMatches = false;
         ui.filterSolvesGoalMatches = false;
+        ui.ruleFilterArtefacts.clear();
+        ui.ruleFilterPicking = false;
     });
 
     afterEach(() => {
@@ -58,6 +61,8 @@ describe('RuleApplications layout', () => {
         ui.filterRedundantMatches = true;
         ui.filterNoProgressMatches = true;
         ui.filterSolvesGoalMatches = false;
+        ui.ruleFilterArtefacts.clear();
+        ui.ruleFilterPicking = false;
     });
 
     it('does not render a rule with no applications', () => {
@@ -112,5 +117,33 @@ describe('RuleApplications layout', () => {
 
         expect(group!.querySelectorAll('.rule-app-row')).toHaveLength(12);
         expect(group!.querySelector('.rule-app-group-count')?.textContent).toBe('12 matches');
+    });
+
+    it('shows the artefact picker and restricts the list to picked artefacts', () => {
+        buildRule();
+        buildHost(2);
+        const v0 = getDrawing().getArtefacts()[0];
+
+        render();
+
+        const pickButton = document.querySelector<HTMLButtonElement>('.rule-artefact-filter .pick-dep-btn');
+        expect(pickButton).not.toBeNull();
+        expect(pickButton!.textContent).toContain('+ Pick Artefact');
+        expect(document.querySelectorAll('.rule-app-row')).toHaveLength(2);
+
+        pickButton!.click();
+        flushSync();
+        expect(ui.ruleFilterPicking).toBe(true);
+        expect(pickButton!.textContent).toContain('Click artefacts in tree...');
+
+        onArtefactNodeClick(v0);
+        flushSync();
+        expect(document.querySelector('.rule-filter-artefacts')?.textContent).toContain('v0');
+        expect(document.querySelectorAll('.rule-app-row')).toHaveLength(1);
+
+        pickButton!.click();
+        flushSync();
+        expect(ui.ruleFilterPicking).toBe(false);
+        expect(pickButton!.textContent).toContain('(1)');
     });
 });

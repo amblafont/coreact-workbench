@@ -2160,13 +2160,20 @@ function findRuleApplicationsInternal(
     options: Required<MatchOptions>,
     maxApplications = Infinity
 ): RuleApplication[] {
-    const { injective, flexible } = options;
+    const { injective, flexible, mustInvolve } = options;
     const resultLimit = Number.isFinite(maxApplications) && maxApplications > 0
         ? Math.floor(maxApplications)
         : Infinity;
 
+    // Applied before deduplication: with flexible matching, the representative
+    // kept for an equivalence class must itself be one that involves every
+    // required artefact.
+    const involvesAll = (result: RuleApplication): boolean =>
+        mustInvolve.every(a => result.hostArtefacts.has(a));
+
     if (patternArts.length === 0) {
-        return [{ matchedArtefacts: new Map(), hostArtefacts: new Set() }];
+        const empty: RuleApplication = { matchedArtefacts: new Map(), hostArtefacts: new Set() };
+        return involvesAll(empty) ? [empty] : [];
     }
 
     const patternSet = new Set<Artefact>(patternArts);
@@ -2202,6 +2209,7 @@ function findRuleApplicationsInternal(
     // order of the unbounded result list.
     const uniqueResults: RuleApplication[] = [];
     const addUniqueResult = (result: RuleApplication): boolean => {
+        if (!involvesAll(result)) return false;
         if (!uniqueResults.some(u => applicationsEquivalent(hostAreEqual, patternSet, result, u, flexible))) {
             uniqueResults.push(result);
         }
@@ -2817,10 +2825,20 @@ export interface MatchOptions {
      * images are provably equal are collapsed. Default false.
      */
     flexible?: boolean;
+    /**
+     * Host artefacts every returned application must involve, i.e. that must
+     * be one of its matched images or a dependency of one. Object identity is
+     * used, not provable equality. Default: no restriction.
+     */
+    mustInvolve?: readonly Artefact[];
 }
 
 function normalizeMatchOptions(options: MatchOptions = {}): Required<MatchOptions> {
-    return { injective: options.injective ?? true, flexible: options.flexible ?? false };
+    return {
+        injective: options.injective ?? true,
+        flexible: options.flexible ?? false,
+        mustInvolve: options.mustInvolve ?? []
+    };
 }
 
 export function findRuleApplications(

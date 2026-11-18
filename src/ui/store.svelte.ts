@@ -150,7 +150,9 @@ export const ui = $state({
     filterInjectiveMatches: true,
     filterFlexibleMatches: false,
     filterSolvesGoalMatches: false,
-    autoApplyEqualityRules: false
+    autoApplyEqualityRules: false,
+    ruleFilterArtefacts: new SvelteSet<Artefact>(),
+    ruleFilterPicking: false
 });
 
 // ---------------------------------------------------------------------------
@@ -269,6 +271,7 @@ export function stopPositionPicker(): void {
 }
 
 export function startPositionPicker(target: PositionPicker): void {
+    ui.ruleFilterPicking = false;
     ui.positionPicker = target;
     setBodyCursor('crosshair');
 }
@@ -403,6 +406,7 @@ export function setDraftLayer(layerId: string): void {
 export function startDraftForSort(sortDef: SortDefinition): void {
     ui.inspectedArtefact = null;
     ui.equalityExtendTarget = null;
+    ui.ruleFilterPicking = false;
     cancelMergeMode();
 
     const initialData: Record<string, DataAttributeValue> = {};
@@ -474,6 +478,7 @@ export function startDuplicateArtefact(art: Artefact): void {
     }
 
     ui.inspectedArtefact = null;
+    ui.ruleFilterPicking = false;
     cancelMergeMode();
     stopPositionPicker();
 
@@ -570,6 +575,7 @@ export function startMergeMode(preselectFirst: Artefact | null = null): void {
     ui.draftArtefact = null;
     ui.dependencyPickingFor = null;
     ui.equalityExtendTarget = null;
+    ui.ruleFilterPicking = false;
     ui.mergeHoverArtefact = null;
     stopPositionPicker();
 
@@ -802,6 +808,8 @@ export function equalityChildren(art: { dependencies: Record<string, Artefact> }
 
 export function resetInteractionState(): void {
     ui.inspectedArtefact = null;
+    ui.ruleFilterPicking = false;
+    ui.ruleFilterArtefacts.clear();
     ui.focusedLayerId = null;
     drawing.setFocusedLayer(null);
     ui.draftArtefact = null;
@@ -1053,6 +1061,7 @@ export function setInspectedLabel(art: Artefact, rawLabel: string): void {
 
 export function setArtefactLayer(art: Artefact, targetLayerId: string): void {
     const updated = drawing.setArtefactLayer(art, targetLayerId);
+    pruneStaleArtefactRefs();
     if (updated.length === 0) return;
 
     const layerName = drawing.getLayer(targetLayerId)?.name ?? targetLayerId;
@@ -1132,6 +1141,7 @@ export function toggleEqualityExtend(eq: Artefact): void {
         return;
     }
     ui.equalityExtendTarget = eq;
+    ui.ruleFilterPicking = false;
     ui.dependencyPickingFor = null;
 }
 
@@ -1181,6 +1191,11 @@ function pruneStaleArtefactRefs(): void {
     const picker = ui.positionPicker;
     if (picker?.kind === 'artefact' && !drawing.getArtefactById(picker.id)) {
         stopPositionPicker();
+    }
+    for (const art of [...ui.ruleFilterArtefacts]) {
+        if (!isRuleFilterableArtefact(art)) {
+            ui.ruleFilterArtefacts.delete(art);
+        }
     }
 }
 
@@ -1248,6 +1263,10 @@ export function moveDrawingDown(name: string): void {
 }
 
 export function onArtefactNodeClick(art: Artefact): void {
+    if (ui.ruleFilterPicking) {
+        toggleRuleFilterArtefact(art);
+        return;
+    }
     if (ui.mergeMode) {
         selectMergeArtefact(art);
         return;
@@ -1691,6 +1710,49 @@ export function toggleFilterSolvesGoalMatches(): void {
     ui.filterSolvesGoalMatches = !ui.filterSolvesGoalMatches;
 }
 
+// Root-layer, non-equality host artefacts are the only ones that can appear in
+// a match's `hostArtefacts`, so they are the only selectable filter artefacts.
+export function isRuleFilterableArtefact(art: Artefact): boolean {
+    if (art.sortName === 'Equality') return false;
+    if (!drawing.getArtefacts().includes(art)) return false;
+    return drawing.getAllLayers().some(layer => layer.parentId === null && layer.id === art.layerId);
+}
+
+export function selectedRuleFilterArtefacts(): Artefact[] {
+    return drawing.getArtefacts().filter(art => ui.ruleFilterArtefacts.has(art));
+}
+
+export function toggleRuleFilterPicking(): void {
+    ui.ruleFilterPicking = !ui.ruleFilterPicking;
+    if (ui.ruleFilterPicking) {
+        cancelMergeMode();
+        ui.equalityExtendTarget = null;
+        ui.dependencyPickingFor = null;
+        ui.inspectedArtefact = null;
+        stopPositionPicker();
+    }
+}
+
+export function toggleRuleFilterArtefact(art: Artefact): void {
+    if (!isRuleFilterableArtefact(art)) {
+        pushToast('info', 'Only artefacts in a root layer can be used in the rules filter.');
+        return;
+    }
+    if (ui.ruleFilterArtefacts.has(art)) {
+        ui.ruleFilterArtefacts.delete(art);
+    } else {
+        ui.ruleFilterArtefacts.add(art);
+    }
+}
+
+export function removeRuleFilterArtefact(art: Artefact): void {
+    ui.ruleFilterArtefacts.delete(art);
+}
+
+export function clearRuleFilterArtefacts(): void {
+    ui.ruleFilterArtefacts.clear();
+}
+
 export function toggleAutoApplyEqualityRules(): void {
     ui.autoApplyEqualityRules = !ui.autoApplyEqualityRules;
     if (ui.autoApplyEqualityRules) {
@@ -1763,7 +1825,8 @@ export function computeRuleMatches(
 
     const options: MatchOptions = matchOptions ?? {
         injective: ui.filterInjectiveMatches,
-        flexible: ui.filterFlexibleMatches
+        flexible: ui.filterFlexibleMatches,
+        mustInvolve: [...ui.ruleFilterArtefacts]
     };
     const entries: RuleAppEntry[] = [];
     for (const entry of drawingStore.getAllDrawings()) {

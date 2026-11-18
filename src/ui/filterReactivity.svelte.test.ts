@@ -11,10 +11,12 @@ import {
     toggleFilterFlexibleMatches,
     toggleFilterRedundantMatches,
     toggleFilterNoProgressMatches,
-    toggleFilterSolvesGoalMatches
+    toggleFilterSolvesGoalMatches,
+    toggleRuleFilterArtefact,
+    clearRuleFilterArtefacts
 } from './store.svelte.ts';
 import { registerDefaultSorts } from '../demo/buildDemo';
-import { buildComposableEdgesRule, buildComposableHost } from '../demo/helpers';
+import { buildComposableEdgesRule, buildComposableHost, makeVertex } from '../demo/helpers';
 
 describe('rule filter reactivity (ui.* state)', () => {
     it('recompute the entries $derived when a filter toggles', () => {
@@ -51,6 +53,37 @@ describe('rule filter reactivity (ui.* state)', () => {
         const afterNoProgress = read();
         toggleFilterSolvesGoalMatches();
         expect(read()).not.toBe(afterNoProgress);
+    });
+
+    it('recompute the entries when a required artefact is picked', () => {
+        registerDefaultSorts(sortStore);
+        drawingStore.clear();
+        getDrawing().clear(true);
+        ui.filterRedundantMatches = false;
+        ui.filterNoProgressMatches = false;
+        ui.filterSolvesGoalMatches = false;
+        ui.filterInjectiveMatches = true;
+        ui.filterFlexibleMatches = false;
+        ui.ruleFilterArtefacts.clear();
+        const { rule } = buildComposableEdgesRule();
+        drawingStore.addDrawing('Rule', rule);
+        const { host } = buildComposableHost();
+        const unrelated = makeVertex(host, 'unrelated');
+        drawingStore.addDrawing('Host', host);
+        setActiveDrawing('Host');
+
+        let entries = $derived(computeRuleApplications());
+        const read = () => entries;
+        expect(read()[0].applications).toHaveLength(1);
+
+        const baseline = read();
+        toggleRuleFilterArtefact(unrelated);
+        const restricted = read();
+        expect(restricted).not.toBe(baseline);
+        expect(restricted[0].applications).toHaveLength(0);
+
+        clearRuleFilterArtefacts();
+        expect(read()[0].applications).toHaveLength(1);
     });
 });
 

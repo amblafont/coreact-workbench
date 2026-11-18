@@ -24,8 +24,16 @@
     let viewReady = $state(false);
     let zoomLevel = $state(1);
     let fitForDrawing: string | null = null;
+    let canvasHovered = $state(false);
 
     const picking = $derived(ui.positionPicker !== null);
+
+    // While the artefact filter picker is active, hovering the canvas reveals
+    // which artefacts are currently required by the filter.
+    const filterArtefacts = $derived(
+        ui.ruleFilterPicking && canvasHovered ? [...ui.ruleFilterArtefacts] : []
+    );
+    const hasFilterOverlay = $derived(filterArtefacts.length > 0);
 
     const mergeOn = $derived(ui.mergeMode);
     const focusedId = $derived(ui.focusedLayerId);
@@ -37,7 +45,7 @@
 
     $effect(() => {
         if (!svgReady) return;
-        if (mergeOn || hasRuleHover || menuHover || inspected || focusedId) {
+        if (mergeOn || hasFilterOverlay || hasRuleHover || menuHover || inspected || focusedId) {
             applyOverlays();
         } else {
             redraw();
@@ -67,6 +75,9 @@
                 return 0.5;
             }
             return mergeBaseOpacityFor(art);
+        }
+        if (filterArtefacts.length > 0) {
+            return filterArtefacts.includes(art) ? 1 : 0.5;
         }
         if (ruleHover && ruleHover.size > 0) {
             return ruleHover.has(art) ? 1 : 0.5;
@@ -209,6 +220,14 @@
         }
     }
 
+    function onCanvasPointerEnter(): void {
+        canvasHovered = true;
+    }
+
+    function onCanvasPointerLeave(): void {
+        canvasHovered = false;
+    }
+
     onMount(() => {
         svgContext = d3.select(svgElement);
         worldSelection = d3.select(worldGroup);
@@ -223,6 +242,8 @@
         // Disable double-click zoom so it does not surprise the position picker.
         svgContext.on('dblclick.zoom', null);
         svgContext.on('click', onSvgClick);
+        svgContext.on('pointerenter', onCanvasPointerEnter);
+        svgContext.on('pointerleave', onCanvasPointerLeave);
 
         svgReady = true;
         viewReady = true;

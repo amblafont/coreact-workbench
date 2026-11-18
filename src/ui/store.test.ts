@@ -8,7 +8,8 @@ import { getDrawing, drawingStore, ui, sortStore, rocqRecorder, syncProvedStatus
     closeCodeExport,
     setActiveDrawing, pendingProofCount, toggleAutoApplyEqualityRules, computeRuleApplications,
     startMergeMode, selectMergeArtefact, performMerge, unmarkInvalidRules,
-    setArtefactLayer, setRuleGroupExpanded, RULE_APPLICATION_GROUP_THRESHOLD, RULE_APPLICATION_PREVIEW_LIMIT
+    setArtefactLayer, setRuleGroupExpanded, RULE_APPLICATION_GROUP_THRESHOLD, RULE_APPLICATION_PREVIEW_LIMIT,
+    toggleRuleFilterPicking, toggleRuleFilterArtefact, clearRuleFilterArtefacts, selectedRuleFilterArtefacts
 } from './store.svelte.ts';
 import { Artefact, Drawing, DrawingStore, getFirstOrderStatementChildLayer } from '../index.svelte.ts';
 import { registerDefaultSorts } from '../demo/buildDemo';
@@ -1389,12 +1390,16 @@ describe('auto-apply equality rules', () => {
         ui.filterSolvesGoalMatches = false;
         ui.filterInjectiveMatches = true;
         ui.filterFlexibleMatches = false;
+        ui.ruleFilterArtefacts.clear();
+        ui.ruleFilterPicking = false;
     });
 
     afterEach(() => {
         ui.activeDrawingName = null;
         ui.toasts = [];
         ui.autoApplyEqualityRules = false;
+        ui.ruleFilterArtefacts.clear();
+        ui.ruleFilterPicking = false;
     });
 
     it('is off by default, so a rule application asserts no equality of its own', () => {
@@ -1416,6 +1421,18 @@ describe('auto-apply equality rules', () => {
         toggleAutoApplyEqualityRules();
 
         expect(ui.autoApplyEqualityRules).toBe(true);
+        expect(equalities()).toHaveLength(1);
+    });
+
+    it('ignores the artefact filter', () => {
+        drawingStore.addDrawing('Eq', buildEqualityOnlyRule());
+        buildHostDrawing();
+        const unrelated = makeVertex(getDrawing(), 'unrelated');
+        toggleRuleFilterArtefact(unrelated);
+        expect(computeRuleApplications().find(e => e.name === 'Eq')!.applications).toHaveLength(0);
+
+        toggleAutoApplyEqualityRules();
+
         expect(equalities()).toHaveLength(1);
     });
 
@@ -1702,6 +1719,133 @@ describe('applicable rule grouping', () => {
         expect(entry!.truncated).toBe(false);
         expect(entry!.applicationCount).toBe(1);
         expect(entry!.applications).toHaveLength(1);
+    });
+});
+
+describe('applicable rule artefact filter', () => {
+    function buildSingleVertexRule(): void {
+        const rule = makeDrawing();
+        makeVertex(rule, 'rv');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        rule.setIsRule(true);
+        drawingStore.addDrawing('Comp', rule);
+    }
+
+    function buildHost(count: number): void {
+        for (let i = 0; i < count; i++) {
+            makeVertex(getDrawing(), `v${i}`);
+        }
+        drawingStore.addDrawing('Host', getDrawing());
+        setActiveDrawing('Host');
+    }
+
+    beforeEach(() => {
+        registerDefaultSorts(sortStore);
+        getDrawing().clear(true);
+        drawingStore.clear();
+        ui.activeDrawingName = null;
+        ui.expandedRuleGroups.clear();
+        ui.filterRedundantMatches = false;
+        ui.filterNoProgressMatches = false;
+        ui.filterSolvesGoalMatches = false;
+        ui.filterInjectiveMatches = true;
+        ui.filterFlexibleMatches = false;
+        ui.ruleFilterArtefacts.clear();
+        ui.ruleFilterPicking = false;
+        ui.toasts = [];
+    });
+
+    afterEach(() => {
+        ui.ruleFilterArtefacts.clear();
+        ui.ruleFilterPicking = false;
+        ui.expandedRuleGroups.clear();
+        ui.activeDrawingName = null;
+        ui.toasts = [];
+        ui.filterRedundantMatches = true;
+        ui.filterNoProgressMatches = true;
+        ui.filterSolvesGoalMatches = false;
+    });
+
+    it('picks artefacts by clicking the tree, and toggling keeps the picker active', () => {
+        buildSingleVertexRule();
+        buildHost(2);
+        const [v0, v1] = getDrawing().getArtefacts();
+
+        toggleRuleFilterPicking();
+        expect(ui.ruleFilterPicking).toBe(true);
+        expect(ui.dependencyPickingFor).toBeNull();
+        expect(ui.inspectedArtefact).toBeNull();
+
+        onArtefactNodeClick(v0);
+        expect(selectedRuleFilterArtefacts()).toEqual([v0]);
+        expect(ui.ruleFilterPicking).toBe(true);
+
+        onArtefactNodeClick(v0);
+        expect(selectedRuleFilterArtefacts()).toEqual([]);
+
+        onArtefactNodeClick(v0);
+        onArtefactNodeClick(v1);
+        expect(selectedRuleFilterArtefacts()).toEqual([v0, v1]);
+    });
+
+    it('ignores artefacts that cannot occur in a match', () => {
+        buildSingleVertexRule();
+        buildHost(2);
+        const [v0, v1] = getDrawing().getArtefacts();
+        const equality = getDrawing().newEqualityArtefact([v0, v1], 'root');
+        getDrawing().addLayer('child', 'Child', 'root');
+        const childVertex = makeVertex(getDrawing(), 'child');
+        getDrawing().setArtefactLayer(childVertex, 'child');
+
+        toggleRuleFilterArtefact(equality);
+        toggleRuleFilterArtefact(childVertex);
+
+        expect(selectedRuleFilterArtefacts()).toEqual([]);
+        expect(ui.toasts).toHaveLength(2);
+    });
+
+    it('restricts collapsed previews and counts with AND semantics', () => {
+        buildSingleVertexRule();
+        buildHost(RULE_APPLICATION_GROUP_THRESHOLD + 2);
+        const [v0, v1] = getDrawing().getArtefacts();
+
+        let entry = computeRuleApplications().find(e => e.name === 'Comp');
+        expect(entry!.truncated).toBe(true);
+        expect(entry!.applicationCount).toBe(RULE_APPLICATION_PREVIEW_LIMIT);
+
+        toggleRuleFilterArtefact(v0);
+        entry = computeRuleApplications().find(e => e.name === 'Comp');
+        expect(entry!.truncated).toBe(false);
+        expect(entry!.applicationCount).toBe(1);
+        expect(entry!.applications[0].matchedArtefacts.values().next().value).toBe(v0);
+
+        toggleRuleFilterArtefact(v1);
+        entry = computeRuleApplications().find(e => e.name === 'Comp');
+        expect(entry!.applicationCount).toBe(0);
+        expect(entry!.applications).toHaveLength(0);
+
+        clearRuleFilterArtefacts();
+        entry = computeRuleApplications().find(e => e.name === 'Comp');
+        expect(entry!.truncated).toBe(true);
+        expect(entry!.applicationCount).toBe(RULE_APPLICATION_PREVIEW_LIMIT);
+    });
+
+    it('clears the selection on a drawing switch and prunes removed artefacts', () => {
+        buildSingleVertexRule();
+        buildHost(1);
+        const v0 = getDrawing().getArtefacts()[0];
+        toggleRuleFilterArtefact(v0);
+        expect(selectedRuleFilterArtefacts()).toEqual([v0]);
+
+        removeArtefactNode(v0);
+        expect(selectedRuleFilterArtefacts()).toEqual([]);
+
+        const v1 = makeVertex(getDrawing(), 'v1');
+        toggleRuleFilterArtefact(v1);
+        drawingStore.addDrawing('Other', new Drawing(sortStore));
+        setActiveDrawing('Other');
+        expect(ui.ruleFilterArtefacts.size).toBe(0);
+        expect(ui.ruleFilterPicking).toBe(false);
     });
 });
 

@@ -46,10 +46,12 @@
     );
 
     let depEntries = $derived(Object.entries(artefact.dependencies) as [string, Artefact][]);
-    let canUp = $derived(rootNode && !ui.dependencyPickingFor && canMoveArtefactUp(artefact));
-    let canDown = $derived(rootNode && !ui.dependencyPickingFor && canMoveArtefactDown(artefact));
+    let picking = $derived(!!ui.dependencyPickingFor || ui.ruleFilterPicking);
+    let canUp = $derived(rootNode && !picking && canMoveArtefactUp(artefact));
+    let canDown = $derived(rootNode && !picking && canMoveArtefactDown(artefact));
     let extendMode = $derived(ui.equalityExtendTarget !== null);
     let isEqualityExtendTarget = $derived(ui.equalityExtendTarget === artefact);
+    let ruleFilterSelected = $derived(ui.ruleFilterArtefacts.has(artefact));
 
     let nodeOpacity = $derived.by(() => {
         if (ui.mergeMode) {
@@ -105,7 +107,7 @@
 </script>
 
 <div
-    class="tree-node {provablyEqualCandidate ? 'provably-equal' : ''} {inspectedNode ? 'inspected' : ''}"
+    class="tree-node {provablyEqualCandidate ? 'provably-equal' : ''} {inspectedNode ? 'inspected' : ''} {ruleFilterSelected ? 'rule-filter-selected' : ''}"
     class:expanded={expanded}
     class:root-node={rootNode}
     style="opacity: {nodeOpacity};"
@@ -158,7 +160,7 @@
         {#if provablyEqualCandidate}
             <span class="eq-badge" title="Provably equal (via equality artefacts)">≡</span>
         {/if}
-        {#if rootNode && !ui.dependencyPickingFor && !extendMode}
+        {#if rootNode && !picking && !extendMode}
             <span
                 class="move-btn"
                 class:disabled={!canUp}
@@ -198,7 +200,7 @@
                 }}
             >↓</span>
         {/if}
-        {#if rootNode && !ui.dependencyPickingFor && artefact.sortName !== 'Equality' && !extendMode}
+        {#if rootNode && !picking && artefact.sortName !== 'Equality' && !extendMode}
             <span
                 class="move-btn"
                 role="button"
@@ -218,7 +220,7 @@
                 }}
             >⧉</span>
         {/if}
-        {#if rootNode && !ui.dependencyPickingFor && artefact.sortName !== 'Equality' && !ui.mergeMode && !extendMode}
+        {#if rootNode && !picking && artefact.sortName !== 'Equality' && !ui.mergeMode && !extendMode}
             <span
                 class="move-btn"
                 role="button"
@@ -238,7 +240,7 @@
                 }}
             >⨝</span>
         {/if}
-        {#if rootNode && !ui.dependencyPickingFor && !ui.mergeMode && artefact.sortName === 'Equality'}
+        {#if rootNode && !picking && !ui.mergeMode && artefact.sortName === 'Equality'}
             <span
                 class="move-btn eq-extend-btn"
                 class:active={isEqualityExtendTarget}
@@ -259,7 +261,7 @@
                 }}
             >⊕</span>
         {/if}
-        {#if rootNode && !ui.dependencyPickingFor && !extendMode}
+        {#if rootNode && !picking && !extendMode}
             <span
                 class="remove-btn"
                 role="button"

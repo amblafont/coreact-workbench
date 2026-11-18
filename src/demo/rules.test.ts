@@ -42,6 +42,49 @@ describe('first-order rule matching', () => {
         expect(apps.length).toBeGreaterThanOrEqual(1);
     });
 
+    it('restricts matches to those involving all required artefacts', () => {
+        const { rule } = buildComposableEdgesRule();
+        const { host, edges } = buildComposableHost();
+        const vertices = host.getArtefacts().filter(a => a.sortName === 'Vertex');
+        const unrelated = makeVertex(host, 'unrelated');
+
+        expect(findRuleApplications(rule, host)).toHaveLength(1);
+        expect(findRuleApplications(rule, host, { mustInvolve: [edges.he1] })).toHaveLength(1);
+        // A dependency of a matched image counts as involved.
+        expect(findRuleApplications(rule, host, { mustInvolve: [vertices[0]] })).toHaveLength(1);
+        expect(findRuleApplications(rule, host, { mustInvolve: [edges.he1, edges.he2, vertices[2]] })).toHaveLength(1);
+        expect(findRuleApplications(rule, host, { mustInvolve: [edges.he1, unrelated] })).toHaveLength(0);
+        expect(findRuleApplications(rule, host, { mustInvolve: [unrelated] })).toHaveLength(0);
+    });
+
+    it('applies the artefact restriction before the application limit', () => {
+        const rule = makeDrawing();
+        const rv = makeVertex(rule, 'rv');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        rule.setIsRule(true);
+
+        const host = makeDrawing();
+        for (let i = 0; i < 12; i++) {
+            makeVertex(host, `v${i}`);
+        }
+        const target = host.getArtefacts()[5];
+
+        const apps = findFirstOrderRuleApplications(rule, host, { mustInvolve: [target] }, 3);
+        expect(apps).toHaveLength(1);
+        expect(apps[0].matchedArtefacts.get(rv)).toBe(target);
+    });
+
+    it('rejects an empty match that does not involve the required artefacts', () => {
+        const rule = makeDrawing();
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        rule.setIsRule(true);
+        const host = makeDrawing();
+        const vertex = makeVertex(host, 'v');
+
+        expect(findFirstOrderRuleApplications(rule, host)).toHaveLength(1);
+        expect(findFirstOrderRuleApplications(rule, host, { mustInvolve: [vertex] })).toHaveLength(0);
+    });
+
     it('can stop after a requested number of applications', () => {
         const rule = makeDrawing();
         makeVertex(rule, 'rv');
