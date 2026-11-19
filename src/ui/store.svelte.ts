@@ -152,7 +152,11 @@ export const ui = $state({
     filterSolvesGoalMatches: false,
     autoApplyEqualityRules: false,
     ruleFilterArtefacts: new SvelteSet<Artefact>(),
-    ruleFilterPicking: false
+    ruleFilterPicking: false,
+    // Name filter: the textbox value is live and cheap; only committing it
+    // (Compute button / Enter) runs the expensive rule matching.
+    ruleNameFilter: '',
+    computedRuleNameFilter: ''
 });
 
 // ---------------------------------------------------------------------------
@@ -1764,6 +1768,27 @@ export function solvesGoalFilterApplicable(): boolean {
     return getFirstOrderStatementChildLayer(drawing) !== null;
 }
 
+// Rule-name filter semantics shared by the live name preview and the committed
+// computation: empty selects nothing, '*' selects everything, and any other
+// text is a case-insensitive substring of the rule name.
+export function ruleNameMatches(name: string, query: string): boolean {
+    const needle = query.trim().toLowerCase();
+    if (needle === '') return false;
+    if (needle === '*') return true;
+    return name.toLowerCase().includes(needle);
+}
+
+// Cheap: reads rule names only, never runs the rule matcher.
+export function matchingRuleNames(query: string): string[] {
+    return drawingStore.getAllDrawings()
+        .filter(entry => entry.drawing.isRule && ruleNameMatches(entry.name, query))
+        .map(entry => entry.name);
+}
+
+export function commitRuleNameFilter(): void {
+    ui.computedRuleNameFilter = ui.ruleNameFilter;
+}
+
 // ---------------------------------------------------------------------------
 // Applicable rules (computed reactively by RuleApplications.svelte)
 // ---------------------------------------------------------------------------
@@ -1805,10 +1830,15 @@ export function setRuleGroupExpanded(name: string, expanded: boolean): void {
  *
  * `limitForRule` lets the panel ask for only a preview of the applications of
  * a collapsed rule. Rules it returns `undefined` for are matched completely.
+ *
+ * `includeRule` restricts which rules are matched at all. It is checked before
+ * the expensive matcher runs, and defaults to all rules; callers that do not
+ * use the panel name filter (auto-apply, applying a single rule) leave it out.
  */
 export function computeRuleMatches(
     matchOptions?: MatchOptions,
-    limitForRule?: (name: string) => number | undefined
+    limitForRule?: (name: string) => number | undefined,
+    includeRule?: (name: string) => boolean
 ): RuleAppEntry[] {
     // Tracked structural guard: the matcher below runs under `untrack`, so this
     // derived still invalidates when the host drawing changes. We deliberately
@@ -1832,6 +1862,7 @@ export function computeRuleMatches(
     for (const entry of drawingStore.getAllDrawings()) {
         const ruleDrawing = entry.drawing;
         if (!ruleDrawing.isRule) continue;
+        if (includeRule && !includeRule(entry.name)) continue;
         let applications: RuleApplication[];
         const isFirstOrder = drawingStore.checkIsFirstOrder(ruleDrawing);
         const requestedLimit = limitForRule?.(entry.name);
@@ -1902,9 +1933,10 @@ export function applyRuleFilters(entries: RuleAppEntry[]): RuleAppEntry[] {
     });
 }
 
-export function computeRuleApplications(): RuleAppEntry[] {
+export function computeRuleApplications(includeRule?: (name: string) => boolean): RuleAppEntry[] {
     return applyRuleFilters(computeRuleMatches(undefined, (name) =>
-        ui.expandedRuleGroups.has(name) ? undefined : RULE_APPLICATION_PREVIEW_LIMIT
+        ui.expandedRuleGroups.has(name) ? undefined : RULE_APPLICATION_PREVIEW_LIMIT,
+        includeRule
     ));
 }
 
@@ -2000,12 +2032,15 @@ export function runEqualityRuleAutoApply(): void {
 
 export function applyRuleAt(savedRuleName: string, appIndex: number): void {
     ui.ruleHoverArtefacts = null;
-    let entry = computeRuleApplications().find(e => e.name === savedRuleName);
+    // Never let the panel's name filter decide which rule can be applied:
+    // compute only the rule that was clicked.
+    const onlyThisRule = (name: string) => name === savedRuleName;
+    let entry = computeRuleApplications(onlyThisRule).find(e => e.name === savedRuleName);
     let app = entry?.applications[appIndex];
     if (!entry || !app) {
         // The panel may only have a preview of a collapsed rule. Fall back to
         // the complete match list if the requested index is beyond it.
-        const fullEntry = applyRuleFilters(computeRuleMatches()).find(e => e.name === savedRuleName);
+        const fullEntry = applyRuleFilters(computeRuleMatches(undefined, undefined, onlyThisRule)).find(e => e.name === savedRuleName);
         entry = fullEntry;
         app = fullEntry?.applications[appIndex];
     }

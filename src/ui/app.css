@@ -91,6 +91,53 @@ body {
     border-bottom: 1px solid #eee;
     margin: -10px -15px 10px -15px;
 }
+.rule-name-filter {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+.rule-name-filter label {
+    font-size: 0.75rem;
+    color: #555;
+}
+.rule-name-filter-row {
+    display: flex;
+    gap: 4px;
+}
+.rule-name-filter input[type="text"] {
+    flex: 1 1 auto;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 5px 6px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 0.8rem;
+}
+.rule-name-filter .compute-btn {
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+.rule-name-list {
+    list-style: none;
+    margin: 6px 0 0 0;
+    padding: 0;
+    max-height: 180px;
+    overflow-y: auto;
+    font-size: 0.75rem;
+    color: #555;
+}
+.rule-name-list li {
+    padding: 2px 0;
+    border-bottom: 1px solid #eee;
+}
+.rule-name-empty {
+    margin-top: 6px;
+    font-size: 0.75rem;
+    color: #888;
+    font-style: italic;
+}
 .rule-artefact-filter {
     margin-top: 6px;
 }

@@ -17,11 +17,18 @@
         toggleRuleFilterPicking,
         removeRuleFilterArtefact,
         clearRuleFilterArtefacts,
+        matchingRuleNames,
+        ruleNameMatches,
+        commitRuleNameFilter,
         RULE_APPLICATION_GROUP_THRESHOLD,
         type RuleAppEntry
     } from './store.svelte.ts';
 
-    const entries = $derived(computeRuleApplications());
+    // Typing only filters rule names (cheap). Matching runs for the committed
+    // names only, after Compute / Enter, and never on a keystroke.
+    const names = $derived(matchingRuleNames(ui.ruleNameFilter));
+    const pending = $derived(ui.ruleNameFilter !== ui.computedRuleNameFilter);
+    const entries = $derived(computeRuleApplications(name => ruleNameMatches(name, ui.computedRuleNameFilter)));
     const selectedArtefacts = $derived(selectedRuleFilterArtefacts());
 
     function matchLabels(entry: RuleAppEntry, app: RuleApplication): string[] {
@@ -119,6 +126,29 @@
 {/snippet}
 
 <div class="rules-filter">
+    <div class="rule-name-filter">
+        <label for="rule-name-filter-input">Rule name filter</label>
+        <div class="rule-name-filter-row">
+            <input
+                id="rule-name-filter-input"
+                type="text"
+                bind:value={ui.ruleNameFilter}
+                placeholder="* for all"
+                onkeydown={(event) => {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        commitRuleNameFilter();
+                    }
+                }}
+            />
+            <button type="button" class="compute-btn" onclick={commitRuleNameFilter}>Compute</button>
+        </div>
+        {#if pending}
+            <div class="rule-filter-hint">
+                Showing names only — press Compute (or Enter) to calculate applications.
+            </div>
+        {/if}
+    </div>
     <label class="rule-checkbox-label">
         <input type="checkbox" checked={ui.filterRedundantMatches} onchange={toggleFilterRedundantMatches} />
         Filter redundant matches
@@ -199,29 +229,41 @@
     {/if}
 {/snippet}
 
-{#each entries as entry (entry.name)}
-    {@const itemCount = applicationItemCount(entry)}
-    {#if itemCount === 1}
-        {@render applicationRow(entry, entry.applications[0], 0, true)}
-        {@render hiddenNotes(entry)}
-    {:else if itemCount > 1}
-        <details
-            class="rule-app-group"
-            class:first-order={entry.isFirstOrder}
-            class:second-order={!entry.isFirstOrder}
-            open={ui.expandedRuleGroups.has(entry.name)}
-            ontoggle={(event) => onGroupToggle(entry, event)}
-        >
-            <summary class="rule-app-group-summary">
-                <span class="rule-app-name">{@render ruleTitle(entry)}</span>
-                <span class="rule-app-group-count">{groupCountLabel(entry)}</span>
-            </summary>
-            {#if !entry.truncated}
-                {#each entry.applications as app, index (entry.name + '-' + index)}
-                    {@render applicationRow(entry, app, index, false)}
-                {/each}
-            {/if}
-            {@render hiddenNotes(entry)}
-        </details>
+{#if pending}
+    {#if names.length === 0}
+        <div class="rule-name-empty">No rules match this filter.</div>
+    {:else}
+        <ul class="rule-name-list">
+            {#each names as name (name)}
+                <li>{name}</li>
+            {/each}
+        </ul>
     {/if}
-{/each}
+{:else}
+    {#each entries as entry (entry.name)}
+        {@const itemCount = applicationItemCount(entry)}
+        {#if itemCount === 1}
+            {@render applicationRow(entry, entry.applications[0], 0, true)}
+            {@render hiddenNotes(entry)}
+        {:else if itemCount > 1}
+            <details
+                class="rule-app-group"
+                class:first-order={entry.isFirstOrder}
+                class:second-order={!entry.isFirstOrder}
+                open={ui.expandedRuleGroups.has(entry.name)}
+                ontoggle={(event) => onGroupToggle(entry, event)}
+            >
+                <summary class="rule-app-group-summary">
+                    <span class="rule-app-name">{@render ruleTitle(entry)}</span>
+                    <span class="rule-app-group-count">{groupCountLabel(entry)}</span>
+                </summary>
+                {#if !entry.truncated}
+                    {#each entry.applications as app, index (entry.name + '-' + index)}
+                        {@render applicationRow(entry, app, index, false)}
+                    {/each}
+                {/if}
+                {@render hiddenNotes(entry)}
+            </details>
+        {/if}
+    {/each}
+{/if}
