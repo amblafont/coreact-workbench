@@ -101,23 +101,14 @@ body {
     font-size: 0.75rem;
     color: #555;
 }
-.rule-name-filter-row {
-    display: flex;
-    gap: 4px;
-}
 .rule-name-filter input[type="text"] {
-    flex: 1 1 auto;
-    min-width: 0;
+    width: 100%;
     box-sizing: border-box;
     padding: 5px 6px;
     border: 1px solid #ccc;
     border-radius: 3px;
     font-family: inherit;
     font-size: 0.8rem;
-}
-.rule-name-filter .compute-btn {
-    font-size: 0.75rem;
-    white-space: nowrap;
 }
 .rule-name-list {
     list-style: none;

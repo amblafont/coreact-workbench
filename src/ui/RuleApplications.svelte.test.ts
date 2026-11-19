@@ -160,7 +160,13 @@ describe('RuleApplications layout', () => {
         flushSync();
     }
 
-    it('lists matching rule names only until Compute is pressed', () => {
+    function pressEnterInNameFilter(): void {
+        document.querySelector<HTMLInputElement>('#rule-name-filter-input')!
+            .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        flushSync();
+    }
+
+    it('lists matching rule names only until Enter is pressed', () => {
         buildRule('Comp');
         buildRule('Other');
         buildHost(1);
@@ -174,10 +180,10 @@ describe('RuleApplications layout', () => {
         expect(ui.computedRuleNameFilter).toBe('*');
         expect(document.querySelectorAll('.rule-app-row')).toHaveLength(0);
         expect([...document.querySelectorAll('.rule-name-list li')].map(li => li.textContent)).toEqual(['Comp']);
-        expect(document.querySelector('.rule-name-filter .rule-filter-hint')?.textContent).toContain('press Compute');
+        expect(document.querySelector('.rule-name-filter .rule-filter-hint')?.textContent).toContain('press Enter');
+        expect(document.querySelector('.rule-name-filter button')).toBeNull();
 
-        document.querySelector<HTMLButtonElement>('.rule-name-filter .compute-btn')!.click();
-        flushSync();
+        pressEnterInNameFilter();
 
         expect(ui.computedRuleNameFilter).toBe('comp');
         expect(document.querySelectorAll('.rule-name-list li')).toHaveLength(0);
@@ -195,9 +201,7 @@ describe('RuleApplications layout', () => {
         expect(document.querySelectorAll('.rule-app-row')).toHaveLength(0);
         expect([...document.querySelectorAll('.rule-name-list li')].map(li => li.textContent)).toEqual(['Other']);
 
-        document.querySelector<HTMLInputElement>('#rule-name-filter-input')!
-            .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-        flushSync();
+        pressEnterInNameFilter();
 
         expect(ui.computedRuleNameFilter).toBe('OTHER');
         expect(document.querySelectorAll('.rule-app-row')).toHaveLength(1);
@@ -216,8 +220,7 @@ describe('RuleApplications layout', () => {
         expect(document.querySelectorAll('.rule-app-row')).toHaveLength(0);
 
         // Commit the empty filter first, so typing '*' becomes a pending edit.
-        document.querySelector<HTMLButtonElement>('.rule-name-filter .compute-btn')!.click();
-        flushSync();
+        pressEnterInNameFilter();
         typeInNameFilter('*');
         expect([...document.querySelectorAll('.rule-name-list li')].map(li => li.textContent)).toEqual(['Comp', 'Other']);
     });

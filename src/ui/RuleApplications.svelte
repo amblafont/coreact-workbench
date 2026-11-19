@@ -128,24 +128,21 @@
 <div class="rules-filter">
     <div class="rule-name-filter">
         <label for="rule-name-filter-input">Rule name filter</label>
-        <div class="rule-name-filter-row">
-            <input
-                id="rule-name-filter-input"
-                type="text"
-                bind:value={ui.ruleNameFilter}
-                placeholder="* for all"
-                onkeydown={(event) => {
-                    if (event.key === 'Enter') {
-                        event.preventDefault();
-                        commitRuleNameFilter();
-                    }
-                }}
-            />
-            <button type="button" class="compute-btn" onclick={commitRuleNameFilter}>Compute</button>
-        </div>
+        <input
+            id="rule-name-filter-input"
+            type="text"
+            bind:value={ui.ruleNameFilter}
+            placeholder="* for all"
+            onkeydown={(event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    commitRuleNameFilter();
+                }
+            }}
+        />
         {#if pending}
             <div class="rule-filter-hint">
-                Showing names only — press Compute (or Enter) to calculate applications.
+                Showing names only — press Enter to calculate applications.
             </div>
         {/if}
     </div>
