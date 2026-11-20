@@ -110,6 +110,37 @@ describe('first-order rule matching', () => {
         expect(limited.map(key)).toEqual(all.slice(0, 11).map(key));
     });
 
+    it('assigns a scarce dependent before its dependencies via forward constraints', () => {
+        const rule = makeDrawing();
+        rule.sortStore.newSort('Tag', { arrow: 'Edge' }, {}, () => null);
+        const rv0 = makeVertex(rule, 'rv0');
+        const rv1 = makeVertex(rule, 'rv1');
+        const re = makeEdge(rule, 're', rv0, rv1);
+        rule.newArtefact('Tag', { arrow: re }, {}, 'root');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        rule.setIsRule(true);
+
+        const host = makeDrawing();
+        host.sortStore.newSort('Tag', { arrow: 'Edge' }, {}, () => null);
+        const hv0 = makeVertex(host, 'hv0');
+        const hv1 = makeVertex(host, 'hv1');
+        const hv2 = makeVertex(host, 'hv2');
+        const hv3 = makeVertex(host, 'hv3');
+        makeEdge(host, 'he0', hv0, hv1);
+        const he1 = makeEdge(host, 'he1', hv2, hv3);
+        host.newArtefact('Tag', { arrow: he1 }, {}, 'root');
+
+        // The Tag is the only host artefact of its sort, so it is assigned first
+        // and forces re -> he1, rv0 -> hv2 and rv1 -> hv3 before any Vertex or
+        // Edge candidates are enumerated.
+        const apps = findFirstOrderRuleApplications(rule, host);
+        expect(apps).toHaveLength(1);
+        expect(apps[0].matchedArtefacts.get(re)).toBe(he1);
+        expect(apps[0].matchedArtefacts.get(rv0)).toBe(hv2);
+        expect(apps[0].matchedArtefacts.get(rv1)).toBe(hv3);
+        expect(findFirstOrderRuleApplications(rule, host, { mustInvolve: [hv3] })).toHaveLength(1);
+    });
+
     it('matches a rule whose isMono artefact leaves from a child layer without requiring isMono in the host', () => {
         const rule = buildIsMonoInChildLayerRule();
         const { host } = buildComposableHost();

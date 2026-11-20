@@ -2184,15 +2184,24 @@ function findRuleApplicationsInternal(
         .filter(l => l.parentId === null)
         .map(l => l.id);
     const hostCandidates = host.getArtefacts().filter(a => rootLayerIds.includes(a.layerId));
-
-    const ordered = orderPatternBySort(patternArts, sortRank);
+    const candidatesBySort = new Map<string, Artefact[]>();
+    for (const cand of hostCandidates) {
+        let list = candidatesBySort.get(cand.sortName);
+        if (!list) {
+            list = [];
+            candidatesBySort.set(cand.sortName, list);
+        }
+        list.push(cand);
+    }
+    const candidatesOf = (a: Artefact): Artefact[] => candidatesBySort.get(a.sortName) ?? [];
 
     // Push the artefact filter into the search. A result's `hostArtefacts` is
     // exactly the union, over assigned slots, of the candidate itself and the
-    // candidate's declared dependencies. Compute that contribution once per
-    // (slot, candidate) and use it to abandon assignments that can no longer
-    // cover every required artefact. When the filter is empty this whole block
-    // is inert, so the unfiltered path (including auto-apply) is unchanged.
+    // candidate's declared dependencies. `coveredCount` tracks what the current
+    // branch already contributes; `covererCount` tracks how many unassigned slots
+    // could still contribute each required artefact. When the filter is empty
+    // this whole block is inert, so the unfiltered path (including auto-apply)
+    // is unchanged.
     const requiredList = [...new Set(mustInvolve)];
     const hasRequirements = requiredList.length > 0;
     const requiredIndex = new Map<Artefact, number>();
@@ -2210,28 +2219,35 @@ function findRuleApplicationsInternal(
     };
 
     const coveredCount = new Array<number>(requiredList.length).fill(0);
-    const lastSlot = new Array<number>(requiredList.length).fill(-1);
+    const covererCount = new Array<number>(requiredList.length).fill(0);
+    const coverageBySlot = new Map<Artefact, number[]>();
     if (hasRequirements) {
-        const canCover = ordered.map(() => new Array<boolean>(requiredList.length).fill(false));
-        for (let i = 0; i < ordered.length; i++) {
-            const a = ordered[i];
-            for (const cand of hostCandidates) {
-                if (cand.sortName !== a.sortName) continue;
+        for (const a of patternArts) {
+            const canCover = new Set<number>();
+            for (const cand of candidatesOf(a)) {
                 coverageIndices(a, cand, covBuf);
-                for (const ri of covBuf) canCover[i][ri] = true;
+                for (const ri of covBuf) canCover.add(ri);
             }
+            const indices = [...canCover];
+            coverageBySlot.set(a, indices);
+            for (const ri of indices) covererCount[ri]++;
         }
         for (let ri = 0; ri < requiredList.length; ri++) {
-            for (let i = 0; i < ordered.length; i++) {
-                if (canCover[i][ri]) lastSlot[ri] = i;
-            }
-            // No assignment can ever bring this artefact into hostArtefacts.
-            if (lastSlot[ri] < 0) return [];
+            // No slot can ever bring this artefact into hostArtefacts.
+            if (covererCount[ri] === 0) return [];
         }
     }
 
     const assignment = new Map<Artefact, Artefact>();
     const used = new Set<Artefact>();
+
+    // A dependent may now be assigned before the artefacts it depends on. When
+    // that happens, record where its dependency images must land and check those
+    // forward constraints when the dependency slots are assigned. This is what
+    // lets scarce, highly constraining sorts (isProd, Triangle, ...) be searched
+    // first instead of enumerating a huge prefix of Vertex/Edge assignments.
+    interface ForwardConstraint { required: Artefact }
+    const constraints = new Map<Artefact, ForwardConstraint[]>();
 
     // Equality-adjacency graphs are host-invariant during a single match run, so
     // build each once per layer and reuse it instead of rebuilding on every check.
@@ -2244,6 +2260,53 @@ function findRuleApplicationsInternal(
             areEqualMemo.set(layerId, adj);
         }
         return isEqualityConnected(adj, a, b);
+    };
+
+    const matchesHost = (cand: Artefact, required: Artefact, layerId: string): boolean =>
+        cand === required || (flexible && hostAreEqual(cand, required, layerId));
+
+    const candidateIsAllowed = (a: Artefact, cand: Artefact): boolean => {
+        if (injective && used.has(cand)) return false;
+        for (const constraint of constraints.get(a) ?? []) {
+            if (!matchesHost(cand, constraint.required, cand.layerId)) return false;
+        }
+        for (const [k, dep] of Object.entries(a.dependencies)) {
+            if (!patternSet.has(dep)) continue;
+            const hostDep = cand.dependencies[k];
+            if (hostDep === undefined) return false;
+            const img = assignment.get(dep);
+            if (img !== undefined && !matchesHost(hostDep, img, cand.layerId)) return false;
+        }
+        return true;
+    };
+
+    interface Choice { cand: Artefact; cov: number[] }
+    const feasibleChoices = (a: Artefact): Choice[] => {
+        const choices: Choice[] = [];
+        for (const cand of candidatesOf(a)) {
+            if (!candidateIsAllowed(a, cand)) continue;
+            let cov: number[] = [];
+            if (hasRequirements) {
+                coverageIndices(a, cand, covBuf);
+                let ok = true;
+                for (let ri = 0; ri < requiredList.length; ri++) {
+                    // If this slot is the last unassigned coverer of `ri`, the
+                    // candidate must cover it now. A different slot being the
+                    // sole coverer must not constrain this slot's candidates.
+                    if (coveredCount[ri] === 0
+                        && covererCount[ri] === 1
+                        && coverageBySlot.get(a)?.includes(ri)
+                        && !covBuf.includes(ri)) {
+                        ok = false;
+                        break;
+                    }
+                }
+                if (!ok) continue;
+                cov = covBuf.slice();
+            }
+            choices.push({ cand, cov });
+        }
+        return choices;
     };
 
     // Deduplicate as results are found, so the search can stop as soon as the
@@ -2277,11 +2340,40 @@ function findRuleApplicationsInternal(
         return true;
     };
 
-    const backtrack = (i: number): void => {
+    const backtrack = (): void => {
         if (limitReached) return;
-        if (i === ordered.length) {
+
+        if (hasRequirements) {
+            for (let ri = 0; ri < requiredList.length; ri++) {
+                if (coveredCount[ri] === 0 && covererCount[ri] === 0) return;
+            }
+        }
+
+        // Most-constrained-first: assigning a scarce, highly constraining slot
+        // early forces its dependencies and prunes whole branches at once.
+        let next: Artefact | null = null;
+        let nextChoices: Choice[] = [];
+        let bestSize = Infinity;
+        let bestScore = -Infinity;
+        for (const a of patternArts) {
+            if (assignment.has(a)) continue;
+            const choices = feasibleChoices(a);
+            if (choices.length === 0) return;
+            let depCount = 0;
+            for (const dep of Object.values(a.dependencies)) if (patternSet.has(dep)) depCount++;
+            const score = depCount * 100000 + (sortRank.get(a.sortName) ?? -1);
+            if (choices.length < bestSize || (choices.length === bestSize && score > bestScore)) {
+                bestSize = choices.length;
+                bestScore = score;
+                next = a;
+                nextChoices = choices;
+            }
+        }
+
+        if (!next) {
             if (checkEqualityConstraints()) {
-                const hostArtefacts = new Set<Artefact>(used);
+                const hostArtefacts = new Set<Artefact>();
+                for (const cand of assignment.values()) hostArtefacts.add(cand);
                 for (const [a, cand] of assignment) {
                     for (const [k] of Object.entries(a.dependencies)) {
                         const hostDep = cand.dependencies[k];
@@ -2297,13 +2389,8 @@ function findRuleApplicationsInternal(
             return;
         }
 
-        if (hasRequirements) {
-            for (let ri = 0; ri < requiredList.length; ri++) {
-                if (coveredCount[ri] === 0 && lastSlot[ri] < i) return;
-            }
-        }
-
-        const a = ordered[i];
+        const a = next;
+        const aCoverage = coverageBySlot.get(a) ?? [];
         // Candidates that are equality-connected for this slot produce duplicate
         // applications (when flexible), and the dedupe collapses them by equality
         // anyway, so in flexible mode explore a single representative per
@@ -2312,25 +2399,8 @@ function findRuleApplicationsInternal(
         // required artefact must not be discarded as a duplicate.
         const triedCandidates: Artefact[] = [];
         const triedCoverages: number[][] = [];
-        for (const cand of hostCandidates) {
+        for (const { cand, cov } of nextChoices) {
             if (limitReached) break;
-            if (cand.sortName !== a.sortName || (injective && used.has(cand))) continue;
-
-            let cov: number[] = [];
-            if (hasRequirements) {
-                coverageIndices(a, cand, covBuf);
-                let feasible = true;
-                for (let ri = 0; ri < requiredList.length; ri++) {
-                    // If this is the last slot that can cover `ri`, the candidate
-                    // must cover it now; otherwise the branch is dead.
-                    if (coveredCount[ri] === 0 && lastSlot[ri] <= i && !covBuf.includes(ri)) {
-                        feasible = false;
-                        break;
-                    }
-                }
-                if (!feasible) continue;
-                cov = covBuf.slice();
-            }
 
             if (flexible) {
                 let skip = false;
@@ -2368,39 +2438,43 @@ function findRuleApplicationsInternal(
                 triedCoverages.push(cov);
             }
 
-            let ok = true;
+            const added: Array<{ dep: Artefact; constraint: ForwardConstraint }> = [];
             for (const [k, dep] of Object.entries(a.dependencies)) {
-                if (patternSet.has(dep)) {
-                    const img = assignment.get(dep);
-                    if (img === undefined) {
-                        ok = false;
-                        break;
-                    }
-                    const hostDep = cand.dependencies[k];
-                    if (hostDep === undefined) {
-                        ok = false;
-                        break;
-                    }
-                    if (hostDep !== img && (!flexible || !hostAreEqual(hostDep, img, cand.layerId))) {
-                        ok = false;
-                        break;
-                    }
+                if (!patternSet.has(dep) || assignment.has(dep)) continue;
+                const constraint: ForwardConstraint = { required: cand.dependencies[k]! };
+                let list = constraints.get(dep);
+                if (!list) {
+                    list = [];
+                    constraints.set(dep, list);
                 }
+                list.push(constraint);
+                added.push({ dep, constraint });
             }
-            if (!ok) continue;
 
             assignment.set(a, cand);
             used.add(cand);
-            if (hasRequirements) for (const ri of cov) coveredCount[ri]++;
-            backtrack(i + 1);
-            if (hasRequirements) for (const ri of cov) coveredCount[ri]--;
+            if (hasRequirements) {
+                for (const ri of aCoverage) covererCount[ri]--;
+                for (const ri of cov) coveredCount[ri]++;
+            }
+            backtrack();
+            if (hasRequirements) {
+                for (const ri of cov) coveredCount[ri]--;
+                for (const ri of aCoverage) covererCount[ri]++;
+            }
             used.delete(cand);
             assignment.delete(a);
+            for (const { dep, constraint } of added) {
+                const list = constraints.get(dep)!;
+                const index = list.indexOf(constraint);
+                if (index >= 0) list.splice(index, 1);
+                if (list.length === 0) constraints.delete(dep);
+            }
             if (limitReached) return;
         }
     };
 
-    backtrack(0);
+    backtrack();
     return uniqueResults;
 }
 
