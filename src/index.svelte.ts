@@ -2187,6 +2187,49 @@ function findRuleApplicationsInternal(
 
     const ordered = orderPatternBySort(patternArts, sortRank);
 
+    // Push the artefact filter into the search. A result's `hostArtefacts` is
+    // exactly the union, over assigned slots, of the candidate itself and the
+    // candidate's declared dependencies. Compute that contribution once per
+    // (slot, candidate) and use it to abandon assignments that can no longer
+    // cover every required artefact. When the filter is empty this whole block
+    // is inert, so the unfiltered path (including auto-apply) is unchanged.
+    const requiredList = [...new Set(mustInvolve)];
+    const hasRequirements = requiredList.length > 0;
+    const requiredIndex = new Map<Artefact, number>();
+    requiredList.forEach((a, ri) => requiredIndex.set(a, ri));
+    const covBuf: number[] = [];
+    const coverageIndices = (a: Artefact, cand: Artefact, out: number[]): void => {
+        out.length = 0;
+        const add = (art: Artefact | undefined): void => {
+            if (art === undefined) return;
+            const ri = requiredIndex.get(art);
+            if (ri !== undefined && !out.includes(ri)) out.push(ri);
+        };
+        add(cand);
+        for (const k of Object.keys(a.dependencies)) add(cand.dependencies[k]);
+    };
+
+    const coveredCount = new Array<number>(requiredList.length).fill(0);
+    const lastSlot = new Array<number>(requiredList.length).fill(-1);
+    if (hasRequirements) {
+        const canCover = ordered.map(() => new Array<boolean>(requiredList.length).fill(false));
+        for (let i = 0; i < ordered.length; i++) {
+            const a = ordered[i];
+            for (const cand of hostCandidates) {
+                if (cand.sortName !== a.sortName) continue;
+                coverageIndices(a, cand, covBuf);
+                for (const ri of covBuf) canCover[i][ri] = true;
+            }
+        }
+        for (let ri = 0; ri < requiredList.length; ri++) {
+            for (let i = 0; i < ordered.length; i++) {
+                if (canCover[i][ri]) lastSlot[ri] = i;
+            }
+            // No assignment can ever bring this artefact into hostArtefacts.
+            if (lastSlot[ri] < 0) return [];
+        }
+    }
+
     const assignment = new Map<Artefact, Artefact>();
     const used = new Set<Artefact>();
 
@@ -2254,19 +2297,45 @@ function findRuleApplicationsInternal(
             return;
         }
 
+        if (hasRequirements) {
+            for (let ri = 0; ri < requiredList.length; ri++) {
+                if (coveredCount[ri] === 0 && lastSlot[ri] < i) return;
+            }
+        }
+
         const a = ordered[i];
         // Candidates that are equality-connected for this slot produce duplicate
         // applications (when flexible), and the dedupe collapses them by equality
         // anyway, so in flexible mode explore a single representative per
-        // equality class.
+        // equality class. The coverage kept alongside each representative is
+        // part of the dedup key: a candidate that is the only one covering a
+        // required artefact must not be discarded as a duplicate.
         const triedCandidates: Artefact[] = [];
+        const triedCoverages: number[][] = [];
         for (const cand of hostCandidates) {
             if (limitReached) break;
             if (cand.sortName !== a.sortName || (injective && used.has(cand))) continue;
 
+            let cov: number[] = [];
+            if (hasRequirements) {
+                coverageIndices(a, cand, covBuf);
+                let feasible = true;
+                for (let ri = 0; ri < requiredList.length; ri++) {
+                    // If this is the last slot that can cover `ri`, the candidate
+                    // must cover it now; otherwise the branch is dead.
+                    if (coveredCount[ri] === 0 && lastSlot[ri] <= i && !covBuf.includes(ri)) {
+                        feasible = false;
+                        break;
+                    }
+                }
+                if (!feasible) continue;
+                cov = covBuf.slice();
+            }
+
             if (flexible) {
                 let skip = false;
-                for (const tried of triedCandidates) {
+                for (let ti = 0; ti < triedCandidates.length; ti++) {
+                    const tried = triedCandidates[ti];
                     if (!hostAreEqual(tried, cand, cand.layerId)) continue;
                     // Guard against unvalidated equality artefacts: only treat two
                     // candidates as interchangeable when their dependency graphs
@@ -2284,12 +2353,19 @@ function findRuleApplicationsInternal(
                                 break;
                             }
                         }
-                        if (depsEqual) skip = true;
+                        // Coverage uses object identity, not provable equality, so
+                        // an equal-class representative can miss a required
+                        // artefact that this candidate covers. Keep both in that
+                        // case; the leaf dedup still collapses equivalent results.
+                        if (depsEqual && cov.every(ri => triedCoverages[ti].includes(ri))) {
+                            skip = true;
+                        }
                     }
                     if (skip) break;
                 }
                 if (skip) continue;
                 triedCandidates.push(cand);
+                triedCoverages.push(cov);
             }
 
             let ok = true;
@@ -2315,7 +2391,9 @@ function findRuleApplicationsInternal(
 
             assignment.set(a, cand);
             used.add(cand);
+            if (hasRequirements) for (const ri of cov) coveredCount[ri]++;
             backtrack(i + 1);
+            if (hasRequirements) for (const ri of cov) coveredCount[ri]--;
             used.delete(cand);
             assignment.delete(a);
             if (limitReached) return;

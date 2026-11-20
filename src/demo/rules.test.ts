@@ -125,6 +125,95 @@ describe('first-order rule matching', () => {
     });
 });
 
+describe('artefact filter inside the search', () => {
+    it('returns exactly the filtered results for every subset of required artefacts', () => {
+        const rule = makeDrawing();
+        const rv0 = makeVertex(rule, 'rv0');
+        const rv1 = makeVertex(rule, 'rv1');
+        makeEdge(rule, 're', rv0, rv1);
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        rule.setIsRule(true);
+
+        const host = makeDrawing();
+        const h0 = makeVertex(host, 'h0');
+        const h1 = makeVertex(host, 'h1');
+        const h2 = makeVertex(host, 'h2');
+        const he0 = makeEdge(host, 'he0', h0, h1);
+        const he1 = makeEdge(host, 'he1', h1, h2);
+        const hostArts = [h0, h1, h2, he0, he1];
+
+        const key = (app: RuleApplication) => [...app.matchedArtefacts]
+            .map(([pattern, image]) => `${pattern.data.label}->${image.data.label}`)
+            .sort()
+            .join('|');
+
+        for (const options of [{}, { injective: false }]) {
+            const all = findFirstOrderRuleApplications(rule, host, options);
+            expect(all.length).toBeGreaterThan(1);
+            for (let mask = 1; mask < 1 << hostArts.length; mask++) {
+                const subset = hostArts.filter((_, idx) => mask & (1 << idx));
+                const actual = findFirstOrderRuleApplications(rule, host, { ...options, mustInvolve: subset });
+                const expected = all.filter(app => subset.every(a => app.hostArtefacts.has(a)));
+                expect(actual.map(key).sort()).toEqual(expected.map(key).sort());
+            }
+        }
+    });
+
+    it('rejects a required artefact no slot can ever cover', () => {
+        const rule = makeDrawing();
+        makeVertex(rule, 'rv');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        rule.setIsRule(true);
+
+        const host = makeDrawing();
+        const h0 = makeVertex(host, 'h0');
+        const h1 = makeVertex(host, 'h1');
+        const edge = makeEdge(host, 'he', h0, h1);
+
+        expect(findFirstOrderRuleApplications(rule, host)).toHaveLength(2);
+        expect(findFirstOrderRuleApplications(rule, host, { mustInvolve: [edge] })).toHaveLength(0);
+    });
+
+    it('keeps a required artefact whose only match is an equal-class duplicate', () => {
+        const rule = makeDrawing();
+        makeVertex(rule, 'rv');
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        rule.setIsRule(true);
+
+        const host = makeDrawing();
+        const hb = makeVertex(host, 'hb');
+        const hc = makeVertex(host, 'hc');
+        host.newEqualityArtefact([hb, hc], 'root');
+
+        // Without the filter, flexible dedup keeps the first representative.
+        expect(findFirstOrderRuleApplications(rule, host, { flexible: true })).toHaveLength(1);
+
+        // Requiring hc must not let that dedup discard hc as a duplicate of hb:
+        // coverage uses object identity, so only hc's application qualifies.
+        const apps = findFirstOrderRuleApplications(rule, host, { flexible: true, mustInvolve: [hc] });
+        expect(apps).toHaveLength(1);
+        expect([...apps[0].matchedArtefacts.values()]).toEqual([hc]);
+    });
+
+    it('covers a required dependency at the last slot that can cover it', () => {
+        const rule = makeDrawing();
+        const rv0 = makeVertex(rule, 'rv0');
+        const rv1 = makeVertex(rule, 'rv1');
+        makeEdge(rule, 're', rv0, rv1);
+        rule.addLayer('conclusion', 'Conclusion', 'root');
+        rule.setIsRule(true);
+
+        const host = makeDrawing();
+        const h0 = makeVertex(host, 'h0');
+        const h1 = makeVertex(host, 'h1');
+        makeEdge(host, 'he', h0, h1);
+
+        const apps = findFirstOrderRuleApplications(rule, host, { mustInvolve: [h1] });
+        expect(apps).toHaveLength(1);
+        expect(apps[0].hostArtefacts.has(h1)).toBe(true);
+    });
+});
+
 describe('applying first-order rules', () => {
     it('adds the conclusion-layer isMono artefact to the matched host root artefact', () => {
         const rule = buildIsMonoInChildLayerRule();

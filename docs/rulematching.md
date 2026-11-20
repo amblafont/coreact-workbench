@@ -38,13 +38,13 @@ All three validate the rule first (`validateRuleDrawing`); they return `[]` if t
 
 ### Matching options
 
-The optional `options` argument controls two independent aspects of the matcher:
+The optional `options` argument controls three independent aspects of the matcher:
 
 | Option | Default | Meaning |
 |---|---|---|
 | `injective` | `true` | Do **not** allow two different rule artefacts to be matched to the same host artefact. When `false`, distinct pattern artefacts may alias a single host artefact (e.g. a rule with two vertices matches a host with one vertex, mapping both to it). |
 | `flexible` | `false` | Allow the match to be **bigger than the rule root layer**. When `true`, a candidate's dependencies may be **provably equal** to (rather than identical with) the already-matched images, and applications whose images are provably equal are collapsed. For example, a rule root layer consisting of a looping arrow on a vertex `A` matches a host root layer with two provably equal vertices `B` and `C` and an edge between them: the edge `B → C` is a match for the loop `A → A`. |
-| `mustInvolve` | `[]` | Keep only applications whose `hostArtefacts` contain **every** listed host artefact (matched images or dependencies of them, by object identity). The Applicable Rules panel uses this for its artefact filter; it is checked before deduplication and before any application limit is applied. |
+| `mustInvolve` | `[]` | Keep only applications whose `hostArtefacts` contain **every** listed host artefact (matched images or dependencies of them, by object identity). The Applicable Rules panel uses this for its artefact filter; the matcher prunes branches that can no longer cover all of them during the search (§2.2), and still checks completed applications before deduplication and before any application limit is applied. |
 
 The rule-root equality constraints (§2.1) are always required regardless of `flexible`: a root-layer equality in the rule demands that its matched images be provably equal in the host.
 
@@ -67,6 +67,7 @@ Root-layer equality artefacts express that their children are provably equal in 
      - if the dependency has already been assigned a host image, the candidate's dependency must be that image itself, or — when `flexible` is `true` — provably equal to it;
      - if the dependency is not part of the pattern (e.g. it lives in a lower ancestor layer), the candidate's dependency must be that same host artefact, or provably equal to it when `flexible`;
      - the candidate must have every dependency of the pattern artefact defined.
+   - **artefact filter pruning**: with `mustInvolve` set, the contribution each assignment makes to `hostArtefacts` (the candidate itself plus the candidate's declared dependencies) is computed up front and tracked along the current branch. Branches that can no longer cover every required artefact are abandoned before descending, and candidates that fail to cover an artefact whose last covering slot is the current one are skipped. A required artefact no slot can cover rejects the rule without searching. In flexible mode, equality-class deduplication keeps a candidate whose coverage differs from the representative's, since coverage uses object identity rather than provable equality.
 4. **Final check**: once a complete assignment is found, every applicable equality constraint must hold — the assigned images must be pairwise equal via `host.areEqual`.
 5. **Deduplication**: when `flexible` is `true`, two applications are considered equivalent when every pattern artefact maps to the same host artefact or to host artefacts that are provably equal (`applicationsEquivalent`). Only one representative of each equivalence class is returned. When `flexible` is `false`, applications collapse only if every pattern artefact maps to exactly the same host artefact.
 
