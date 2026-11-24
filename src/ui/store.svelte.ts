@@ -156,7 +156,14 @@ export const ui = $state({
     // Name filter: the textbox value is live and cheap; only committing it
     // (Compute button / Enter) runs the expensive rule matching.
     ruleNameFilter: '',
-    computedRuleNameFilter: ''
+    computedRuleNameFilter: '',
+    // Sort filter for the artefact panel: '*' (the default) lists every declared
+    // sort, empty lists only sorts present in the drawing, anything else matches
+    // by substring. Still gated by the constructible filter when that is checked.
+    artefactSortFilter: '*',
+    // Restrict the panel to sorts whose dependencies can be picked from the
+    // drawing already; checked by default so unusable sorts stay out of the way.
+    constructibleSortsOnly: true
 });
 
 // ---------------------------------------------------------------------------
@@ -804,6 +811,26 @@ export function getArtefactLabel(art: Artefact): string {
 
 export function equalityChildren(art: { dependencies: Record<string, Artefact> }): Artefact[] {
     return Object.values(art.dependencies);
+}
+
+// Sort-filter semantics for the artefact panel: empty shows only sorts used by
+// the drawing, '*' shows all declared sorts (including unused ones), and any
+// other text is a case-insensitive substring of the sort name. Equality is a
+// built-in pseudo-sort whose artefacts are never subject to this filter.
+export function sortFilterMatches(name: string, query: string, hasArtefacts: boolean): boolean {
+    if (name === 'Equality') return true;
+    const needle = query.trim().toLowerCase();
+    if (needle === '') return hasArtefacts;
+    if (needle === '*') return true;
+    return name.toLowerCase().includes(needle);
+}
+
+// A sort is constructible when each of its dependency sorts already has an
+// artefact in the drawing, so a draft can be filled by picking them. Sorts with
+// no dependencies (including the built-in Equality sort) are always
+// constructible.
+export function isSortConstructible(sortDef: SortDefinition, presentSorts: Set<string>): boolean {
+    return Object.values(sortDef.dependencies).every(dep => presentSorts.has(dep));
 }
 
 // ---------------------------------------------------------------------------
