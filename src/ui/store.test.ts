@@ -4,7 +4,7 @@ import { getDrawing, drawingStore, ui, sortStore, rocqRecorder, syncProvedStatus
     resetInteractionState, togglePositionPicker, isPositionPickerActive, isDraftPickerActive,
     applyPickedPosition, startPositionPicker, selectArtefactToInspect, removeArtefactNode,
     toggleEqualityExtend, equalityChildren, onArtefactNodeClick, createDraftArtefact,
-    splitFirstOrderRecording, openProofEditor, closeProofEditor, updateDrawingProof, removeDrawingProofs, suggestAdmittedProof, toggleProofRecording /* runRecorderStep */,
+    splitFirstOrderRecording, isCompleteProofScript, openProofEditor, closeProofEditor, updateDrawingProof, removeDrawingProofs, suggestAdmittedProof, toggleProofRecording /* runRecorderStep */,
     closeCodeExport,
     setActiveDrawing, pendingProofCount, toggleAutoApplyEqualityRules, computeRuleApplications,
     startMergeMode, selectMergeArtefact, performMerge, unmarkInvalidRules,
@@ -670,6 +670,12 @@ describe('rocq recording proof attachment', () => {
         expect(drawingStore.getDrawing('Statement (proof) (2)')?.drawing).toBe(stmt);
     });
 
+    it('isCompleteProofScript recognizes only scripts closed by Qed', () => {
+        expect(isCompleteProofScript('Lemma x : True.\nexact I.\nQed.\n')).toBe(true);
+        expect(isCompleteProofScript('Lemma x : True.\nadmit.\nAdmitted.\n')).toBe(false);
+        expect(isCompleteProofScript(null)).toBe(false);
+    });
+
     it('rejects a snapshot that is not a first-order statement', () => {
         const nonStatement = new Drawing(sortStore);
         makeVertex(nonStatement, 'x');
@@ -800,8 +806,10 @@ describe('rocq recording proof attachment', () => {
         expect(rule?.drawing.isRule).toBe(true);
         expect(rule!.drawing.rocqProof).not.toBeNull();
         expect(rule!.drawing.rocqProof).toContain('Lemma Statement_rule :');
-        const working = drawingStore.getDrawing('Statement (proof)');
-        expect(working?.drawing).toBe(stmt);
+        // The proof closed with Qed., so the proof working drawing is removed.
+        expect(drawingStore.getDrawing('Statement (proof)')).toBeUndefined();
+        expect(ui.activeDrawingName).toBe('Statement');
+        expect(getDrawing()).toBe(rule!.drawing);
 
         expect(ui.proofEditorName).toBeNull();
         expect(ui.codeExport?.names).toEqual(['Statement']);
@@ -1197,6 +1205,42 @@ describe('proof recording subgoal navigation', () => {
         expect(drawingStore.getDrawing('Host (proof)')?.drawing).toBe(host);
     });
 
+    it('removes the whole proof tree once every goal of a recording closes', () => {
+        const host = buildHost();
+        drawingStore.addDrawing('Host', host);
+        buildSecondOrderRule(['Premise A', 'Premise B'], true);
+        setActiveDrawing('Host');
+
+        startRecording();
+        const [subA, subB] = applyRule();
+        expect(drawingStore.getDrawing(subA)).toBeDefined();
+        expect(drawingStore.getDrawing(subB)).toBeDefined();
+
+        // Solve the main goal too, so the recorded script closes with Qed. The
+        // two derived subgoals are provable on load and are discharged as the
+        // recorder walks through them.
+        const goal = goalLayerOfCurrentDrawing()!;
+        host.newArtefact(
+            'Edge',
+            { source: byLabel(host, 'b'), target: byLabel(host, 'a') },
+            { width: 2, bend: 0, label: 'back' },
+            'root'
+        );
+        expect(host.checkLayerProvable(goal.id).provable).toBe(true);
+        syncProvedStatus();
+
+        expect(rocqRecorder.isActive()).toBe(false);
+        expect(ui.activeDrawingName).toBe('Host');
+        const rule = drawingStore.getDrawing('Host');
+        expect(rule!.drawing.rocqProof).toContain('Qed.');
+        expect(rule!.drawing.rocqProof).not.toContain('Admitted.');
+        expect(drawingStore.getDrawing('Host (proof)')).toBeUndefined();
+        expect(drawingStore.getDrawing(subA)).toBeUndefined();
+        expect(drawingStore.getDrawing(subB)).toBeUndefined();
+        expect(ui.exportSelection.has('Host')).toBe(true);
+        expect(ui.exportSelection.has('Host (proof)')).toBe(false);
+    });
+
     it('solving the main goal with a pending subgoal loads that subgoal instead of stopping', () => {
         const host = buildHost();
         drawingStore.addDrawing('Host', host);
@@ -1239,6 +1283,8 @@ describe('proof recording subgoal navigation', () => {
         // The main goal is closed too, so the script ends with `Qed.`.
         expect(rule!.drawing.rocqProof).toContain('Qed.');
         expect(rule!.drawing.rocqProof).not.toContain('Admitted.');
+        expect(drawingStore.getDrawing('Statement (proof)')).toBeUndefined();
+        expect(ui.activeDrawingName).toBe('Statement');
     });
 
     it('a rule application that solves the main goal with no subgoal pending stops the recording', () => {

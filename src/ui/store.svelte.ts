@@ -939,6 +939,12 @@ export function uniqueProofDrawingName(baseName: string): string {
     return candidate;
 }
 
+// The recorder emits a trailing `Qed.` only when the main goal and every inline
+// subgoal are closed; a partial proof ends with `Admitted.` instead.
+export function isCompleteProofScript(script: string | null): boolean {
+    return script?.trimEnd().endsWith('Qed.') ?? false;
+}
+
 export function splitFirstOrderRecording(name: string, snapshot: Drawing, rocqScript: string | null): { proofName: string } {
     if (getFirstOrderStatementChildLayer(snapshot) === null) {
         throw new Error(`Consistency Check Failed: Drawing '${name}' is not a first-order statement; the recording cannot be attached as a rule proof.`);
@@ -1479,7 +1485,18 @@ export function toggleProofRecording(): void {
 
             try {
                 const { proofName } = splitFirstOrderRecording(mainName!, snapshot!, rocqScript);
-                pushToast('info', `Proof recording saved: '${mainName}' is now a rule carrying its proof; the proof-working drawing is '${proofName}'.`);
+                const proofCompleted = isCompleteProofScript(rocqScript);
+                if (proofCompleted) {
+                    // Delete the working tree only after moving the canvas to the
+                    // rule drawing that now owns the attached proof. Deleting the
+                    // root also removes every derived subgoal drawing beneath it.
+                    setActiveDrawing(mainName!);
+                    drawingStore.deleteDrawing(proofName);
+                    ui.exportSelection.delete(proofName);
+                }
+                pushToast('info', proofCompleted
+                    ? `Proof recording saved: '${mainName}' now carries its completed proof; the proof drawing and its subgoals were removed.`
+                    : `Proof recording saved: '${mainName}' is now a rule carrying its proof; the proof-working drawing is '${proofName}'.`);
                 // Open the proof export window with the recorded proof checked
                 // together with every rule it used, so the exported code is
                 // self-contained. Used rules come first: the recorded proof
