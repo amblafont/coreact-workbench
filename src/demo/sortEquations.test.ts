@@ -7,7 +7,7 @@ import {
     type Artefact
 } from '../index.svelte.ts';
 import { exportDrawingsToRocq } from '../rocq_export.ts';
-import { parseHrx } from '../hrx/codec.ts';
+import { parseHrx, serializeHrx } from '../hrx/codec.ts';
 import { exportHrx } from '../hrx/export.ts';
 import { loadHrxArchive } from '../hrx/load.ts';
 import { newSortStore, makeVertex, makeEdge } from './helpers.ts';
@@ -19,6 +19,23 @@ function triangleEdges(drawing: Drawing): Record<string, Artefact> {
         '2': makeEdge(drawing, 'e2', v, v),
         o: makeEdge(drawing, 'o', v, v)
     };
+}
+
+function triangleHrx(): string {
+    const sortStore = newSortStore();
+    const drawing = new Drawing(sortStore);
+    drawing.newArtefact('Triangle', triangleEdges(drawing), {}, 'root');
+    const drawingStore = new DrawingStore();
+    drawingStore.addDrawing('TriangleDrawing', drawing);
+    return exportHrx(['TriangleDrawing'], sortStore, drawingStore);
+}
+
+function removeTriangleEquations(hrx: string): string {
+    const sections = parseHrx(hrx).sections;
+    const records = JSON.parse(sections.get('sorts.json')!) as Array<{ name: string; equations?: string[] }>;
+    delete records.find(record => record.name === 'Triangle')!.equations;
+    sections.set('sorts.json', `${JSON.stringify(records, null, 2)}\n`);
+    return serializeHrx(sections);
 }
 
 describe('sort equations', () => {
@@ -149,6 +166,125 @@ describe('sort equations', () => {
         legacySorts.newSort('Triangle', { '1': 'Edge', '2': 'Edge', o: 'Edge' }, {}, () => null);
         expect(() => loadHrxArchive(hrx, legacySorts, new DrawingStore()))
             .toThrow(/different dependencies, data fields, or equations/);
+    });
+
+    it('asks before keeping stronger equations when an imported sort declares fewer', () => {
+        const sections = parseHrx(removeTriangleEquations(triangleHrx())).sections;
+        sections.set('js/cancelProbe.js', 'return 1;\n');
+        const archive = serializeHrx(sections);
+
+        const asked: Array<{ name: string; existing: string[]; imported: string[] }> = [];
+        const acceptedSorts = newSortStore();
+        const accepted = loadHrxArchive(archive, acceptedSorts, new DrawingStore(), {
+            resolveSortEquationConflict: (name, existing, imported) => {
+                asked.push({ name, existing, imported });
+                return true;
+            }
+        });
+        expect(asked).toEqual([{
+            name: 'Triangle',
+            existing: [
+                '1.source = o.source',
+                '1.target = 2.source',
+                '2.target = o.target'
+            ],
+            imported: []
+        }]);
+        expect(accepted.sortsKeptWithExistingEquations).toEqual(['Triangle']);
+        expect(accepted.modulesAdded).toContain('cancelProbe');
+        expect(acceptedSorts.getModuleSource('cancelProbe')).toBeDefined();
+        expect(acceptedSorts.getSort('Triangle')!.equations.map(equation => equation.raw)).toEqual([
+            '1.source = o.source',
+            '1.target = 2.source',
+            '2.target = o.target'
+        ]);
+
+        const cancelledSorts = newSortStore();
+        let prompts = 0;
+        expect(() => loadHrxArchive(archive, cancelledSorts, new DrawingStore(), {
+            resolveSortEquationConflict: () => {
+                prompts++;
+                return false;
+            }
+        })).toThrow(/Import cancelled: sort 'Triangle' declares fewer equations/);
+        expect(prompts).toBe(1);
+        expect(cancelledSorts.getModuleSource('cancelProbe')).toBeUndefined();
+
+        expect(() => loadHrxArchive(archive, newSortStore(), new DrawingStore()))
+            .toThrow(/declares fewer equations/);
+    });
+
+    it('treats chained and pairwise equations as equivalent without prompting', () => {
+        const deps = { a: 'Edge', b: 'Edge', c: 'Edge' };
+        const archiveSorts = newSortStore();
+        archiveSorts.newSort('Chain', deps, {}, () => null, undefined, [
+            'a.source = b.source = c.source'
+        ]);
+        archiveSorts.setSortSource('Chain', { drawBody: 'return null;', requires: [] });
+        const archiveDrawing = new Drawing(archiveSorts);
+        const v = makeVertex(archiveDrawing, 'v');
+        archiveDrawing.newArtefact('Chain', {
+            a: makeEdge(archiveDrawing, 'a', v, v),
+            b: makeEdge(archiveDrawing, 'b', v, v),
+            c: makeEdge(archiveDrawing, 'c', v, v)
+        }, {}, 'root');
+        const archiveStore = new DrawingStore();
+        archiveStore.addDrawing('ChainDrawing', archiveDrawing);
+        const archive = exportHrx(['ChainDrawing'], archiveSorts, archiveStore);
+
+        const workspace = newSortStore();
+        workspace.newSort('Chain', deps, {}, () => null, undefined, [
+            'a.source = b.source',
+            'b.source = c.source'
+        ]);
+        let prompts = 0;
+        const result = loadHrxArchive(archive, workspace, new DrawingStore(), {
+            resolveSortEquationConflict: () => {
+                prompts++;
+                return true;
+            }
+        });
+        expect(prompts).toBe(0);
+        expect(result.sortsKept).toContain('Chain');
+        expect(result.sortsKeptWithExistingEquations).toEqual([]);
+        expect(workspace.getSort('Chain')!.equations.map(equation => equation.raw)).toEqual([
+            'a.source = b.source',
+            'b.source = c.source'
+        ]);
+    });
+
+    it('still rejects imported sorts with stronger or incompatible equations', () => {
+        const sortStore = newSortStore();
+        sortStore.getSort('Triangle')!.equations = [];
+        let prompts = 0;
+        expect(() => loadHrxArchive(triangleHrx(), sortStore, new DrawingStore(), {
+            resolveSortEquationConflict: () => {
+                prompts++;
+                return true;
+            }
+        })).toThrow(/different dependencies, data fields, or equations/);
+        expect(prompts).toBe(0);
+    });
+
+    it('rejects an imported drawing that breaks equations kept from the existing sort', () => {
+        const sourceSorts = newSortStore();
+        sourceSorts.getSort('Triangle')!.equations = [];
+        const drawing = new Drawing(sourceSorts);
+        const a = makeVertex(drawing, 'a');
+        const b = makeVertex(drawing, 'b');
+        const c = makeVertex(drawing, 'c');
+        drawing.newArtefact('Triangle', {
+            '1': makeEdge(drawing, 'ac', a, c),
+            '2': makeEdge(drawing, 'cb', c, b),
+            o: makeEdge(drawing, 'ba', b, a)
+        }, {}, 'root');
+        const sourceStore = new DrawingStore();
+        sourceStore.addDrawing('InvalidTriangle', drawing);
+        const archive = exportHrx(['InvalidTriangle'], sourceSorts, sourceStore);
+
+        expect(() => loadHrxArchive(archive, newSortStore(), new DrawingStore(), {
+            resolveSortEquationConflict: () => true
+        })).toThrow(/violates equation/);
     });
 
     it('constrains rule matching and provability checks by sort equations', () => {

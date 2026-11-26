@@ -13,11 +13,23 @@ export interface HrxLoadOptions {
         existing: SavedDrawing,
         imported: SavedDrawing
     ) => 'keepExisting' | 'keepImported';
+    /**
+     * Called when the archive declares fewer equations than an existing sort.
+     * Returning `true` keeps the existing sort and its equations; returning
+     * `false` cancels the import.
+     */
+    resolveSortEquationConflict?: (
+        name: string,
+        existingEquations: string[],
+        importedEquations: string[]
+    ) => boolean;
 }
 
 export interface HrxLoadResult {
     sortsAdded: string[];
     sortsKept: string[];
+    /** Sorts whose imported equations were weaker and were discarded on approval. */
+    sortsKeptWithExistingEquations: string[];
     modulesAdded: string[];
     drawings: Array<{ name: string; requestedName: string; action: 'added' | 'renamed' | 'kept' | 'replaced' }>;
 }
@@ -54,16 +66,75 @@ function stable(value: unknown): string {
     return JSON.stringify(value) ?? 'null';
 }
 
-function canonicalEquations(equations: string[]): string[] {
-    return equations.map(raw => raw.split('=').map(term => term.trim()).join(' = '));
+/** Parse equations into canonical path keys without depending on sort sources. */
+function parseEquationPaths(equations: string[], sortName: string): string[][] {
+    return equations.map(raw => {
+        const terms = raw.split('=').map(term => term.trim());
+        if (terms.length < 2 || terms.some(term => term.length === 0)) {
+            throw new Error(`Consistency Check Failed: Invalid equation '${raw}' in sort '${sortName}'.`);
+        }
+        return terms.map(term => {
+            const segments = term.split('.');
+            if (segments.some(segment => segment.length === 0)) {
+                throw new Error(`Consistency Check Failed: Invalid dependency path '${term}' in equation '${raw}' of sort '${sortName}'.`);
+            }
+            return JSON.stringify(segments);
+        });
+    });
 }
 
-function schemaOf(
-    deps: Record<string, string>,
-    data: Record<string, AttributeType>,
-    equations: string[]
-): string {
-    return stable({ deps, data, equations: canonicalEquations(equations) });
+/** Convert parsed path segments to the same canonical keys used above. */
+function canonicalizePaths(equations: string[][][]): string[][] {
+    return equations.map(paths => paths.map(path => JSON.stringify(path)));
+}
+
+/**
+ * Normalize equations into equality classes. This makes `a = b = c` equivalent
+ * to `a = b` plus `b = c`, regardless of declaration order or duplicates.
+ */
+function equationClasses(equations: string[][]): string[][] {
+    const parent = new Map<string, string>();
+    const find = (key: string): string => {
+        const current = parent.get(key);
+        if (current === undefined) {
+            parent.set(key, key);
+            return key;
+        }
+        if (current === key) return key;
+        const root = find(current);
+        parent.set(key, root);
+        return root;
+    };
+
+    for (const paths of equations) {
+        if (paths.length === 0) continue;
+        const first = find(paths[0]);
+        for (let i = 1; i < paths.length; i++) {
+            const root = find(paths[i]);
+            if (root !== first) parent.set(root, first);
+        }
+    }
+
+    const groups = new Map<string, string[]>();
+    for (const key of parent.keys()) {
+        const root = find(key);
+        const group = groups.get(root) ?? [];
+        group.push(key);
+        groups.set(root, group);
+    }
+    return Array.from(groups.values())
+        .map(group => group.sort())
+        .sort((a, b) => stable(a).localeCompare(stable(b)));
+}
+
+function classesEqual(left: string[][], right: string[][]): boolean {
+    return left.length === right.length && left.every((entry, index) => stable(entry) === stable(right[index]));
+}
+
+/** True when every imported equality class is contained in an existing class. */
+function classesAreWeaker(imported: string[][], existing: string[][]): boolean {
+    const existingSets = existing.map(entry => new Set(entry));
+    return imported.every(entry => existingSets.some(set => entry.every(path => set.has(path))));
 }
 
 function parseSortRecords(text: string): HrxSortRecord[] {
@@ -106,8 +177,10 @@ function relativeSectionPaths(sections: Map<string, string>, prefix: string): st
  * Load an HRX archive into the existing workspace.
  *
  * Sorts and modules are merged: matching definitions are kept from the
- * workspace, while new ones are registered from the archive. Drawings are
- * merged with the duplicate policy requested by the caller.
+ * workspace, while new ones are registered from the archive. If an archive
+ * sort declares fewer equations than the existing sort, the caller is asked
+ * whether to keep the stronger existing definition. Drawings are merged with
+ * the duplicate policy requested by the caller.
  */
 export function loadHrxArchive(
     text: string,
@@ -151,7 +224,6 @@ export function loadHrxArchive(
             continue;
         }
         modules.set(name, imported);
-        sortStore.registerModuleSource(name, imported);
         modulesAdded.push(name);
     }
 
@@ -166,8 +238,16 @@ export function loadHrxArchive(
             : []
     ).map(name => sortRecords.find(record => record.name === name)!);
 
+    type SortDecision =
+        | { record: HrxSortRecord; keepExisting: true }
+        | { record: HrxSortRecord; keepExisting: false; drawFunction: (data: any, context: any) => any };
+
+    // Validate everything before mutating the workspace so that declining an
+    // equation prompt cannot leave half-imported modules or sorts behind.
+    const sortDecisions: SortDecision[] = [];
     const sortsAdded: string[] = [];
     const sortsKept: string[] = [];
+    const sortsKeptWithExistingEquations: string[] = [];
     for (const record of orderedRecords) {
         const body = importedSortSources.get(record.name);
         if (body === undefined) {
@@ -176,18 +256,63 @@ export function loadHrxArchive(
 
         const existing = sortStore.getSort(record.name);
         if (existing) {
-            if (schemaOf(existing.dependencies, existing.attributes, existing.equations.map(eq => eq.raw)) !==
-                schemaOf(record.deps, record.data, record.equations)) {
+            if (stable(existing.dependencies) !== stable(record.deps) ||
+                stable(existing.attributes) !== stable(record.data)) {
                 throw new Error(
                     `Consistency Check Failed: Sort '${record.name}' already exists with different dependencies, data fields, or equations.`
                 );
             }
+
+            const existingClasses = equationClasses(
+                canonicalizePaths(existing.equations.map(equation => equation.paths))
+            );
+            const importedClasses = equationClasses(parseEquationPaths(record.equations, record.name));
+            if (!classesEqual(existingClasses, importedClasses)) {
+                if (!classesAreWeaker(importedClasses, existingClasses)) {
+                    throw new Error(
+                        `Consistency Check Failed: Sort '${record.name}' already exists with different dependencies, data fields, or equations.`
+                    );
+                }
+                const approved = options.resolveSortEquationConflict?.(
+                    record.name,
+                    existing.equations.map(equation => equation.raw),
+                    record.equations
+                ) === true;
+                if (!approved) {
+                    throw new Error(
+                        `Import cancelled: sort '${record.name}' declares fewer equations than the existing sort.`
+                    );
+                }
+                sortsKeptWithExistingEquations.push(record.name);
+            }
             sortsKept.push(record.name);
+            sortDecisions.push({ record, keepExisting: true });
             continue;
         }
 
-        const drawFunction = compileDrawFunction(body, api);
-        sortStore.newSort(record.name, record.deps, record.data, drawFunction, undefined, record.equations);
+        sortDecisions.push({
+            record,
+            keepExisting: false,
+            drawFunction: compileDrawFunction(body, api)
+        });
+    }
+
+    const committedModules = new Set(modulesAdded);
+    for (const name of committedModules) {
+        sortStore.registerModuleSource(name, modules.get(name)!);
+    }
+    for (const decision of sortDecisions) {
+        if (decision.keepExisting) continue;
+        const { record } = decision;
+        const body = importedSortSources.get(record.name)!;
+        sortStore.newSort(
+            record.name,
+            record.deps,
+            record.data,
+            decision.drawFunction,
+            undefined,
+            record.equations
+        );
         sortStore.setSortSource(record.name, { drawBody: body, requires: parseRequires(body) });
         sortsAdded.push(record.name);
     }
@@ -202,5 +327,5 @@ export function loadHrxArchive(
         drawings.push(drawingStore.importSavedDrawingWithPolicy(drawing, sortStore, resolveConflict));
     }
 
-    return { sortsAdded, sortsKept, modulesAdded, drawings };
+    return { sortsAdded, sortsKept, sortsKeptWithExistingEquations, modulesAdded, drawings };
 }

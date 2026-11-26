@@ -1418,6 +1418,12 @@ export async function importDrawingsFile(file: File): Promise<void> {
     }
 }
 
+function formatEquationList(equations: string[]): string {
+    return equations.length > 0
+        ? equations.map(equation => `  - ${equation}`).join('\n')
+        : '  (none)';
+}
+
 export async function importHrxFile(file: File): Promise<void> {
     const text = await file.text();
     try {
@@ -1429,12 +1435,26 @@ export async function importHrxFile(file: File): Promise<void> {
                     'Cancel: keep the existing data.'
                 ].join('\n\n');
                 return confirm(message) ? 'keepImported' : 'keepExisting';
+            },
+            resolveSortEquationConflict: (name, existingEquations, importedEquations) => {
+                const message = [
+                    `Sort '${name}' in the archive has fewer equations than the existing sort.`,
+                    `Existing equations:\n${formatEquationList(existingEquations)}`,
+                    `Imported equations:\n${formatEquationList(importedEquations)}`,
+                    '',
+                    'OK: keep the existing sort and its equations.',
+                    'Cancel: abort the import.'
+                ].join('\n\n');
+                return confirm(message);
             }
         });
 
         const parts: string[] = [];
         if (result.sortsAdded.length > 0) {
             parts.push(`added sorts: ${result.sortsAdded.join(', ')}`);
+        }
+        if (result.sortsKeptWithExistingEquations.length > 0) {
+            parts.push(`kept existing equations for sorts: ${result.sortsKeptWithExistingEquations.join(', ')}`);
         }
         if (result.modulesAdded.length > 0) {
             parts.push(`added modules: ${result.modulesAdded.join(', ')}`);
