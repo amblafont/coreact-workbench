@@ -42,6 +42,7 @@ export function registerDefaultSorts(sortStore: SortStore): void {
         name: string;
         data: Record<string, unknown>;
         deps: Record<string, string>;
+        equations?: string[];
     }>;
     for (const record of records) {
         const draw = drawFunctions[record.name];
@@ -53,7 +54,9 @@ export function registerDefaultSorts(sortStore: SortStore): void {
             record.name,
             record.deps,
             record.data as Record<string, AttributeType>,
-            compileDrawFunction(drawBody, api)
+            compileDrawFunction(drawBody, api),
+            undefined,
+            record.equations
         );
         sortStore.setSortSource(record.name, {
             drawBody,

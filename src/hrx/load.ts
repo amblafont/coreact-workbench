@@ -26,6 +26,7 @@ interface HrxSortRecord {
     name: string;
     data: Record<string, AttributeType>;
     deps: Record<string, string>;
+    equations: string[];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -53,8 +54,16 @@ function stable(value: unknown): string {
     return JSON.stringify(value) ?? 'null';
 }
 
-function schemaOf(deps: Record<string, string>, data: Record<string, AttributeType>): string {
-    return stable({ deps, data });
+function canonicalEquations(equations: string[]): string[] {
+    return equations.map(raw => raw.split('=').map(term => term.trim()).join(' = '));
+}
+
+function schemaOf(
+    deps: Record<string, string>,
+    data: Record<string, AttributeType>,
+    equations: string[]
+): string {
+    return stable({ deps, data, equations: canonicalEquations(equations) });
 }
 
 function parseSortRecords(text: string): HrxSortRecord[] {
@@ -74,10 +83,15 @@ function parseSortRecords(text: string): HrxSortRecord[] {
                 throw new Error(`Consistency Check Failed: Dependency '${depKey}' of sort '${item.name}' must name a sort.`);
             }
         }
+        const equations = item.equations ?? [];
+        if (!Array.isArray(equations) || equations.some(equation => typeof equation !== 'string')) {
+            throw new Error(`Consistency Check Failed: Field 'equations' of sort '${item.name}' must be an array of strings.`);
+        }
         return {
             name: item.name.trim(),
             data: item.data as Record<string, AttributeType>,
-            deps: item.deps as Record<string, string>
+            deps: item.deps as Record<string, string>,
+            equations: equations as string[]
         };
     });
 }
@@ -162,9 +176,10 @@ export function loadHrxArchive(
 
         const existing = sortStore.getSort(record.name);
         if (existing) {
-            if (schemaOf(existing.dependencies, existing.attributes) !== schemaOf(record.deps, record.data)) {
+            if (schemaOf(existing.dependencies, existing.attributes, existing.equations.map(eq => eq.raw)) !==
+                schemaOf(record.deps, record.data, record.equations)) {
                 throw new Error(
-                    `Consistency Check Failed: Sort '${record.name}' already exists with different dependencies or data fields.`
+                    `Consistency Check Failed: Sort '${record.name}' already exists with different dependencies, data fields, or equations.`
                 );
             }
             sortsKept.push(record.name);
@@ -172,7 +187,7 @@ export function loadHrxArchive(
         }
 
         const drawFunction = compileDrawFunction(body, api);
-        sortStore.newSort(record.name, record.deps, record.data, drawFunction);
+        sortStore.newSort(record.name, record.deps, record.data, drawFunction, undefined, record.equations);
         sortStore.setSortSource(record.name, { drawBody: body, requires: parseRequires(body) });
         sortsAdded.push(record.name);
     }

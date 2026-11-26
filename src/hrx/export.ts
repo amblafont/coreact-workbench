@@ -32,7 +32,7 @@ export function exportHrx(names: string[], sortStore: SortStore, drawingStore: D
     }
 
     const sortNames = sortStore.getSortNames().filter(name => neededSorts.has(name));
-    const sortRecords: Array<{ name: string; data: unknown; deps: Record<string, string> }> = [];
+    const sortRecords: Array<{ name: string; data: unknown; deps: Record<string, string>; equations: string[] }> = [];
     const sortBodies = new Map<string, string>();
 
     for (const name of sortNames) {
@@ -41,7 +41,12 @@ export function exportHrx(names: string[], sortStore: SortStore, drawingStore: D
         if (!source) {
             throw new Error(`Consistency Check Failed: No source is available for sort '${name}'.`);
         }
-        sortRecords.push({ name, data: def.attributes, deps: def.dependencies });
+        sortRecords.push({
+            name,
+            data: def.attributes,
+            deps: def.dependencies,
+            equations: def.equations.map(equation => equation.raw)
+        });
         sortBodies.set(name, `${source.drawBody.replace(/\s+$/, '')}\n`);
     }
 

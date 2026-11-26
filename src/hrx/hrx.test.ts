@@ -144,7 +144,7 @@ describe('HRX merge policy', () => {
         const drawingStore = new DrawingStore();
         sortStore.newSort('Vertex', {}, { position: 'position', label: 'string' }, () => null);
 
-        expect(() => loadHrxArchive(EXAMPLE, sortStore, drawingStore)).toThrow(/different dependencies or data fields/);
+        expect(() => loadHrxArchive(EXAMPLE, sortStore, drawingStore)).toThrow(/different dependencies, data fields, or equations/);
     });
 
     it('keeps an existing matching sort definition', () => {

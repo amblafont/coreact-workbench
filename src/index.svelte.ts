@@ -35,12 +35,98 @@ export interface SortSource {
     requires: string[];
 }
 
+/**
+ * An equality between dependency paths of a sort.
+ *
+ * `paths` is a list because equality artefacts are n-ary: every path in the
+ * list denotes an artefact that must be provably equal to the first one.
+ */
+export interface SortEquation {
+    paths: string[][];
+    /** Original declaration, kept for diagnostics and HRX round-trips. */
+    raw: string;
+}
+
+/** Parse and validate the equations declared by a sort. */
+export function parseSortEquations(
+    sortName: string,
+    dependencies: Record<string, string>,
+    equations: string[],
+    getSort: (name: string) => SortDefinition | undefined
+): SortEquation[] {
+    return equations.map((raw, index) => {
+        if (typeof raw !== "string") {
+            throw new Error(`Consistency Check Failed: Equation ${index + 1} of sort '${sortName}' is not a string.`);
+        }
+        const terms = raw.split("=").map(term => term.trim());
+        if (terms.length < 2 || terms.some(term => term.length === 0)) {
+            throw new Error(`Consistency Check Failed: Invalid equation '${raw}' in sort '${sortName}'; expected 'path = path'.`);
+        }
+
+        const paths: string[][] = [];
+        let expectedLeafSort: string | null = null;
+        for (const term of terms) {
+            const segments = term.split(".");
+            if (segments.some(segment => segment.length === 0)) {
+                throw new Error(`Consistency Check Failed: Invalid dependency path '${term}' in equation '${raw}' of sort '${sortName}'.`);
+            }
+            let currentSort: SortDefinition = { name: sortName, dependencies, attributes: {}, drawFunction: () => null, equations: [] };
+            let leafSort = "";
+            for (const segment of segments) {
+                const depSortName = currentSort.dependencies[segment];
+                if (!depSortName) {
+                    throw new Error(`Consistency Check Failed: Dependency path '${term}' in equation '${raw}' of sort '${sortName}' references unknown dependency '${segment}'.`);
+                }
+                const depSort = getSort(depSortName);
+                if (!depSort) {
+                    throw new Error(`Consistency Check Failed: Dependency path '${term}' in equation '${raw}' of sort '${sortName}' references undefined sort '${depSortName}'.`);
+                }
+                currentSort = depSort;
+                leafSort = depSortName;
+            }
+            // Only leaf paths (depth >= 2) can be identified with a variable in
+            // the Rocq header; direct dependencies are their own binders.
+            if (segments.length < 2 || Object.keys(currentSort.dependencies).length > 0) {
+                throw new Error(`Consistency Check Failed: Dependency path '${term}' in equation '${raw}' of sort '${sortName}' must end at a dependency with no dependencies of its own.`);
+            }
+            if (expectedLeafSort === null) {
+                expectedLeafSort = leafSort;
+            } else if (expectedLeafSort !== leafSort) {
+                throw new Error(`Consistency Check Failed: Equation '${raw}' of sort '${sortName}' equates paths of sorts '${expectedLeafSort}' and '${leafSort}'.`);
+            }
+            paths.push(segments);
+        }
+        return { paths, raw };
+    });
+}
+
+/** Resolve a dependency path (e.g. `["1", "source"]`) on an artefact. */
+export function resolveDependencyPath(art: Artefact, path: string[]): Artefact {
+    const resolved = tryResolveDependencyPath(art, path);
+    if (!resolved) {
+        throw new Error(`Consistency Check Failed: Artefact '${art.data.label || art.sortName}' is missing a dependency required by a sort equation.`);
+    }
+    return resolved;
+}
+
+/** Non-throwing variant used while a rule match is only partially assigned. */
+function tryResolveDependencyPath(art: Artefact, path: string[]): Artefact | undefined {
+    let current: Artefact | undefined = art;
+    for (const segment of path) {
+        current = current?.dependencies[segment];
+        if (!current) return undefined;
+    }
+    return current;
+}
+
 export interface SortDefinition {
     name: string;
     dependencies: Record<string, string>;
     attributes: Record<string, AttributeType>;
     drawFunction: (data: any, context: D3Context) => D3Context | null; // Now returns the element
     initContext?: (context: D3Context) => void;
+    /** Equalities that the artefact's dependency paths must satisfy. */
+    equations: SortEquation[];
     /** Source text for HRX export; absent for sorts without a known source. */
     source?: SortSource;
 }
@@ -101,7 +187,8 @@ export class SortStore {
             name: "Equality",
             dependencies: {},
             attributes: {},
-            drawFunction: () => null
+            drawFunction: () => null,
+            equations: []
         });
     }
 
@@ -129,7 +216,8 @@ export class SortStore {
         dependencies: Record<string, string>,
         attributes: Record<string, AttributeType>,
         drawFunction: (data: any, context: D3Context) => D3Context | null,
-        initContext?: (context: D3Context) => void
+        initContext?: (context: D3Context) => void,
+        equations: string[] = []
     ): this {
         if (this.sorts.has(name)) {
             throw new Error(`Consistency Check Failed: Sort '${name}' is already defined.`);
@@ -144,6 +232,10 @@ export class SortStore {
                 throw new Error(`Consistency Check Failed: Dependency sort '${depSortName}' for dependency '${depKey}' in sort '${name}' is not defined.`);
             }
         }
+
+        // Equations are paths through those dependencies; validate them now so
+        // later artefact checks and the Rocq exporter can trust the shape.
+        const parsedEquations = parseSortEquations(name, dependencies, equations, key => this.sorts.get(key));
 
         // Validate attribute types
         const validTypeNames = ["number", "string", "boolean", "position", "slider", "relativePosition"];
@@ -189,7 +281,8 @@ export class SortStore {
             dependencies,
             attributes,
             drawFunction,
-            initContext
+            initContext,
+            equations: parsedEquations
         });
 
         return this; // Enable chaining
@@ -613,6 +706,33 @@ export class Drawing {
                 }
                 if (!ok) continue;
 
+                const sortDef = this.sortStore.getSort(a.sortName);
+                for (const equation of sortDef?.equations ?? []) {
+                    const endpoints = equation.paths.map(path => tryResolveDependencyPath(a, path));
+                    const hosts = equation.paths.map(path => tryResolveDependencyPath(cand, path));
+                    if (endpoints.some(endpoint => endpoint === undefined) || hosts.some(host => host === undefined)) {
+                        ok = false;
+                        break;
+                    }
+                    const values = endpoints.map(endpoint =>
+                        endpoint && patternSet.has(endpoint) ? assignment.get(endpoint) : endpoint
+                    );
+                    if (values.some(value => value === undefined)) {
+                        ok = false;
+                        break;
+                    }
+                    for (let i = 1; i < values.length; i++) {
+                        if (!this.areEqual(hosts[0]!, values[0]!, parentId)
+                            || !this.areEqual(hosts[0]!, hosts[i]!, parentId)
+                            || !this.areEqual(values[0]!, values[i]!, parentId)) {
+                            ok = false;
+                            break;
+                        }
+                    }
+                    if (!ok) break;
+                }
+                if (!ok) continue;
+
                 assignment.set(a, cand);
                 if (backtrack(i + 1)) {
                     return true;
@@ -870,6 +990,7 @@ export class Drawing {
                     this.validateEqualityDependencies(artefactChildren(art), targetLayerId);
                 }
             }
+            this.validateDrawingEquations();
         } catch (err) {
             for (const [art, layerId] of previousLayers) {
                 art.layerId = layerId;
@@ -953,6 +1074,82 @@ export class Drawing {
     public areEqual(a: Artefact, b: Artefact, layerId: string): boolean {
         if (a === b) return true;
         return isEqualityConnected(buildEqualityAdjacency(this, layerId), a, b);
+    }
+
+    /**
+     * Check an artefact's sort equations against the given artefact list.
+     * All paths in one equation denote artefacts that must be provably equal.
+     */
+    public validateSortEquations(
+        art: Artefact,
+        artefacts: readonly Artefact[] = this.artefacts,
+        layerId: string = art.layerId
+    ): void {
+        const def = this.sortStore.getSort(art.sortName);
+        if (!def || def.equations.length === 0) return;
+        const adj = buildEqualityAdjacencyFor(artefacts, this.getAncestors(layerId));
+        for (const eq of def.equations) {
+            const endpoints = eq.paths.map(path => resolveDependencyPath(art, path));
+            const first = endpoints[0];
+            for (let i = 1; i < endpoints.length; i++) {
+                if (!isEqualityConnected(adj, first, endpoints[i])) {
+                    throw new Error(
+                        `Consistency Check Failed: Artefact '${art.data.label || art.sortName}' (sort '${art.sortName}') violates equation '${eq.raw}': ` +
+                        `'${first.data.label || first.sortName}' and '${endpoints[i].data.label || endpoints[i].sortName}' are not provably equal.`
+                    );
+                }
+            }
+        }
+    }
+
+    /** Check every artefact in a drawing against its sort equations. */
+    public validateDrawingEquations(artefacts: readonly Artefact[] = this.artefacts): void {
+        const adjByLayer = new Map<string, Map<Artefact, Set<Artefact>>>();
+        for (const art of artefacts) {
+            const def = this.sortStore.getSort(art.sortName);
+            if (!def || def.equations.length === 0) continue;
+            let adj = adjByLayer.get(art.layerId);
+            if (!adj) {
+                adj = buildEqualityAdjacencyFor(artefacts, this.getAncestors(art.layerId));
+                adjByLayer.set(art.layerId, adj);
+            }
+            for (const eq of def.equations) {
+                const endpoints = eq.paths.map(path => resolveDependencyPath(art, path));
+                const first = endpoints[0];
+                for (let i = 1; i < endpoints.length; i++) {
+                    if (!isEqualityConnected(adj, first, endpoints[i])) {
+                        throw new Error(
+                            `Consistency Check Failed: Artefact '${art.data.label || art.sortName}' (sort '${art.sortName}') violates equation '${eq.raw}': ` +
+                            `'${first.data.label || first.sortName}' and '${endpoints[i].data.label || endpoints[i].sortName}' are not provably equal.`
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Run a mutation that may invalidate sort equations. On failure the drawing
+     * is restored so a rejected edit never leaves it in an inconsistent state.
+     */
+    private validatedMutation<T>(mutate: () => T): T {
+        const savedArtefacts = this.artefacts;
+        const savedDependencies = savedArtefacts.map(art => [art, art.dependencies] as const);
+        const savedData = savedArtefacts.map(art => [art, { ...art.data }] as const);
+        const savedChildren = savedArtefacts
+            .filter((art): art is EqualityArtefact => art instanceof EqualityArtefact)
+            .map(art => [art, art.children] as const);
+        try {
+            const result = mutate();
+            this.validateDrawingEquations();
+            return result;
+        } catch (error) {
+            this.artefacts = savedArtefacts;
+            for (const [art, deps] of savedDependencies) art.dependencies = deps;
+            for (const [art, data] of savedData) art.data = data;
+            for (const [art, children] of savedChildren) art.setChildren(children);
+            throw error;
+        }
     }
 
     public validateEqualityDependencies(artefacts: Artefact[], layerId: string): void {
@@ -1083,7 +1280,8 @@ export class Drawing {
         sortName: string,
         dependencies: Record<string, Artefact>,
         data: Record<string, any>,
-        layerId?: string
+        layerId?: string,
+        validateEquations: boolean = true
     ): Artefact {
         if (sortName === "Equality") {
             const children: Artefact[] = [];
@@ -1170,6 +1368,9 @@ export class Drawing {
         }
 
         const artefact = new Artefact(this.mintId(), sortName, { ...dependencies }, resolvedData, sortDef.drawFunction, targetLayerId);
+        if (validateEquations) {
+            this.validateSortEquations(artefact);
+        }
         this.artefacts.push(artefact);
         
         return artefact;
@@ -1388,29 +1589,32 @@ export class Drawing {
     }
 
     removeArtefact(target: Artefact): void {
-        this.artefacts = this.artefacts.filter(art => !art.getSelfAndDependencies().has(target));
-        // Remove any equality artefacts whose children count fell below 2
-        this.artefacts = this.artefacts.filter(art => {
-            if (art.sortName === "Equality") {
-                const children = artefactChildren(art);
-                return children.length >= 2;
-            }
-            return true;
+        this.validatedMutation(() => {
+            this.artefacts = this.artefacts.filter(art => !art.getSelfAndDependencies().has(target));
+            // Remove any equality artefacts whose children count fell below 2
+            this.artefacts = this.artefacts.filter(art => {
+                if (art.sortName === "Equality") {
+                    const children = artefactChildren(art);
+                    return children.length >= 2;
+                }
+                return true;
+            });
         });
     }
 
     removeEqualityChild(eq: Artefact, childToRemove: Artefact): void {
         if (eq.sortName !== "Equality") return;
 
-        const currentChildren = artefactChildren(eq);
-
-        const remaining = currentChildren.filter(c => c !== childToRemove);
-        if (remaining.length < 2) {
-            this.artefacts = this.artefacts.filter(art => art !== eq);
-        } else {
-            this.applyEqualityChildren(eq, remaining);
-        }
-        this.consolidateEqualities(eq.layerId);
+        this.validatedMutation(() => {
+            const currentChildren = artefactChildren(eq);
+            const remaining = currentChildren.filter(c => c !== childToRemove);
+            if (remaining.length < 2) {
+                this.artefacts = this.artefacts.filter(art => art !== eq);
+            } else {
+                this.applyEqualityChildren(eq, remaining);
+            }
+            this.consolidateEqualities(eq.layerId);
+        });
     }
 
     // Set the equalized children of an equality artefact, mirroring them into
@@ -1559,6 +1763,7 @@ export class Drawing {
     }
 
     public mergeArtefacts(a1: Artefact, a2: Artefact): Artefact {
+        return this.validatedMutation(() => {
         if (!this.artefacts.includes(a1) || !this.artefacts.includes(a2)) {
             throw new Error("Consistency Check Failed: Both artefacts must exist in the drawing to be merged.");
         }
@@ -1649,6 +1854,7 @@ export class Drawing {
         this.consolidateEqualities();
 
         return a2;
+        });
     }
 
     clear(keepDefaultRoot: boolean = true): void {
@@ -1853,6 +2059,9 @@ export class DrawingStore {
             }
         );
 
+        // Saved artefacts are adopted directly so dependency order need not
+        // match equation order; validate once the whole drawing exists.
+        drawing.validateDrawingEquations();
         drawing.setIsRule(savedDrawing.isRule);
         drawing.setRocqProof(savedDrawing.rocqProof ?? null);
         return drawing;
@@ -2274,6 +2483,7 @@ function extractEqualityConstraints(rule: Drawing): Array<{ children: Artefact[]
 
 function findRuleApplicationsInternal(
     host: Drawing,
+    sortStore: SortStore,
     sortRank: Map<string, number>,
     patternArts: Artefact[],
     equalityConstraints: Array<{ children: Artefact[] }>,
@@ -2385,6 +2595,48 @@ function findRuleApplicationsInternal(
     const matchesHost = (cand: Artefact, required: Artefact, layerId: string): boolean =>
         cand === required || (flexible && hostAreEqual(cand, required, layerId));
 
+    // Sort equations are semantic constraints, so they are checked for every
+    // candidate regardless of the flexible-matching option.
+    interface EquationEndpoint { pattern: Artefact; path: string[] }
+    interface EquationCandidateCheck { endpoints: EquationEndpoint[] }
+    const equationChecks = new Map<Artefact, EquationCandidateCheck[]>();
+    for (const a of patternArts) {
+        const def = sortStore.getSort(a.sortName);
+        if (!def || def.equations.length === 0) continue;
+        equationChecks.set(a, def.equations.map(equation => ({
+            endpoints: equation.paths.map(path => ({ pattern: tryResolveDependencyPath(a, path)!, path }))
+        })));
+    }
+
+    const hostEndpoint = (cand: Artefact, check: EquationCandidateCheck): Array<Artefact | undefined> =>
+        check.endpoints.map(endpoint => tryResolveDependencyPath(cand, endpoint.path));
+
+    const checkSortEquations = (
+        a: Artefact,
+        cand: Artefact,
+        images: Map<Artefact, Artefact>,
+        partial = true
+    ): boolean => {
+        for (const check of equationChecks.get(a) ?? []) {
+            const hosts = hostEndpoint(cand, check);
+            if (hosts.some(host => host === undefined)) return false;
+            const values = check.endpoints.map(endpoint => {
+                if (!patternSet.has(endpoint.pattern)) return endpoint.pattern;
+                return images.get(endpoint.pattern);
+            });
+            if (values.some(value => value === undefined)) {
+                if (!partial) return false;
+                continue;
+            }
+            for (let i = 1; i < values.length; i++) {
+                if (!hostAreEqual(hosts[0]!, values[0]!, cand.layerId)) return false;
+                if (!hostAreEqual(hosts[0]!, hosts[i]!, cand.layerId)) return false;
+                if (!hostAreEqual(values[0]!, values[i]!, cand.layerId)) return false;
+            }
+        }
+        return true;
+    };
+
     const candidateIsAllowed = (a: Artefact, cand: Artefact): boolean => {
         if (injective && used.has(cand)) return false;
         for (const constraint of constraints.get(a) ?? []) {
@@ -2397,7 +2649,7 @@ function findRuleApplicationsInternal(
             const img = assignment.get(dep);
             if (img !== undefined && !matchesHost(hostDep, img, cand.layerId)) return false;
         }
-        return true;
+        return checkSortEquations(a, cand, assignment);
     };
 
     interface Choice { cand: Artefact; cov: number[] }
@@ -2456,6 +2708,9 @@ function findRuleApplicationsInternal(
                     return false;
                 }
             }
+        }
+        for (const [a, cand] of assignment) {
+            if (!checkSortEquations(a, cand, assignment, false)) return false;
         }
         return true;
     };
@@ -2570,6 +2825,21 @@ function findRuleApplicationsInternal(
                 list.push(constraint);
                 added.push({ dep, constraint });
             }
+            for (const check of equationChecks.get(a) ?? []) {
+                const hosts = hostEndpoint(cand, check);
+                check.endpoints.forEach((endpoint, index) => {
+                    const host = hosts[index];
+                    if (!host || !patternSet.has(endpoint.pattern) || assignment.has(endpoint.pattern)) return;
+                    const constraint: ForwardConstraint = { required: host };
+                    let list = constraints.get(endpoint.pattern);
+                    if (!list) {
+                        list = [];
+                        constraints.set(endpoint.pattern, list);
+                    }
+                    list.push(constraint);
+                    added.push({ dep: endpoint.pattern, constraint });
+                });
+            }
 
             assignment.set(a, cand);
             used.add(cand);
@@ -2636,7 +2906,7 @@ function findRootRuleApplications(
     }
     const root = rootLayers[0];
     const rootArts = rule.getArtefacts().filter(a => a.sortName !== "Equality" && a.layerId === root.id);
-    return findRuleApplicationsInternal(host, sortRankMap(rule.sortStore), rootArts, extractEqualityConstraints(rule), options, maxApplications);
+    return findRuleApplicationsInternal(host, rule.sortStore, sortRankMap(rule.sortStore), rootArts, extractEqualityConstraints(rule), options, maxApplications);
 }
 
 export function filterRedundantRuleApplications(rule: Drawing, host: Drawing, applications: RuleApplication[]): RuleApplication[] {
@@ -3197,12 +3467,14 @@ function artefactChildren(art: Artefact): Artefact[] {
         : Object.values(art.dependencies);
 }
 
-// Build the undirected equality-connexity graph over a drawing's artefacts,
+// Build the undirected equality-connexity graph over a list of artefacts,
 // restricted to equality artefacts living in ancestor layers of `layerId`.
-function buildEqualityAdjacency(host: Drawing, layerId: string): Map<Artefact, Set<Artefact>> {
-    const allowedAncestors = host.getAncestors(layerId);
+function buildEqualityAdjacencyFor(
+    artefacts: readonly Artefact[],
+    allowedAncestors: Set<string>
+): Map<Artefact, Set<Artefact>> {
     const adj = new Map<Artefact, Set<Artefact>>();
-    for (const art of host.getArtefacts()) {
+    for (const art of artefacts) {
         if (art.sortName === "Equality" && allowedAncestors.has(art.layerId)) {
             const children = artefactChildren(art);
             for (let i = 0; i < children.length; i++) {
@@ -3243,6 +3515,10 @@ function isEqualityConnected(adj: Map<Artefact, Set<Artefact>>, a: Artefact, b: 
     }
 
     return false;
+}
+
+function buildEqualityAdjacency(host: Drawing, layerId: string): Map<Artefact, Set<Artefact>> {
+    return buildEqualityAdjacencyFor(host.getArtefacts(), host.getAncestors(layerId));
 }
 
 export function applyRuleConclusion(rule: Drawing, host: Drawing, application: RuleApplication, childLayer: Layer): { artefacts: Artefact[]; created: Map<Artefact, Artefact> } {

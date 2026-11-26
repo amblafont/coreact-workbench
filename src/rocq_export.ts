@@ -136,59 +136,138 @@ function getSort(sortStore: SortStore, name: string): SortDefinition {
     return def;
 }
 
-function uniquePrefix(depKey: string, used: Set<string>): string {
-    const base = sanitizeIdent(depKey);
-    let prefix = base;
-    let index = 2;
-    while (used.has(prefix)) {
-        prefix = `${base}_${index}`;
-        index++;
-    }
-    used.add(prefix);
-    return prefix;
+type DependencyPath = string[];
+
+function pathKey(path: DependencyPath): string {
+    return JSON.stringify(path);
 }
 
-function leafBinderNames(sortStore: SortStore, sortName: string): string[] {
-    const def = getSort(sortStore, sortName);
-    const deps = Object.entries(def.dependencies);
-    if (deps.length === 0) {
-        return [];
-    }
-    const result: string[] = [];
-    const headerNames = new Set<string>();
-    for (const [depKey, depSortName] of deps) {
-        const prefix = uniquePrefix(depKey, headerNames);
-        for (const leaf of leafBinderNames(sortStore, depSortName)) {
-            result.push(`${prefix}_${leaf}`);
+class PathUnifier {
+    private readonly parent = new Map<string, string>();
+
+    find(path: DependencyPath): string {
+        const key = pathKey(path);
+        const current = this.parent.get(key);
+        if (!current) {
+            this.parent.set(key, key);
+            return key;
         }
-        result.push(prefix);
+        if (current === key) {
+            return key;
+        }
+        const root = this.find(JSON.parse(current) as DependencyPath);
+        this.parent.set(key, root);
+        return root;
     }
-    return result;
+
+    union(a: DependencyPath, b: DependencyPath): void {
+        const rootA = this.find(a);
+        const rootB = this.find(b);
+        if (rootA !== rootB) {
+            this.parent.set(rootB, rootA);
+        }
+    }
 }
 
+/**
+ * Collect equalities declared by a sort together with those declared by its
+ * dependencies. Dependency sorts are already validated when declared, so their
+ * paths can be prefixed onto the current sort's dependency tree.
+ */
+function collectEquationClasses(
+    sortStore: SortStore,
+    def: SortDefinition,
+    prefix: DependencyPath,
+    unifier: PathUnifier
+): void {
+    for (const equation of def.equations) {
+        const paths = equation.paths.map(path => [...prefix, ...path]);
+        for (let i = 1; i < paths.length; i++) {
+            unifier.union(paths[0], paths[i]);
+        }
+    }
+    for (const [depKey, depSortName] of Object.entries(def.dependencies)) {
+        collectEquationClasses(sortStore, getSort(sortStore, depSortName), [...prefix, depKey], unifier);
+    }
+}
+
+/**
+ * Render the type of a dependency artefact. Generalized variables stand for
+ * the artefacts that occur as arguments of nested sorts; `Set Implicit
+ * Arguments` lets callers pass only the direct dependency artefacts.
+ */
 function sortHeaderType(sortStore: SortStore, def: SortDefinition): string {
     const deps = Object.entries(def.dependencies);
     if (deps.length === 0) {
         return "Type";
     }
-    const binders: string[] = [];
-    const arrows: string[] = [];
-    const headerNames = new Set<string>();
-    for (const [depKey, depSortName] of deps) {
-        const leafs = leafBinderNames(sortStore, depSortName);
-        if (leafs.length === 0) {
-            arrows.push(depSortName);
-        } else {
-            const prefix = uniquePrefix(depKey, headerNames);
-            const prefixed = leafs.map(leaf => `${prefix}_${leaf}`);
-            binders.push(`\`(${prefix} : ${depSortName} ${prefixed.join(" ")})`);
+
+    const unifier = new PathUnifier();
+    collectEquationClasses(sortStore, def, [], unifier);
+
+    const variableTypes = new Map<string, { sortName: string; representative: DependencyPath }>();
+    const registerVariable = (path: DependencyPath, sortName: string): void => {
+        const root = unifier.find(path);
+        if (!variableTypes.has(root)) {
+            variableTypes.set(root, { sortName, representative: JSON.parse(root) as DependencyPath });
         }
+    };
+    const variableName = new Map<string, string>();
+    const usedNames = new Set<string>();
+
+    const resolveName = (path: DependencyPath): string => {
+        const root = unifier.find(path);
+        let name = variableName.get(root);
+        if (!name) {
+            const entry = variableTypes.get(root);
+            if (!entry) {
+                throw new Error(`Consistency Check Failed: No Rocq variable for dependency path '${path.join(".")}'.`);
+            }
+            const base = sanitizeIdent(entry.representative.join("_"));
+            name = base;
+            let index = 2;
+            while (usedNames.has(name)) {
+                name = `${base}_${index}`;
+                index++;
+            }
+            usedNames.add(name);
+            variableName.set(root, name);
+        }
+        return name;
+    };
+
+    const collectVariables = (sortName: string, prefix: DependencyPath): void => {
+        const current = getSort(sortStore, sortName);
+        for (const [depKey, depSortName] of Object.entries(current.dependencies)) {
+            const path = [...prefix, depKey];
+            collectVariables(depSortName, path);
+            registerVariable(path, depSortName);
+        }
+    };
+
+    const dependencyType = (sortName: string, prefix: DependencyPath): string => {
+        const current = getSort(sortStore, sortName);
+        const args = Object.keys(current.dependencies).map(depKey => resolveName([...prefix, depKey]));
+        return args.length === 0 ? sortName : `${sortName} ${args.join(" ")}`;
+    };
+
+    for (const [depKey, depSortName] of deps) {
+        collectVariables(depSortName, [depKey]);
     }
+
+    // Declare generalized artefacts before the types that mention them.
+    const binders: string[] = [];
+    for (const [root, entry] of variableTypes) {
+        const type = dependencyType(entry.sortName, entry.representative);
+        binders.push(`\`(${resolveName(JSON.parse(root) as DependencyPath)} : ${type})`);
+    }
+
+    const arrows = deps.map(([depKey, depSortName]) => dependencyType(depSortName, [depKey])).
+        concat("Type").join(" -> ");
     if (binders.length === 0) {
-        return `${arrows.join(" -> ")} -> Type`;
+        return arrows;
     }
-    const tail = arrows.length > 0 ? `${arrows.join(" -> ")} -> Type` : "Type";
-    return `forall ${binders.join(" ")}, ${tail}`;
+    return `forall ${binders.join(" ")}, ${arrows}`;
 }
 
 export interface FieldItem {

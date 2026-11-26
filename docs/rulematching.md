@@ -56,6 +56,8 @@ Each returned `RuleApplication` contains:
 
 Root-layer equality artefacts express that their children are provably equal in the host. During matching, the constraint holds only when the assigned host images are pairwise provably equal (see §2.4). Constraints whose children are not all part of the pattern are ignored.
 
+Sort equations declared in `sorts.json` constrain matching too. If a pattern artefact's sort declares an equation such as `1.source = o.source`, the corresponding dependency paths in the candidate must be provably equal to each other and to the pattern's images. These constraints hold regardless of the `flexible` option; `flexible` only relaxes ordinary dependency matching to provable equality.
+
 ### 2.2 The matcher (`findRuleApplicationsInternal`)
 
 1. **Candidate pool** (`hostCandidates`): every host artefact that lives in a host **root layer**, indexed by sort.

@@ -198,6 +198,24 @@ describe.skipIf(!rocqAvailable)('rocq export compiles', () => {
         compile(name, recordScenario(sortStore, build(sortStore)));
     });
 
+    it('compiles sort headers with unified equation variables and nested sorts', () => {
+        const sortStore = newSortStore();
+        sortStore.newSort('Wrap', { t: 'Triangle' }, {}, () => null, undefined, [
+            't.1.source = t.o.source'
+        ]);
+        const host = new Drawing(sortStore);
+        const v = makeVertex(host, 'v');
+        const triangle = host.newArtefact('Triangle', {
+            '1': makeEdge(host, 'e1', v, v),
+            '2': makeEdge(host, 'e2', v, v),
+            o: makeEdge(host, 'o', v, v)
+        }, {}, 'root');
+        host.newArtefact('Wrap', { t: triangle }, {}, 'root');
+        const store = new DrawingStore();
+        store.addDrawing('Main', host);
+        compile('sort_equations', exportDrawingsToRocq(store.getAllDrawings(), sortStore));
+    });
+
     it('compiles a host whose second-order subgoal derived drawing is proved for real', () => {
         const sortStore = newSortStore();
         const store = new DrawingStore();

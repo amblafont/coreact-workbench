@@ -57,6 +57,12 @@ export function buildDemo(ctx: DemoContext): DemoContext {
     const e1 = drawing.newArtefact('Edge', { source: v1, target: v2 }, { width: 2, bend: 30, label: 'e1' }, 'layer-1');
     const e2 = drawing.newArtefact('Edge', { source: v2, target: v0 }, { width: 2, bend: 0, label: 'e2' }, 'layer-1');
     drawing.newArtefact('isMono', { arrow: e1 }, {}, 'layer-2');
+
+    // The triangle's endpoints are identified by these equalities, so they must
+    // exist before its equation validation runs.
+    drawing.newEqualityArtefact([v0, v1], 'root');
+    drawing.newEqualityArtefact([v1, v2], 'root');
+
     // --- Square Graph for Pullback Demo ---
 
     // Square vertices in Root Layer
@@ -85,8 +91,6 @@ export function buildDemo(ctx: DemoContext): DemoContext {
     drawing.newArtefact('Edge', { source: cd1, target: cd2 }, { width: 2, bend: 0, label: 'r2' }, 'root');
 
     // 4. Create Equality artefacts (demonstrates same-layer automatic merging)
-    drawing.newEqualityArtefact([v0, v1], 'root');
-    drawing.newEqualityArtefact([v1, v2], 'root');
     drawing.newEqualityArtefact([v2, sq_v0], 'layer-1');
 
     // Drawing Store & Rule Validation
@@ -196,17 +200,16 @@ export function buildDemo(ctx: DemoContext): DemoContext {
         const mkEdge = (label: string, source: Artefact, target: Artefact) =>
             host.newArtefact('Edge', { source, target }, { width: 2, bend: 0, label }, 'root');
 
+        // Loops on one vertex automatically satisfy the Triangle equations,
+        // leaving only the edge-identity matching behaviour under test.
         const v0 = mkVertex('v0');
-        const v1 = mkVertex('v1');
-        const v2 = mkVertex('v2');
-        const v3 = mkVertex('v3');
 
-        const o = mkEdge('o', v0, v1);
-        const o2 = mode === 'shared' ? o : mkEdge('o2', v0, v1);
-        const a1 = mkEdge('a1', v1, v2);
-        const a2 = mkEdge('a2', v2, v0);
-        const b1 = mkEdge('b1', v1, v3);
-        const b2 = mkEdge('b2', v3, v0);
+        const o = mkEdge('o', v0, v0);
+        const o2 = mode === 'shared' ? o : mkEdge('o2', v0, v0);
+        const a1 = mkEdge('a1', v0, v0);
+        const a2 = mkEdge('a2', v0, v0);
+        const b1 = mkEdge('b1', v0, v0);
+        const b2 = mkEdge('b2', v0, v0);
 
         host.newArtefact('Triangle', { '1': a1, '2': a2, o }, {}, 'root');
         host.newArtefact('Triangle', { '1': b1, '2': b2, o: o2 }, {}, 'root');

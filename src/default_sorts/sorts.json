@@ -20,7 +20,8 @@
   {
     "name": "Triangle",
     "data": { "bend": { "type": "slider", "min": -500, "max": 500, "default": 0 } },
-    "deps": { "1": "Edge", "2": "Edge", "o": "Edge" }
+    "deps": { "1": "Edge", "2": "Edge", "o": "Edge" },
+    "equations": ["1.source = o.source", "1.target = 2.source", "2.target = o.target"]
   },
   {
     "name": "Square",
