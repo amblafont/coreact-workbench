@@ -9,7 +9,6 @@
     import RuleApplications from './RuleApplications.svelte';
     import Toasts from './Toasts.svelte';
     import {
-        loadSortScript,
         ui,
         applyPersistedPanelWidths,
         persistPanelWidths,
@@ -22,8 +21,6 @@
     const LEFT_MAX = 480;
     const RIGHT_MIN = 180;
     const RIGHT_MAX = 640;
-
-    let scriptUpload: HTMLInputElement;
 
     onMount(() => {
         applyPersistedPanelWidths();
@@ -39,33 +36,12 @@
         unmarkInvalidRules();
     });
 
-    function onLoadScript(): void {
-        scriptUpload.click();
-    }
-
-    function onScriptChange(event: Event): void {
-        const target = event.currentTarget as HTMLInputElement;
-        const file = target.files?.[0];
-        if (file) {
-            loadSortScript(file);
-        }
-        target.value = '';
-    }
 </script>
 
 <div id="app">
     <div id="menu" style:width={`${ui.leftPanelWidth}px`}>
         <div class="menu-header">
             <h2>Layers & Artefacts</h2>
-            <div class="menu-header-actions">
-                <button
-                    class="btn"
-                    id="load-script-btn"
-                    title="Load JS script to define sorts"
-                    onclick={onLoadScript}
-                >Load Sorts</button>
-                <input bind:this={scriptUpload} type="file" id="script-upload" accept=".js" style="display: none;" onchange={onScriptChange} />
-            </div>
         </div>
 
         <DrawingsStorePanel />

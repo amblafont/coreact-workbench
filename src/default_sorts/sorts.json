@@ -1,0 +1,45 @@
+[
+  {
+    "name": "Vertex",
+    "data": { "position": "position" },
+    "deps": {}
+  },
+  {
+    "name": "Edge",
+    "data": {
+      "width": "number",
+      "bend": { "type": "slider", "min": -500, "max": 500, "default": 0 }
+    },
+    "deps": { "source": "Vertex", "target": "Vertex" }
+  },
+  {
+    "name": "Pullback",
+    "data": {},
+    "deps": { "p1": "Edge", "p2": "Edge", "q1": "Edge", "q2": "Edge" }
+  },
+  {
+    "name": "Triangle",
+    "data": { "bend": { "type": "slider", "min": -500, "max": 500, "default": 0 } },
+    "deps": { "1": "Edge", "2": "Edge", "o": "Edge" }
+  },
+  {
+    "name": "Square",
+    "data": { "bend": { "type": "slider", "min": -500, "max": 500, "default": 0 } },
+    "deps": { "p1": "Edge", "p2": "Edge", "q1": "Edge", "q2": "Edge" }
+  },
+  {
+    "name": "isMono",
+    "data": {},
+    "deps": { "arrow": "Edge" }
+  },
+  {
+    "name": "isId",
+    "data": {},
+    "deps": { "arrow": "Edge" }
+  },
+  {
+    "name": "EqEdges",
+    "data": { "bend": { "type": "slider", "min": -500, "max": 500, "default": 0 } },
+    "deps": { "source": "Edge", "target": "Edge" }
+  }
+]

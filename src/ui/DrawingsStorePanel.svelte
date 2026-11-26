@@ -9,7 +9,7 @@
     import {
         newDrawing,
         importDrawingsFile,
-        downloadDrawingsJson,
+        downloadHrxFile,
         openCodeExport,
         deleteSelectedDrawings,
         setExportSelectionAll,
@@ -36,13 +36,13 @@
         target.value = '';
     }
 
-    function onExportJson(): void {
+    function onExportHrx(): void {
         const names = getSelectedDrawingNames();
         if (names.length === 0) {
             pushToast('info', 'Select at least one drawing to export.');
             return;
         }
-        downloadDrawingsJson(names);
+        downloadHrxFile(names);
     }
 
     function onCodeExport(): void {
@@ -76,8 +76,8 @@
                 onchange={(e) => setExportSelectionAll((e.currentTarget as HTMLInputElement).checked)}
             />
             <button class="layer-btn new-btn" title="Start a new blank drawing" onclick={newDrawing}>New</button>
-            <button class="layer-btn import-btn" title="Import one or more drawings from a JSON file" onclick={() => importInput!.click()}>Load</button>
-            <button class="layer-btn export-btn" title="Export the checked drawings to a JSON file" onclick={onExportJson}>Save</button>
+            <button class="layer-btn import-btn" title="Import drawings and sorts from a JSON or HRX file" onclick={() => importInput!.click()}>Load</button>
+            <button class="layer-btn export-btn" title="Export the checked drawings to an HRX archive" onclick={onExportHrx}>Save</button>
             <button class="layer-btn rocq-btn" title="Show the checked drawings exported as Rocq code" onclick={onCodeExport}>Export Proofs</button>
             <button
                 class="layer-btn delete-btn"
@@ -87,7 +87,7 @@
             <input
                 bind:this={importInput}
                 type="file"
-                accept=".json"
+                accept=".json,.hrx"
                 style="display: none;"
                 onchange={onImportFile}
             />

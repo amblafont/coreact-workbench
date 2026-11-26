@@ -1,11 +1,10 @@
-import * as d3 from 'd3';
 import {
     Drawing,
     DrawingStore,
     SortStore,
     type Artefact
 } from '../index.svelte.ts';
-import defaultSortsCode from '../generated/default_sorts.js?raw';
+import { registerDefaultSorts as registerSorts } from '../default_sorts/index.ts';
 
 export interface DemoContext {
     sortStore: SortStore;
@@ -14,10 +13,7 @@ export interface DemoContext {
 }
 
 export function registerDefaultSorts(sortStore: SortStore): void {
-    if (sortStore.getSort('Vertex')) {
-        return;
-    }
-    new Function('sortStore', 'd3', defaultSortsCode)(sortStore, d3);
+    registerSorts(sortStore);
 }
 
 export function newDemoContext(): DemoContext {

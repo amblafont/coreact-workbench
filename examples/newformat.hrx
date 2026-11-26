@@ -1,0 +1,222 @@
+<===> sorts.json
+[
+  {
+    "name": "Vertex",
+    "data": { "position": "position" },
+    "deps": {}
+  },
+  {
+    "name": "Edge",
+    "data": {
+      "width": "number",
+      "bend": { "type": "slider", "min": -500, "max": 500, "default": 0 }
+    },
+    "deps": { "source": "Vertex", "target": "Vertex" }
+  }
+]
+<===> sorts/Vertex.js
+        // Draw a vertex (circle) at data.position in the d3 context.
+        // To be imported with new Function("data", "context", ..)
+        const group = context.append("g")
+            .attr("transform", `translate(${data.position[0]}, ${data.position[1]})`);
+        group.append("circle")
+            .attr("r", 20)
+            .attr("fill", "#69b3a2")
+            .attr("stroke", "#333")
+            .attr("stroke-width", 2);
+        if (data.label) {
+            group.append("text")
+                .attr("text-anchor", "middle")
+                .attr("dy", ".3em") // Vertically center text
+                .attr("fill", "white")
+                .attr("font-family", "sans-serif")
+                .attr("font-size", "14px")
+                .text(data.label);
+        }
+        return group; // Return the group to store in Artefact
+<===> sorts/Edge.js
+//!Require arrow hookStartOffset
+// the previous line requires to import the arrow module, defined in another section
+// Then api.arrow contains all the exported functions in js/arrow.js
+        const srcPos = data.source.position;
+        const tgtPos = data.target.position;
+        const bend = typeof data.bend === "number" ? data.bend : 0;
+        const dx = tgtPos[0] - srcPos[0];
+        const dy = tgtPos[1] - srcPos[1];
+        const len = Math.sqrt(dx * dx + dy * dy);
+        // Perpendicular unit vector (-dy/len, dx/len)
+        const nx = len > 0 ? -dy / len : 0;
+        const ny = len > 0 ? dx / len : 0;
+        // Midpoint between source and target
+        const mx = (srcPos[0] + tgtPos[0]) / 2;
+        const my = (srcPos[1] + tgtPos[1]) / 2;
+        // Control point for quadratic Bézier curve
+        const cx = mx + bend * nx;
+        const cy = my + bend * ny;
+        const R = 20;
+        // Initial tangent at t=0
+        let ux0 = cx - srcPos[0], uy0 = cy - srcPos[1];
+        const u0Len = Math.hypot(ux0, uy0);
+        ux0 = u0Len > 0 ? ux0 / u0Len : (len > 0 ? dx / len : 1);
+        uy0 = u0Len > 0 ? uy0 / u0Len : (len > 0 ? dy / len : 0);
+        // Final tangent at t=1
+        let ux1 = tgtPos[0] - cx, uy1 = tgtPos[1] - cy;
+        const u1Len = Math.hypot(ux1, uy1);
+        ux1 = u1Len > 0 ? ux1 / u1Len : (len > 0 ? dx / len : 1);
+        uy1 = u1Len > 0 ? uy1 / u1Len : (len > 0 ? dy / len : 0);
+        const width = typeof data.width === "number" ? data.width : 2;
+        // When an isMono hook is drawn on this edge, shorten the tail so it
+        // ends exactly at the beginning of the hook's semi-circle.
+        const startDist = data.isMono ? api.hookStartOffset(width) : R;
+        const startX = srcPos[0] + ux0 * startDist;
+        const startY = srcPos[1] + uy0 * startDist;
+        // Arrowhead size scales with the edge width
+        const halfW = width * 2;
+        const L = halfW * 2.5;
+        const baseX = tgtPos[0] - ux1 * (R + L);
+        const baseY = tgtPos[1] - uy1 * (R + L);
+        // Midpoint of the drawn Bézier curve at t = 0.5
+        const [midX, midY] = api.arrow.edgeMidpoint(srcPos, tgtPos, bend, width, !!data.isMono);
+        const tipX = tgtPos[0] - ux1 * R;
+        const tipY = tgtPos[1] - uy1 * R;
+        // Perpendicular to the final tangent (for the arrow base half-width)
+        const px = -uy1, py = ux1;
+        const lineGroup = context.insert("g", ":first-child");
+            lineGroup.append("path")
+                .attr("d", `M ${startX},${startY} Q ${cx},${cy} ${baseX},${baseY}`)
+                .attr("fill", "none")
+                .attr("stroke", "#999")
+                .attr("stroke-width", data.width);
+            // Manual arrowhead polygon
+            lineGroup.append("path")
+                .attr("d", `M ${baseX - px * halfW},${baseY - py * halfW} L ${tipX},${tipY} L ${baseX + px * halfW},${baseY + py * halfW} Z`)
+                .attr("fill", "#999")
+                .attr("stroke", "none");
+        if (data.label) {
+            context.append("text")
+                .attr("x", midX)
+                .attr("y", midY - 10) // slightly above the curve
+                .attr("text-anchor", "middle")
+                .attr("fill", "#333")
+                .attr("font-family", "sans-serif")
+                .attr("font-size", "12px")
+                .text(data.label);
+        }
+        return lineGroup; // Return the line group
+<===> js/arrow.js
+//!Require hookStartOffset
+
+const VERTEX_RADIUS = 20;
+const HOOK_MARGIN = 4;
+
+const ret = {};
+
+// Distance from the source vertex center to the beginning of the isMono
+// semi-circle hook, measured along the initial edge tangent.
+// Midpoint of the drawn quadratic Bézier edge at t = 0.5.
+// Accounts for the vertex-clearing offsets at both ends.
+ret.edgeMidpoint = function(srcPos, tgtPos, bend, width, isMono) {
+    const dx = tgtPos[0] - srcPos[0];
+    const dy = tgtPos[1] - srcPos[1];
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const nx = len > 0 ? -dy / len : 0;
+    const ny = len > 0 ? dx / len : 0;
+    const mx = (srcPos[0] + tgtPos[0]) / 2;
+    const my = (srcPos[1] + tgtPos[1]) / 2;
+    const cx = mx + bend * nx;
+    const cy = my + bend * ny;
+    // Initial tangent at t=0
+    let ux0 = cx - srcPos[0], uy0 = cy - srcPos[1];
+    const u0Len = Math.hypot(ux0, uy0);
+    ux0 = u0Len > 0 ? ux0 / u0Len : (len > 0 ? dx / len : 1);
+    uy0 = u0Len > 0 ? uy0 / u0Len : (len > 0 ? dy / len : 0);
+    // Final tangent at t=1
+    let ux1 = tgtPos[0] - cx, uy1 = tgtPos[1] - cy;
+    const u1Len = Math.hypot(ux1, uy1);
+    ux1 = u1Len > 0 ? ux1 / u1Len : (len > 0 ? dx / len : 1);
+    uy1 = u1Len > 0 ? uy1 / u1Len : (len > 0 ? dy / len : 0);
+    const R = 20;
+    const startDist = isMono ? api.hookStartOffset(width) : R;
+    const startX = srcPos[0] + ux0 * startDist;
+    const startY = srcPos[1] + uy0 * startDist;
+    const halfW = width * 2;
+    const L = halfW * 2.5;
+    const baseX = tgtPos[0] - ux1 * (R + L);
+    const baseY = tgtPos[1] - uy1 * (R + L);
+    const midX = 0.25 * startX + 0.5 * cx + 0.25 * baseX;
+    const midY = 0.25 * startY + 0.5 * cy + 0.25 * baseY;
+    return [midX, midY];
+}
+// Offset a quadratic Bézier sideways by d (signed), so that both ends of the
+// new curve stay square to the original curve's direction at that end.
+// u0/u1 are the unit tangents of the source curve at t=0 and t=1.
+
+return ret;
+<===> js/hookStartOffset.js
+
+return function (width) {
+    const r = Math.max(3, width * 2.5);
+    return Math.sqrt(Math.pow(VERTEX_RADIUS + HOOK_MARGIN + r, 2) - r * r);
+}
+<===> drawings.json
+{
+  "drawings": [
+    {
+      "name": "Example",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "a1",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              218,
+              345
+            ],
+            "label": "a"
+          }
+        },
+        {
+          "id": "a2",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              412,
+              353
+            ],
+            "label": "b"
+          }
+        },
+        {
+          "id": "a3",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a2",
+            "target": "a1"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "f"
+          }
+        }
+      ],
+      "isRule": false,
+      "isFirstOrder": false
+    }
+  ]
+}

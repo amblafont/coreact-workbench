@@ -29,6 +29,8 @@ import {
     getRelativePositionMeta
 } from '../index.svelte.ts';
 import { RocqRecorder } from '../rocq_recording.svelte.ts';
+import { loadHrxArchive } from '../hrx/load';
+import { exportHrx } from '../hrx/export';
 import { exportDrawingsToRocq, drawingExportNames, ruleTypeInfo, newExportRegistry, NameRegistry } from '../rocq_export';
 import type { DrawingExportNames } from '../rocq_export';
 
@@ -1397,6 +1399,11 @@ export function newDrawing(): void {
 }
 
 export async function importDrawingsFile(file: File): Promise<void> {
+    if (file.name.toLowerCase().endsWith('.hrx')) {
+        await importHrxFile(file);
+        return;
+    }
+
     const text = await file.text();
     try {
         const { names, renames } = drawingStore.importDrawingsJSON(text, sortStore);
@@ -1408,6 +1415,64 @@ export async function importDrawingsFile(file: File): Promise<void> {
 
     } catch (err) {
         pushToast('error', `Error importing drawing:\n${(err as Error).message}`);
+    }
+}
+
+export async function importHrxFile(file: File): Promise<void> {
+    const text = await file.text();
+    try {
+        const result = loadHrxArchive(text, sortStore, drawingStore, {
+            resolveDrawingConflict: (name, _existing, _imported) => {
+                const message = [
+                    `Drawing '${name}' already exists with different data fields.`,
+                    'OK: keep the imported data.',
+                    'Cancel: keep the existing data.'
+                ].join('\n\n');
+                return confirm(message) ? 'keepImported' : 'keepExisting';
+            }
+        });
+
+        const parts: string[] = [];
+        if (result.sortsAdded.length > 0) {
+            parts.push(`added sorts: ${result.sortsAdded.join(', ')}`);
+        }
+        if (result.modulesAdded.length > 0) {
+            parts.push(`added modules: ${result.modulesAdded.join(', ')}`);
+        }
+        for (const drawing of result.drawings) {
+            if (drawing.action === 'kept') {
+                parts.push(`kept '${drawing.name}'`);
+            } else if (drawing.action === 'replaced') {
+                parts.push(`replaced '${drawing.name}' with imported data`);
+            } else if (drawing.action === 'renamed') {
+                parts.push(`renamed '${drawing.requestedName}' -> '${drawing.name}'`);
+            } else {
+                parts.push(`added '${drawing.name}'`);
+            }
+        }
+        if (result.drawings.some(d => d.action === 'replaced' && d.name === ui.activeDrawingName)) {
+            setActiveDrawing(ui.activeDrawingName!);
+        }
+        pushToast('info', `Imported HRX archive.\n${parts.join('\n')}`);
+    } catch (err) {
+        pushToast('error', `Error importing HRX archive:\n${(err as Error).message}`);
+    }
+}
+
+export function downloadHrxFile(names: string[]): void {
+    try {
+        const hrx = exportHrx(names, sortStore, drawingStore);
+        const blob = new Blob([hrx], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'drawings.hrx';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        pushToast('error', `Error exporting HRX archive:\n${(err as Error).message}`);
     }
 }
 
@@ -1542,21 +1607,6 @@ export function toggleExportSelection(name: string): void {
 
 export function setExportSelectionAll(checked: boolean): void {
     ui.exportSelection = checked ? new SvelteSet(drawingStore.getAllNames()) : new SvelteSet();
-}
-
-export async function loadSortScript(file: File): Promise<void> {
-    const code = await file.text();
-    try {
-        sortStore.clear();
-        drawing.clear();
-        resetInteractionState();
-        const executor = new Function('sortStore', 'd3', code);
-        executor(sortStore, d3);
-
-    } catch (err) {
-        pushToast('error', `Error executing sort script:\n${(err as Error).message}`);
-        console.error('Script Execution Error:', err);
-    }
 }
 
 // ---------------------------------------------------------------------------

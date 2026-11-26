@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "src/default_sorts/**/*.ts",
+    "src/hrx/codec.ts",
+    "src/hrx/moduleRuntime.ts"
+  ]
+}

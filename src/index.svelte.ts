@@ -1,4 +1,5 @@
 import type { D3Context } from './types';
+import type { HrxModuleSource } from './hrx/moduleRuntime';
 import { SvelteMap } from 'svelte/reactivity';
 
 export interface SliderAttribute {
@@ -27,12 +28,21 @@ export function getRelativePositionMeta(at: AttributeType): RelativePositionAttr
     return typeof at !== "string" && at.type === "relativePosition" ? at : null;
 }
 
+export interface SortSource {
+    /** JS body written to `sorts/<Name>.js` on HRX export. */
+    drawBody: string;
+    /** Module names parsed from `//!Require` directives in `drawBody`. */
+    requires: string[];
+}
+
 export interface SortDefinition {
     name: string;
     dependencies: Record<string, string>;
     attributes: Record<string, AttributeType>;
     drawFunction: (data: any, context: D3Context) => D3Context | null; // Now returns the element
     initContext?: (context: D3Context) => void;
+    /** Source text for HRX export; absent for sorts without a known source. */
+    source?: SortSource;
 }
 
 /**
@@ -80,6 +90,7 @@ export class Layer {
 
 export class SortStore {
     private sorts = new SvelteMap<string, SortDefinition>();
+    private modules = new Map<string, HrxModuleSource>();
 
     constructor() {
         this.registerBuiltInSorts();
@@ -188,8 +199,33 @@ export class SortStore {
         return this.sorts.get(name);
     }
 
+    setSortSource(name: string, source: SortSource): void {
+        const def = this.sorts.get(name);
+        if (!def) {
+            throw new Error(`Consistency Check Failed: Cannot set source for unknown sort '${name}'.`);
+        }
+        def.source = source;
+    }
+
+    getSortSource(name: string): SortSource | undefined {
+        return this.sorts.get(name)?.source;
+    }
+
+    registerModuleSource(name: string, source: HrxModuleSource): void {
+        this.modules.set(name, source);
+    }
+
+    getModuleSource(name: string): HrxModuleSource | undefined {
+        return this.modules.get(name);
+    }
+
+    getAllModuleSources(): Map<string, HrxModuleSource> {
+        return new Map(this.modules);
+    }
+
     clear(): void {
         this.sorts.clear();
+        this.modules.clear();
         this.registerBuiltInSorts();
     }
 }
@@ -1993,6 +2029,90 @@ export class DrawingStore {
             names: [result.name],
             renames: result.renamed ? [{ requested: result.requestedName, actual: result.name }] : []
         };
+    }
+
+    private static stableStringify(value: unknown): string {
+        if (Array.isArray(value)) {
+            return `[${value.map(item => DrawingStore.stableStringify(item)).join(',')}]`;
+        }
+        if (value && typeof value === "object") {
+            const entries = Object.entries(value as Record<string, unknown>)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([key, item]) => `${JSON.stringify(key)}:${DrawingStore.stableStringify(item)}`);
+            return `{${entries.join(',')}}`;
+        }
+        return JSON.stringify(value) ?? 'null';
+    }
+
+    private static canonicalDrawing(saved: SavedDrawing, ignoreData: boolean): string {
+        const canonical: SavedDrawing = {
+            ...saved,
+            layers: saved.layers,
+            artefacts: saved.artefacts.map(art => ({
+                ...art,
+                data: ignoreData ? {} : art.data
+            }))
+        };
+        return DrawingStore.stableStringify(canonical);
+    }
+
+    private storeHydratedDrawing(name: string, built: SavedDrawing, sortStore: SortStore): void {
+        const live = DrawingStore.hydrateDrawing(built, sortStore);
+        live.consolidateEqualities();
+        this.drawings.set(name, live);
+        if (built.parentName) {
+            this.meta.set(name, { parentName: built.parentName });
+        } else {
+            this.meta.delete(name);
+        }
+        if (built.proved) {
+            this.proved.set(name, true);
+        } else {
+            this.proved.delete(name);
+        }
+    }
+
+    /**
+     * Import one drawing using the merge policy requested for HRX archives.
+     * Exact duplicates are skipped; drawings differing only in artefact data are
+     * handed to `resolveConflict`; structurally different drawings are renamed.
+     */
+    public importSavedDrawingWithPolicy(
+        parsed: unknown,
+        sortStore: SortStore,
+        resolveConflict: (name: string, existing: SavedDrawing, imported: SavedDrawing) => 'keepExisting' | 'keepImported'
+    ): { name: string; requestedName: string; action: 'added' | 'renamed' | 'kept' | 'replaced' } {
+        const built = DrawingStore.validateAndBuildDrawing(parsed);
+        const requestedName = built.name;
+
+        if (!this.drawings.has(requestedName)) {
+            const actualName = this.uniqueName(requestedName);
+            this.storeHydratedDrawing(actualName, built, sortStore);
+            return {
+                name: actualName,
+                requestedName,
+                action: actualName === requestedName ? 'added' : 'renamed'
+            };
+        }
+
+        const existing = DrawingStore.validateAndBuildDrawing(
+            JSON.parse(this.exportDrawingJSON(requestedName))
+        );
+        if (DrawingStore.canonicalDrawing(existing, false) === DrawingStore.canonicalDrawing(built, false)) {
+            return { name: requestedName, requestedName, action: 'kept' };
+        }
+        if (DrawingStore.canonicalDrawing(existing, true) === DrawingStore.canonicalDrawing(built, true)) {
+            const choice = resolveConflict(requestedName, existing, built);
+            if (choice === 'keepExisting') {
+                return { name: requestedName, requestedName, action: 'kept' };
+            }
+            this.storeHydratedDrawing(requestedName, built, sortStore);
+            return { name: requestedName, requestedName, action: 'replaced' };
+        }
+
+        const actualName = this.uniqueName(requestedName);
+        this.storeHydratedDrawing(actualName, built, sortStore);
+        return { name: actualName, requestedName, action: 'renamed' };
     }
 
     public getDrawing(name: string): DrawingStoreEntry | undefined {
