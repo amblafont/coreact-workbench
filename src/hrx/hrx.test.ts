@@ -117,6 +117,104 @@ describe('HRX archive support', () => {
         expect(roundTrip.sortsAdded).toEqual(['Vertex', 'Edge']);
         expect(freshDrawings.getDrawing('Example')).toBeDefined();
     });
+
+    it('treats a sort without a data field as having empty data', () => {
+        const sections = parseHrx(EXAMPLE).sections;
+        const records = JSON.parse(sections.get('sorts.json')!) as Array<Record<string, unknown>>;
+        delete records.find(record => record.name === 'Vertex')!.data;
+        sections.set('sorts.json', JSON.stringify(records));
+        sections.set('drawings.json', '{"drawings":[]}\n');
+
+        const archive = serializeHrx(sections);
+        const sortStore = new SortStore();
+        const drawingStore = new DrawingStore();
+        const plan = analyseHrxArchive(archive, sortStore, drawingStore, { ui: true });
+
+        expect(plan.errors).toEqual([]);
+        expect(plan.sorts.map(row => [row.name, row.kind, row.decision])).toEqual([
+            ['Vertex', 'new', 'add'],
+            ['Edge', 'new', 'add']
+        ]);
+        expect(plan.sorts.every(row => !row.error)).toBe(true);
+
+        loadHrxArchive(archive, sortStore, drawingStore);
+        expect(sortStore.getSort('Vertex')!.attributes).toEqual({});
+        expect(sortStore.getSort('Edge')!.attributes.bend).toEqual({
+            type: 'slider', min: -500, max: 500, default: 0
+        });
+    });
+
+    it('matches an existing attribute-free sort when the archive omits data', () => {
+        const sections = parseHrx(EXAMPLE).sections;
+        const records = JSON.parse(sections.get('sorts.json')!) as Array<Record<string, unknown>>;
+        delete records.find(record => record.name === 'Vertex')!.data;
+        sections.set('sorts.json', JSON.stringify(records));
+        sections.set('drawings.json', '{"drawings":[]}\n');
+
+        const sortStore = new SortStore();
+        sortStore.newSort('Vertex', {}, {}, () => null);
+        const plan = analyseHrxArchive(serializeHrx(sections), sortStore, new DrawingStore(), { ui: true });
+
+        const vertex = plan.sorts.find(row => row.name === 'Vertex')!;
+        expect(vertex.kind).toBe('existing');
+        expect(vertex.error).toBeUndefined();
+    });
+
+    it('still rejects a sort whose data field is present but not an object', () => {
+        const sections = parseHrx(EXAMPLE).sections;
+        const records = JSON.parse(sections.get('sorts.json')!) as Array<Record<string, unknown>>;
+        records[0].data = null;
+        sections.set('sorts.json', JSON.stringify(records));
+
+        expect(() => analyseHrxArchive(serializeHrx(sections), new SortStore(), new DrawingStore()))
+            .toThrow(/must have an object 'deps' field/);
+    });
+
+    it('imports a sort without a drawing JS section as a no-op draw function', () => {
+        const sections = parseHrx(EXAMPLE).sections;
+        sections.delete('sorts/Vertex.js');
+        const archive = serializeHrx(sections);
+
+        const sortStore = new SortStore();
+        const drawingStore = new DrawingStore();
+        const plan = analyseHrxArchive(archive, sortStore, drawingStore, { ui: true });
+        expect(plan.errors).toEqual([]);
+        expect(plan.sorts.every(row => !row.error)).toBe(true);
+        expect(plan.sorts.find(row => row.name === 'Vertex')!.decision).toBe('add');
+
+        expect(loadHrxArchive(archive, sortStore, drawingStore).sortsAdded).toEqual(['Vertex', 'Edge']);
+        expect(sortStore.getSortSource('Vertex')).toBeUndefined();
+        expect(sortStore.getSort('Vertex')!.drawFunction({} as any, {} as any)).toBeNull();
+
+        const exported = parseHrx(exportHrx(['Example'], sortStore, drawingStore)).sections;
+        expect(JSON.parse(exported.get('sorts.json')!).map((sort: { name: string }) => sort.name))
+            .toEqual(['Vertex', 'Edge']);
+        expect(exported.has('sorts/Vertex.js')).toBe(false);
+        expect(exported.has('sorts/Edge.js')).toBe(true);
+    });
+
+    it('keeps an existing sort drawing when the archive omits its JS section', () => {
+        const sections = parseHrx(EXAMPLE).sections;
+        sections.delete('sorts/Vertex.js');
+        const archive = serializeHrx(sections);
+
+        const sortStore = new SortStore();
+        registerDefaultSorts(sortStore);
+        const drawingStore = new DrawingStore();
+        const originalSource = sortStore.getSortSource('Vertex');
+        const originalDraw = sortStore.getSort('Vertex')!.drawFunction;
+
+        const plan = analyseHrxArchive(archive, sortStore, drawingStore, { ui: true });
+        const vertex = plan.sorts.find(row => row.name === 'Vertex')!;
+        expect(vertex.kind).toBe('existing');
+        expect(vertex.error).toBeUndefined();
+        expect(vertex.drawFunctionsEqual).toBe(true);
+        expect(vertex.replaceDrawFunctions).toBe(false);
+
+        loadHrxArchive(archive, sortStore, drawingStore);
+        expect(sortStore.getSortSource('Vertex')).toEqual(originalSource);
+        expect(sortStore.getSort('Vertex')!.drawFunction).toBe(originalDraw);
+    });
 });
 
 describe('built-in sorts', () => {
@@ -263,7 +361,7 @@ describe('HRX import preview', () => {
         expect(sortStore.getSortNames()).toEqual([]);
     });
 
-    it('shows error reasons and refuses to apply an archive with a missing sort source', () => {
+    it('allows an archive with a missing sort source', () => {
         const sections = parseHrx(EXAMPLE).sections;
         sections.delete('sorts/Edge.js');
         const archive = serializeHrx(sections);
@@ -271,12 +369,12 @@ describe('HRX import preview', () => {
         const drawingStore = new DrawingStore();
 
         const plan = analyseHrxArchive(archive, sortStore, drawingStore, { ui: true });
-        expect(plan.sorts.find(row => row.name === 'Edge')!.error)
-            .toMatch(/has no sorts\/Edge\.js section/);
-        expect(validateHrxPlan(plan, sortStore, drawingStore).hasErrors).toBe(true);
-        expect(() => applyHrxImportPlan(archive, plan, sortStore, drawingStore))
-            .toThrow(/has no sorts\/Edge\.js section/);
-        expect(sortStore.getSortNames()).toEqual([]);
+        expect(plan.sorts.find(row => row.name === 'Edge')!.error).toBeUndefined();
+        expect(validateHrxPlan(plan, sortStore, drawingStore).hasErrors).toBe(false);
+
+        applyHrxImportPlan(archive, plan, sortStore, drawingStore);
+        expect(sortStore.getSortNames()).toEqual(['Vertex', 'Edge']);
+        expect(sortStore.getSortSource('Edge')).toBeUndefined();
     });
 
     it('renames or replaces an existing drawing on request', () => {

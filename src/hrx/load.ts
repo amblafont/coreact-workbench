@@ -205,8 +205,10 @@ function parseSortRecords(text: string): HrxSortRecord[] {
         if (!isRecord(item) || typeof item.name !== 'string' || !item.name.trim()) {
             throw new Error(`Consistency Check Failed: Invalid sort record at index ${index} in sorts.json.`);
         }
-        if (!isRecord(item.data) || !isRecord(item.deps)) {
-            throw new Error(`Consistency Check Failed: Sort '${item.name}' must have object 'data' and 'deps' fields.`);
+        // An omitted `data` field means a sort with no data attributes.
+        const data = item.data === undefined ? {} : item.data;
+        if (!isRecord(data) || !isRecord(item.deps)) {
+            throw new Error(`Consistency Check Failed: Sort '${item.name}' must have an object 'deps' field and, if present, an object 'data' field.`);
         }
         for (const [depKey, depSort] of Object.entries(item.deps)) {
             if (typeof depSort !== 'string') {
@@ -219,7 +221,7 @@ function parseSortRecords(text: string): HrxSortRecord[] {
         }
         return {
             name: item.name.trim(),
-            data: item.data as Record<string, AttributeType>,
+            data: data as Record<string, AttributeType>,
             deps: item.deps as Record<string, string>,
             equations: equations as string[]
         };
@@ -338,16 +340,15 @@ export function analyseHrxArchive(
             weakerEquations: false
         };
 
-        if (body === undefined) {
-            row.error = `Consistency Check Failed: HRX archive has no sorts/${record.name}.js section.`;
-            sorts.push(row);
-            continue;
+        // A sort may be declared without a drawing JS section; it simply has
+        // no draw source to import or replace.
+        if (body !== undefined) {
+            row.error = moduleProblem(body, modules);
         }
-        row.error = moduleProblem(body, modules);
 
         if (existing) {
             row.existingEquations = existing.equations.map(equation => equation.raw);
-            row.drawFunctionsEqual = sortStore.getSortSource(record.name)?.drawBody === body;
+            row.drawFunctionsEqual = body === undefined || sortStore.getSortSource(record.name)?.drawBody === body;
             if (stable(existing.dependencies) !== stable(record.deps) ||
                 stable(existing.attributes) !== stable(record.data)) {
                 row.error = row.error ?? sortConflictMessage(record.name);
@@ -547,18 +548,20 @@ export function applyHrxImportPlan(
     for (const name of order) {
         const row = plan.sorts.find(entry => entry.name === name)!;
         const record = recordByName.get(name)!;
-        const body = sortSources.get(name)!;
+        const body = sortSources.get(name);
         if (row.kind === 'new') {
             if (row.decision !== 'add') continue;
             sortStore.newSort(
                 name,
                 record.deps,
                 record.data,
-                compileDrawFunction(body, api),
+                body === undefined ? () => null : compileDrawFunction(body, api),
                 undefined,
                 row.equations
             );
-            sortStore.setSortSource(name, { drawBody: body, requires: parseRequires(body) });
+            if (body !== undefined) {
+                sortStore.setSortSource(name, { drawBody: body, requires: parseRequires(body) });
+            }
             sortsAdded.push(name);
             continue;
         }
@@ -566,7 +569,7 @@ export function applyHrxImportPlan(
         if (!row.keepEquations && row.weakerEquations) {
             sortStore.setSortEquations(name, row.equations);
         }
-        if (row.replaceDrawFunctions) {
+        if (row.replaceDrawFunctions && body !== undefined) {
             sortStore.setSortSource(name, { drawBody: body, requires: parseRequires(body) });
         }
         sortsKept.push(name);

@@ -294,17 +294,16 @@ describe('HRX import preview dialog', () => {
         expect(hasButton(row, 'Rename')).toBe(true);
     });
 
-    it('shows error reasons and disables Import while an error blocks the archive', () => {
+    it('allows import when a sort has no drawing JS section', () => {
         const sections = parseHrx(EXAMPLE).sections;
         sections.delete('sorts/Edge.js');
         open(serializeHrx(sections));
         render();
 
-        expect(document.body.textContent).toContain('has no sorts/Edge.js section');
-        expect(actionButton('Import').disabled).toBe(true);
-        const edgeRow = sortRow('Edge');
-        expect(hasButton(edgeRow, 'Keep equations')).toBe(false);
-        expect(buttonIn(edgeRow, 'Replace draw functions').disabled).toBe(true);
+        expect(document.body.textContent).not.toContain('has no sorts/Edge.js section');
+        expect(actionButton('Import').disabled).toBe(false);
+        const existingSorts = group('Sorts already in the workspace');
+        expect(existingSorts.querySelector('.hrx-compact')?.textContent?.trim()).toBe('Edge');
     });
 
     it('commits the plan on Import and closes on Cancel', () => {

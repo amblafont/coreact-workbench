@@ -38,16 +38,16 @@ export function exportHrx(names: string[], sortStore: SortStore, drawingStore: D
     for (const name of sortNames) {
         const def = sortStore.getSort(name)!;
         const source = sortStore.getSortSource(name);
-        if (!source) {
-            throw new Error(`Consistency Check Failed: No source is available for sort '${name}'.`);
-        }
         sortRecords.push({
             name,
             data: def.attributes,
             deps: def.dependencies,
             equations: def.equations.map(equation => equation.raw)
         });
-        sortBodies.set(name, `${source.drawBody.replace(/\s+$/, '')}\n`);
+        // A sort declared without a drawing JS section stays without one.
+        if (source) {
+            sortBodies.set(name, `${source.drawBody.replace(/\s+$/, '')}\n`);
+        }
     }
 
     const sections = new Map<string, string>();
@@ -59,7 +59,7 @@ export function exportHrx(names: string[], sortStore: SortStore, drawingStore: D
 
     const moduleSources = sortStore.getAllModuleSources();
     const moduleRoots = new Set<string>();
-    for (const name of sortNames) {
+    for (const name of sortBodies.keys()) {
         for (const moduleName of sortStore.getSortSource(name)!.requires) {
             moduleRoots.add(moduleName);
         }
