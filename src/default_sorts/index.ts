@@ -1,39 +1,43 @@
 import type { AttributeType, SortStore } from '../index.svelte.ts';
-import type { D3Context } from '../types';
-import { buildModuleApi, compileDrawFunction, functionBody, parseRequires } from '../hrx/moduleRuntime';
+import { buildModuleApi, compileDrawFunction, parseRequires } from '../hrx/moduleRuntime';
 import metadata from './sorts.json';
 
-import * as Vertex from './Vertex';
-import * as Edge from './Edge';
-import * as Pullback from './Pullback';
-import * as Triangle from './Triangle';
-import * as Square from './Square';
-import * as isMono from './isMono';
-import * as isId from './isId';
-import * as EqEdges from './EqEdges';
-import { module as geometryModule } from './js/geometry';
+// The JS bodies are generated from the TypeScript drawing functions by the
+// drawBodies Vite plugin. Deriving them with fn.toString() at runtime breaks in
+// production builds, where the bundler renames `data`/`context`.
+import geometryBody from 'virtual:draw-body/geometry';
+import vertexBody from 'virtual:draw-body/Vertex';
+import edgeBody from 'virtual:draw-body/Edge';
+import pullbackBody from 'virtual:draw-body/Pullback';
+import triangleBody from 'virtual:draw-body/Triangle';
+import squareBody from 'virtual:draw-body/Square';
+import isMonoBody from 'virtual:draw-body/isMono';
+import isIdBody from 'virtual:draw-body/isId';
+import eqEdgesBody from 'virtual:draw-body/EqEdges';
 
-type DrawFunction = (data: any, context: D3Context) => D3Context | null;
+// HRX section bodies are trimmed when parsed, so the generated bodies receive
+// the same treatment as the old functionBody() sources to avoid false conflicts.
+const body = (raw: string): string => raw.trim();
 
-const drawFunctions: Record<string, DrawFunction> = {
-    Vertex: Vertex.draw as DrawFunction,
-    Edge: Edge.draw as DrawFunction,
-    Pullback: Pullback.draw as DrawFunction,
-    Triangle: Triangle.draw as DrawFunction,
-    Square: Square.draw as DrawFunction,
-    isMono: isMono.draw as DrawFunction,
-    isId: isId.draw as DrawFunction,
-    EqEdges: EqEdges.draw as DrawFunction
+const geometrySource = body(geometryBody);
+const drawBodies: Record<string, string> = {
+    Vertex: body(vertexBody),
+    Edge: body(edgeBody),
+    Pullback: body(pullbackBody),
+    Triangle: body(triangleBody),
+    Square: body(squareBody),
+    isMono: body(isMonoBody),
+    isId: body(isIdBody),
+    EqEdges: body(eqEdgesBody)
 };
 
 /** Register the built-in sorts together with the source used by HRX export. */
 export function registerDefaultSorts(sortStore: SortStore): void {
     if (sortStore.getSort('Vertex')) return;
 
-    const geometryBody = functionBody(geometryModule);
     sortStore.registerModuleSource('geometry', {
-        source: geometryBody,
-        requires: parseRequires(geometryBody)
+        source: geometrySource,
+        requires: parseRequires(geometrySource)
     });
     const moduleSources = sortStore.getAllModuleSources();
     const api = buildModuleApi(moduleSources, moduleSources.keys());
@@ -45,11 +49,10 @@ export function registerDefaultSorts(sortStore: SortStore): void {
         equations?: string[];
     }>;
     for (const record of records) {
-        const draw = drawFunctions[record.name];
-        if (!draw) {
-            throw new Error(`Consistency Check Failed: No draw function for built-in sort '${record.name}'.`);
+        const drawBody = drawBodies[record.name];
+        if (!drawBody) {
+            throw new Error(`Consistency Check Failed: No draw body for built-in sort '${record.name}'.`);
         }
-        const drawBody = functionBody(draw);
         sortStore.newSort(
             record.name,
             record.deps,

@@ -27,17 +27,6 @@ export function stripRequires(source: string): string {
     return source.replace(REQUIRE_DIRECTIVE, '');
 }
 
-/** Strip the wrapper from a compiled function to recover its JS body. */
-export function functionBody(fn: Function): string {
-    const text = fn.toString().trim();
-    const open = text.indexOf('{');
-    const close = text.lastIndexOf('}');
-    if (open < 0 || close <= open) {
-        throw new Error(`Consistency Check Failed: Cannot extract body from function '${text}'.`);
-    }
-    return text.slice(open + 1, close).trim();
-}
-
 /**
  * Order names so that every dependency appears before its dependents.
  * Missing dependencies and cycles are reported as consistency errors.

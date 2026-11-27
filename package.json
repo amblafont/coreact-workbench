@@ -8,6 +8,7 @@
     "build": "vite build",
     "build:standalone": "SINGLEFILE=true vite build",
     "build:sorts": "tsc -p tsconfig.sorts.json",
+    "test:standalone": "npm run build:standalone && node scripts/smoke-standalone.mjs",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run"

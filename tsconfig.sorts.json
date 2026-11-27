@@ -6,6 +6,7 @@
   "include": [
     "src/default_sorts/**/*.ts",
     "src/hrx/codec.ts",
-    "src/hrx/moduleRuntime.ts"
+    "src/hrx/moduleRuntime.ts",
+    "src/vite-env.d.ts"
   ]
 }
