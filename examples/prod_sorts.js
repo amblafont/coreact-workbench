@@ -479,5 +479,48 @@ function offsetQuadratic(startX, startY, cx, cy, endX, endY, u0x, u0y, u1x, u1y,
     })
     .newSort("isIso", { arrow : "Edge" }, {}, (_data, context) => {
         return context.append("i");
-    });
+    })
+    .newSort("MonOb", { left : "Vertex", right : "Vertex", mon : "Vertex"}, {}, (_data, context) => {
+//        const group = context.append("g")
+//            .attr("transform", `translate(${data.mon.position[0]}, ${data.mon.position[1]})`);
+//        group.append("text")
+//            .attr("text-anchor", "middle")
+//            .attr("dy", ".3em") // Vertically center text
+//            .attr("fill", "white")
+//            .attr("font-family", "sans-serif")
+//            .attr("font-size", "14px")
+//            .text(`${data.left.label} ⊗ ${data.right.label}`);
+//        return group;
+        return context.append("g");
+
+    })
+    .newSort("MonMor", { left: "Edge", right: "Edge", mon : "Edge" }, {}, (data, context) => {
+        // The image of the source edge, labelled where the label of its
+        // Edge2 target has just been hidden.
+//        const [midX, midY] = edgeMidpoint(data.mon.source.position, data.mon.target.position, typeof data.mon.bend === "number" ? data.mon.bend : 0, typeof data.mon.width === "number" ? data.mon.width : 2, !!data.mon.isMono);
+//        const group = context.append("g");
+//        group.append("text")
+//            .attr("x", midX)
+//            .attr("y", midY - 10) // slightly above the curve
+//            .attr("text-anchor", "middle")
+//            .attr("fill", "#333")
+//            .attr("font-family", "sans-serif")
+//            .attr("font-size", "12px")
+//            .text(`${data.left.label} ⊗ ${data.right.label}`);
+//        return group;
+        return context.append("g");
+
+    })
+    .newSort("MonUnit", { I : "Vertex"}, {}, (_data, context) => {
+                return context.append("g");
+    })
+    .newSort("MonUnitL", { arrow : "Edge"}, {}, (_data, context) => {
+        return context.append("g");
+    })
+    .newSort("MonUnitR", { arrow : "Edge"}, {}, (_data, context) => {
+        return context.append("g");
+    })
+    .newSort("MonAss", { arrow : "Edge"}, {}, (_data, context) => {
+        return context.append("g");
+    })
 }

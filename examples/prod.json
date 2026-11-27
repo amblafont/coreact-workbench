@@ -895,8 +895,7 @@
         }
       ],
       "isRule": true,
-      "isFirstOrder": true,
-      "proved": false
+      "isFirstOrder": true
     },
     {
       "name": "UnitL",
@@ -1436,8 +1435,7 @@
       ],
       "isRule": true,
       "isFirstOrder": true,
-      "rocqProof": "Lemma IdUniq_rule : forall (a a_2 a_3 : Vertex)(eq_a_a_a : a = a_2)(eq_a_a_a_2 : a_2 = a_3), ltac:(subst_all_in (forall (ida : Edge a a_2)(ida_2 : Edge a_2 a)(ida_3 : Edge a_2 a_3)(ida_4 : Edge a_3 a_2)(eq_ida_ida : ida = ida_2)(eq_ida_ida_2 : ida_3 = ida_4), ltac:(subst_all_in (forall (isId_2 : isId ida)(isId_3 : isId ida_2)(isId_4 : isId ida_3)(isId_5 : isId ida_4), ida = ida_3)))).\nintros_sigma ().\ndestruct_sigma (@Comp_rule a a_2 a_3 ida ida_3) as idaida Triangle_2.\ndestruct_sigma (@UnitL_rule a a a eq_refl ida_3 ida ida idaida Triangle_2 isId_2 isId_2) as _.\ndestruct_sigma (@UnitR_rule a a a eq_refl ida ida_3 ida ida_3 Triangle_2 isId_4 isId_2) as _.\nexact eq_refl.\nQed.\n",
-      "proved": false
+      "rocqProof": "Lemma IdUniq_rule : forall (a a_2 a_3 : Vertex)(eq_a_a_a : a = a_2)(eq_a_a_a_2 : a_2 = a_3), ltac:(subst_all_in (forall (ida : Edge a a_2)(ida_2 : Edge a_2 a)(ida_3 : Edge a_2 a_3)(ida_4 : Edge a_3 a_2)(eq_ida_ida : ida = ida_2)(eq_ida_ida_2 : ida_3 = ida_4), ltac:(subst_all_in (forall (isId_2 : isId ida)(isId_3 : isId ida_2)(isId_4 : isId ida_3)(isId_5 : isId ida_4), ida = ida_3)))).\nintros_sigma ().\ndestruct_sigma (@Comp_rule a a_2 a_3 ida ida_3) as idaida Triangle_2.\ndestruct_sigma (@UnitL_rule a a a eq_refl ida_3 ida ida idaida Triangle_2 isId_2 isId_2) as _.\ndestruct_sigma (@UnitR_rule a a a eq_refl ida ida_3 ida ida_3 Triangle_2 isId_4 isId_2) as _.\nexact eq_refl.\nQed.\n"
     },
     {
       "name": "AddIso",
@@ -2659,86 +2657,6 @@
       "isFirstOrder": true
     },
     {
-      "name": "TermWit",
-      "layers": [
-        {
-          "id": "root",
-          "name": "Root Layer",
-          "parentId": null,
-          "color": "#3498db",
-          "colorEnabled": false,
-          "visible": true
-        },
-        {
-          "id": "layer-mwni9rp8",
-          "name": "Child of Root Layer",
-          "parentId": "root",
-          "color": "#7d810e",
-          "colorEnabled": true,
-          "visible": true
-        }
-      ],
-      "artefacts": [
-        {
-          "id": "a9",
-          "sortName": "Vertex",
-          "layerId": "root",
-          "dependencies": {},
-          "data": {
-            "position": [
-              300,
-              300
-            ],
-            "label": "1"
-          }
-        },
-        {
-          "id": "a10",
-          "sortName": "isTerminal",
-          "layerId": "root",
-          "dependencies": {
-            "object": "a9"
-          },
-          "data": {}
-        },
-        {
-          "id": "a11",
-          "sortName": "Vertex",
-          "layerId": "root",
-          "dependencies": {},
-          "data": {
-            "position": [
-              500,
-              300
-            ],
-            "label": "1'"
-          }
-        },
-        {
-          "id": "a12",
-          "sortName": "isTerminal",
-          "layerId": "root",
-          "dependencies": {
-            "object": "a11"
-          },
-          "data": {}
-        },
-        {
-          "id": "a13",
-          "sortName": "Equality",
-          "layerId": "layer-mwni9rp8",
-          "dependencies": {
-            "0": "a9",
-            "1": "a11"
-          },
-          "data": {}
-        }
-      ],
-      "isRule": false,
-      "isFirstOrder": false,
-      "proved": true
-    },
-    {
       "name": "AddProd",
       "layers": [
         {
@@ -3085,8 +3003,7 @@
         }
       ],
       "isRule": true,
-      "isFirstOrder": false,
-      "proved": false
+      "isFirstOrder": false
     },
     {
       "name": "ProdEssUniq",
@@ -4935,6 +4852,14 @@
           "color": "#3498db",
           "colorEnabled": false,
           "visible": true
+        },
+        {
+          "id": "layer-mwnra1ow",
+          "name": "Child of Root Layer",
+          "parentId": "root",
+          "color": "#eac7e9",
+          "colorEnabled": true,
+          "visible": true
         }
       ],
       "artefacts": [
@@ -5524,10 +5449,4389 @@
           "data": {
             "bend": 0
           }
+        },
+        {
+          "id": "a49",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a1",
+            "target": "a3"
+          },
+          "data": {
+            "width": 2,
+            "bend": 110,
+            "label": "fg"
+          }
+        },
+        {
+          "id": "a50",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a7",
+            "2": "a8",
+            "o": "a49"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a51",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a4",
+            "target": "a6"
+          },
+          "data": {
+            "width": 2,
+            "bend": -147,
+            "label": "hi"
+          }
+        },
+        {
+          "id": "a52",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a9",
+            "2": "a10",
+            "o": "a51"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a53",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              0
+            ],
+            "label": "a*d"
+          }
+        },
+        {
+          "id": "a54",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a53",
+            "target": "a1"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "pa"
+          }
+        },
+        {
+          "id": "a55",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a53",
+            "target": "a4"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "pd"
+          }
+        },
+        {
+          "id": "a56",
+          "sortName": "isProd",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a1",
+            "right": "a4",
+            "prod": "a53",
+            "projl": "a54",
+            "projr": "a55"
+          },
+          "data": {}
+        },
+        {
+          "id": "a57",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              800
+            ],
+            "label": "c*f"
+          }
+        },
+        {
+          "id": "a58",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a57",
+            "target": "a3"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "pc"
+          }
+        },
+        {
+          "id": "a59",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a57",
+            "target": "a6"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "pf"
+          }
+        },
+        {
+          "id": "a60",
+          "sortName": "isProd",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a3",
+            "right": "a6",
+            "prod": "a57",
+            "projl": "a58",
+            "projr": "a59"
+          },
+          "data": {}
+        },
+        {
+          "id": "a61",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a53",
+            "target": "a57"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "fg*hi"
+          }
+        },
+        {
+          "id": "a62",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a53",
+            "target": "a3"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "pafg"
+          }
+        },
+        {
+          "id": "a63",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a54",
+            "2": "a49",
+            "o": "a62"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a64",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a53",
+            "target": "a6"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "pdhi"
+          }
+        },
+        {
+          "id": "a65",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a55",
+            "2": "a51",
+            "o": "a64"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a66",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a61",
+            "2": "a58",
+            "o": "a62"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a67",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a61",
+            "2": "a59",
+            "o": "a64"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a68",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a53",
+            "target": "a11"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "iso"
+          }
+        },
+        {
+          "id": "a69",
+          "sortName": "isIso",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a68"
+          },
+          "data": {}
+        },
+        {
+          "id": "a70",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a68",
+            "2": "a12",
+            "o": "a54"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a71",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a68",
+            "2": "a13",
+            "o": "a55"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a72",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a34",
+            "target": "a57"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "iso"
+          }
+        },
+        {
+          "id": "a73",
+          "sortName": "isIso",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a72"
+          },
+          "data": {}
+        },
+        {
+          "id": "a74",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a72",
+            "2": "a58",
+            "o": "a35"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a75",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a72",
+            "2": "a59",
+            "o": "a36"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a76",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a53",
+            "target": "a15"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "isof*h"
+          }
+        },
+        {
+          "id": "a77",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a68",
+            "2": "a19",
+            "o": "a76"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a78",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a53",
+            "target": "a30"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "isof*hiso"
+          }
+        },
+        {
+          "id": "a79",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a76",
+            "2": "a45",
+            "o": "a78"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a80",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a53",
+            "target": "a34"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "isof*hisog*i"
+          }
+        },
+        {
+          "id": "a81",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a78",
+            "2": "a38",
+            "o": "a80"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a82",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a53",
+            "target": "a57"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "isof*hisog*iiso"
+          }
+        },
+        {
+          "id": "a83",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a80",
+            "2": "a72",
+            "o": "a82"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a84",
+          "sortName": "Equality",
+          "layerId": "layer-mwnra1ow",
+          "dependencies": {
+            "0": "a82",
+            "1": "a61"
+          },
+          "data": {}
+        }
+      ],
+      "isRule": true,
+      "isFirstOrder": true,
+      "rocqProof": "Lemma ExchProdComp_rule : forall (a b c d e f a_d b_e b_e_2 c_f a_d_2 c_f_2 : Vertex)(f_2 : Edge a b)(g : Edge b c)(h : Edge d e)(i : Edge e f)(pa : Edge a_d a)(pd : Edge a_d d)(pb : Edge b_e b)(pe : Edge b_e e)(f_h : Edge a_d b_e)(paf : Edge a_d b)(pdh : Edge a_d e)(pb_2 : Edge b_e_2 b)(pe_2 : Edge b_e_2 e)(pc : Edge c_f c)(pf : Edge c_f f)(g_i : Edge b_e_2 c_f)(pbg : Edge b_e_2 c)(pei : Edge b_e_2 f)(iso : Edge b_e b_e_2)(fg : Edge a c)(hi : Edge d f)(pa_2 : Edge a_d_2 a)(pd_2 : Edge a_d_2 d)(pc_2 : Edge c_f_2 c)(pf_2 : Edge c_f_2 f)(fg_hi : Edge a_d_2 c_f_2)(pafg : Edge a_d_2 c)(pdhi : Edge a_d_2 f)(iso_2 : Edge a_d_2 a_d)(iso_3 : Edge c_f c_f_2)(isof_h : Edge a_d_2 b_e)(isof_hiso : Edge a_d_2 b_e_2)(isof_hisog_i : Edge a_d_2 c_f)(isof_hisog_iiso : Edge a_d_2 c_f_2)(Triangle_2 : Triangle pa f_2 paf)(Triangle_3 : Triangle pd h pdh)(Triangle_4 : Triangle f_h pb paf)(Triangle_5 : Triangle f_h pe pdh)(Triangle_6 : Triangle pb_2 g pbg)(Triangle_7 : Triangle pe_2 i pei)(Triangle_8 : Triangle g_i pc pbg)(Triangle_9 : Triangle g_i pf pei)(Triangle_10 : Triangle iso pb_2 pb)(Triangle_11 : Triangle iso pe_2 pe)(Triangle_12 : Triangle f_2 g fg)(Triangle_13 : Triangle h i hi)(Triangle_14 : Triangle pa_2 fg pafg)(Triangle_15 : Triangle pd_2 hi pdhi)(Triangle_16 : Triangle fg_hi pc_2 pafg)(Triangle_17 : Triangle fg_hi pf_2 pdhi)(Triangle_18 : Triangle iso_2 pa pa_2)(Triangle_19 : Triangle iso_2 pd pd_2)(Triangle_20 : Triangle iso_3 pc_2 pc)(Triangle_21 : Triangle iso_3 pf_2 pf)(Triangle_22 : Triangle iso_2 f_h isof_h)(Triangle_23 : Triangle isof_h iso isof_hiso)(Triangle_24 : Triangle isof_hiso g_i isof_hisog_i)(Triangle_25 : Triangle isof_hisog_i iso_3 isof_hisog_iiso)(isProd_2 : isProd a d a_d pa pd)(isProd_3 : isProd b e b_e pb pe)(isProd_4 : isProd b e b_e_2 pb_2 pe_2)(isProd_5 : isProd c f c_f pc pf)(isProd_6 : isProd a d a_d_2 pa_2 pd_2)(isProd_7 : isProd c f c_f_2 pc_2 pf_2)(isIso_2 : isIso iso)(isIso_3 : isIso iso_2)(isIso_4 : isIso iso_3), isof_hisog_iiso = fg_hi.\nintros_sigma ().\ndestruct_sigma (@Comp_rule a_d_2 c_f_2 f isof_hisog_iiso pf_2) as isof_hisog_iisopf Triangle_26.\ndestruct_sigma (@Comp_rule a_d_2 c_f_2 c isof_hisog_iiso pc_2) as isof_hisog_iisopc Triangle_27.\ndestruct_sigma (@Comp_rule a_d_2 c_f f isof_hisog_i pf) as isof_hisog_ipf Triangle_28.\ndestruct_sigma (@Assoc_rule a_d_2 c_f c_f_2 f isof_hisog_i iso_3 pf_2 isof_hisog_iiso isof_hisog_iisopf pf isof_hisog_ipf Triangle_25 Triangle_26 Triangle_21 Triangle_28) as _.\ndestruct_sigma (@Comp_rule a_d_2 c_f c isof_hisog_i pc) as isof_hisog_ipc Triangle_29.\ndestruct_sigma (@Assoc_rule a_d_2 c_f c_f_2 c isof_hisog_i iso_3 pc_2 isof_hisog_iiso isof_hisog_iisopc pc isof_hisog_ipc Triangle_25 Triangle_27 Triangle_20 Triangle_29) as _.\nrename isof_hisog_iisopc into isof_hisog_ipc__isof_hisog_iisopc.\nrename isof_hisog_iisopf into isof_hisog_ipf__isof_hisog_iisopf.\ndestruct_sigma (@Comp_rule a_d_2 b_e_2 f isof_hiso pei) as isof_hisopei Triangle_30.\ndestruct_sigma (@Assoc_rule a_d_2 b_e_2 c_f f isof_hiso g_i pf isof_hisog_i isof_hisog_ipf__isof_hisog_iisopf pei isof_hisopei Triangle_24 Triangle_28 Triangle_9 Triangle_30) as _.\nrename isof_hisog_ipf__isof_hisog_iisopf into isof_hisopei__isof_hisog_ipf__isof_hisog_iisopf.\ndestruct_sigma (@Comp_rule a_d_2 b_e_2 c isof_hiso pbg) as isof_hisopbg Triangle_31.\ndestruct_sigma (@Assoc_rule a_d_2 b_e_2 c_f c isof_hiso g_i pc isof_hisog_i isof_hisog_ipc__isof_hisog_iisopc pbg isof_hisopbg Triangle_24 Triangle_29 Triangle_8 Triangle_31) as _.\nrename isof_hisog_ipc__isof_hisog_iisopc into isof_hisopbg__isof_hisog_ipc__isof_hisog_iisopc.\ndestruct_sigma (@Comp_rule a_d_2 b_e_2 e isof_hiso pe_2) as isof_hisope Triangle_32.\ndestruct_sigma (@Comp_rule a_d_2 b_e_2 b isof_hiso pb_2) as isof_hisopb Triangle_33.\ndestruct_sigma (@Comp_rule a_d_2 b_e e isof_h pe) as isof_hpe Triangle_34.\ndestruct_sigma (@Assoc_rule a_d_2 b_e b_e_2 e isof_h iso pe_2 isof_hiso isof_hisope pe isof_hpe Triangle_23 Triangle_32 Triangle_11 Triangle_34) as _.\nrename isof_hisope into isof_hpe__isof_hisope.\ndestruct_sigma (@Comp_rule a_d_2 b_e b isof_h pb) as isof_hpb Triangle_35.\ndestruct_sigma (@Assoc_rule a_d_2 b_e b_e_2 b isof_h iso pb_2 isof_hiso isof_hisopb pb isof_hpb Triangle_23 Triangle_33 Triangle_10 Triangle_35) as _.\nrename isof_hisopb into isof_hpb__isof_hisopb.\ndestruct_sigma (@Comp_rule a_d_2 a_d e iso_2 pdh) as isopdh Triangle_36.\ndestruct_sigma (@Assoc_rule a_d_2 a_d b_e e iso_2 f_h pe isof_h isof_hpe__isof_hisope pdh isopdh Triangle_22 Triangle_34 Triangle_5 Triangle_36) as _.\ndestruct_sigma (@Comp_rule a_d_2 a_d b iso_2 paf) as isopaf Triangle_37.\ndestruct_sigma (@Assoc_rule a_d_2 a_d b_e b iso_2 f_h pb isof_h isof_hpb__isof_hisopb paf isopaf Triangle_22 Triangle_35 Triangle_4 Triangle_37) as _.\nrename isof_hpb__isof_hisopb into isopaf__isof_hpb__isof_hisopb.\nrename isof_hpe__isof_hisope into isopdh__isof_hpe__isof_hisope.\ndestruct_sigma (@Comp_rule a_d_2 e f isopdh__isof_hpe__isof_hisope i) as isopdh__isof_hpe__isof_hisopei Triangle_38.\ndestruct_sigma (@Assoc_rule a_d_2 b_e_2 e f isof_hiso pe_2 i isopdh__isof_hpe__isof_hisope isopdh__isof_hpe__isof_hisopei pei isof_hisopei__isof_hisog_ipf__isof_hisog_iisopf Triangle_32 Triangle_38 Triangle_7 Triangle_30) as _.\nrename isof_hisopei__isof_hisog_ipf__isof_hisog_iisopf into isopdh__isof_hpe__isof_hisopei__isof_hisopei__isof_hisog_ipf__isof_hisog_iisopf.\ndestruct_sigma (@Comp_rule a_d_2 d e pd_2 h) as pdh_2 Triangle_39.\ndestruct_sigma (@Assoc_rule a_d_2 a_d d e iso_2 pd h pd_2 pdh_2 pdh isopdh__isof_hpe__isof_hisope Triangle_19 Triangle_39 Triangle_3 Triangle_36) as _.\ndestruct_sigma (@Assoc_rule a_d_2 d e f pd_2 h i isopdh__isof_hpe__isof_hisope isopdh__isof_hpe__isof_hisopei__isof_hisopei__isof_hisog_ipf__isof_hisog_iisopf hi pdhi Triangle_39 Triangle_38 Triangle_13 Triangle_15) as _.\nrename isopdh__isof_hpe__isof_hisope into pdh__isopdh__isof_hpe__isof_hisope.\nrename isopdh__isof_hpe__isof_hisopei__isof_hisopei__isof_hisog_ipf__isof_hisog_iisopf into pdhi__isopdh__isof_hpe__isof_hisopei__isof_hisopei__isof_hisog_ipf__isof_hisog_iisopf.\ndestruct_sigma (@Comp_rule a_d_2 b c isopaf__isof_hpb__isof_hisopb g) as isopaf__isof_hpb__isof_hisopbg Triangle_40.\ndestruct_sigma (@Assoc_rule a_d_2 b_e_2 b c isof_hiso pb_2 g isopaf__isof_hpb__isof_hisopb isopaf__isof_hpb__isof_hisopbg pbg isof_hisopbg__isof_hisog_ipc__isof_hisog_iisopc Triangle_33 Triangle_40 Triangle_6 Triangle_31) as _.\nrename isof_hisopbg__isof_hisog_ipc__isof_hisog_iisopc into isopaf__isof_hpb__isof_hisopbg__isof_hisopbg__isof_hisog_ipc__isof_hisog_iisopc.\ndestruct_sigma (@Comp_rule a_d_2 a b pa_2 f_2) as paf_2 Triangle_41.\ndestruct_sigma (@Assoc_rule a_d_2 a_d a b iso_2 pa f_2 pa_2 paf_2 paf isopaf__isof_hpb__isof_hisopb Triangle_18 Triangle_41 Triangle_2 Triangle_37) as _.\ndestruct_sigma (@Assoc_rule a_d_2 a b c pa_2 f_2 g isopaf__isof_hpb__isof_hisopb isopaf__isof_hpb__isof_hisopbg__isof_hisopbg__isof_hisog_ipc__isof_hisog_iisopc fg pafg Triangle_41 Triangle_40 Triangle_12 Triangle_14) as _.\ndestruct_sigma (@UseProdFactUnique_rule c f c_f_2 a_d_2 pc_2 pf_2 pafg pdhi__isopdh__isof_hpe__isof_hisopei__isof_hisopei__isof_hisog_ipf__isof_hisog_iisopf fg_hi isof_hisog_iiso Triangle_16 Triangle_17 Triangle_27 Triangle_26 isProd_7) as _.\nexact eq_refl.\nQed.\n"
+    },
+    {
+      "name": "RProdFunctComp",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        },
+        {
+          "id": "layer-mwusx8j9",
+          "name": "Child of Root Layer",
+          "parentId": "root",
+          "color": "#1c2556",
+          "colorEnabled": true,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "a1",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              300
+            ],
+            "label": "a"
+          }
+        },
+        {
+          "id": "a2",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              500
+            ],
+            "label": "b"
+          }
+        },
+        {
+          "id": "a3",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              700
+            ],
+            "label": "c"
+          }
+        },
+        {
+          "id": "a4",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              500,
+              300
+            ],
+            "label": "d"
+          }
+        },
+        {
+          "id": "a5",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a1",
+            "target": "a2"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "f"
+          }
+        },
+        {
+          "id": "a6",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a2",
+            "target": "a3"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "g"
+          }
+        },
+        {
+          "id": "a7",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              200
+            ],
+            "label": "a*d"
+          }
+        },
+        {
+          "id": "a8",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a7",
+            "target": "a1"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "pa"
+          }
+        },
+        {
+          "id": "a9",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a7",
+            "target": "a4"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "pd"
+          }
+        },
+        {
+          "id": "a10",
+          "sortName": "isProd",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a1",
+            "right": "a4",
+            "prod": "a7",
+            "projl": "a8",
+            "projr": "a9"
+          },
+          "data": {}
+        },
+        {
+          "id": "a11",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              400
+            ],
+            "label": "b*d"
+          }
+        },
+        {
+          "id": "a12",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a11",
+            "target": "a2"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "pb"
+          }
+        },
+        {
+          "id": "a13",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a11",
+            "target": "a4"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "pd"
+          }
+        },
+        {
+          "id": "a14",
+          "sortName": "isProd",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a2",
+            "right": "a4",
+            "prod": "a11",
+            "projl": "a12",
+            "projr": "a13"
+          },
+          "data": {}
+        },
+        {
+          "id": "a15",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a7",
+            "target": "a11"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "f*d"
+          }
+        },
+        {
+          "id": "a16",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a7",
+            "target": "a2"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "paf"
+          }
+        },
+        {
+          "id": "a17",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a8",
+            "2": "a5",
+            "o": "a16"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a18",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a15",
+            "2": "a12",
+            "o": "a16"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a19",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a15",
+            "2": "a13",
+            "o": "a9"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a20",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              600
+            ],
+            "label": "b*d"
+          }
+        },
+        {
+          "id": "a21",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a20",
+            "target": "a2"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "pb"
+          }
+        },
+        {
+          "id": "a22",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a20",
+            "target": "a4"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "pd"
+          }
+        },
+        {
+          "id": "a23",
+          "sortName": "isProd",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a2",
+            "right": "a4",
+            "prod": "a20",
+            "projl": "a21",
+            "projr": "a22"
+          },
+          "data": {}
+        },
+        {
+          "id": "a24",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              800
+            ],
+            "label": "c*d"
+          }
+        },
+        {
+          "id": "a25",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a24",
+            "target": "a3"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "pc"
+          }
+        },
+        {
+          "id": "a26",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a24",
+            "target": "a4"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "pd"
+          }
+        },
+        {
+          "id": "a27",
+          "sortName": "isProd",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a3",
+            "right": "a4",
+            "prod": "a24",
+            "projl": "a25",
+            "projr": "a26"
+          },
+          "data": {}
+        },
+        {
+          "id": "a28",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a20",
+            "target": "a24"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "g*d"
+          }
+        },
+        {
+          "id": "a29",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a20",
+            "target": "a3"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "pbg"
+          }
+        },
+        {
+          "id": "a30",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a21",
+            "2": "a6",
+            "o": "a29"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a31",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a28",
+            "2": "a25",
+            "o": "a29"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a32",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a28",
+            "2": "a26",
+            "o": "a22"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a33",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a11",
+            "target": "a20"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "iso"
+          }
+        },
+        {
+          "id": "a34",
+          "sortName": "isIso",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a33"
+          },
+          "data": {}
+        },
+        {
+          "id": "a35",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a33",
+            "2": "a21",
+            "o": "a12"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a36",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a33",
+            "2": "a22",
+            "o": "a13"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a37",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a1",
+            "target": "a3"
+          },
+          "data": {
+            "width": 2,
+            "bend": 139,
+            "label": "fg"
+          }
+        },
+        {
+          "id": "a38",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a5",
+            "2": "a6",
+            "o": "a37"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a39",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              0
+            ],
+            "label": "a*d"
+          }
+        },
+        {
+          "id": "a40",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a39",
+            "target": "a1"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "pa"
+          }
+        },
+        {
+          "id": "a41",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a39",
+            "target": "a4"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "pd"
+          }
+        },
+        {
+          "id": "a42",
+          "sortName": "isProd",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a1",
+            "right": "a4",
+            "prod": "a39",
+            "projl": "a40",
+            "projr": "a41"
+          },
+          "data": {}
+        },
+        {
+          "id": "a43",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              1000
+            ],
+            "label": "c*d"
+          }
+        },
+        {
+          "id": "a44",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a43",
+            "target": "a3"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "pc"
+          }
+        },
+        {
+          "id": "a45",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a43",
+            "target": "a4"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "pd"
+          }
+        },
+        {
+          "id": "a46",
+          "sortName": "isProd",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a3",
+            "right": "a4",
+            "prod": "a43",
+            "projl": "a44",
+            "projr": "a45"
+          },
+          "data": {}
+        },
+        {
+          "id": "a47",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a39",
+            "target": "a43"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "fg*d"
+          }
+        },
+        {
+          "id": "a48",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a39",
+            "target": "a3"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "pafg"
+          }
+        },
+        {
+          "id": "a49",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a40",
+            "2": "a37",
+            "o": "a48"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a50",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a47",
+            "2": "a44",
+            "o": "a48"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a51",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a47",
+            "2": "a45",
+            "o": "a41"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a52",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a39",
+            "target": "a7"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "iso"
+          }
+        },
+        {
+          "id": "a53",
+          "sortName": "isIso",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a52"
+          },
+          "data": {}
+        },
+        {
+          "id": "a54",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a52",
+            "2": "a8",
+            "o": "a40"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a55",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a52",
+            "2": "a9",
+            "o": "a41"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a56",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a24",
+            "target": "a43"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "iso"
+          }
+        },
+        {
+          "id": "a57",
+          "sortName": "isIso",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a56"
+          },
+          "data": {}
+        },
+        {
+          "id": "a58",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a56",
+            "2": "a44",
+            "o": "a25"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a59",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a56",
+            "2": "a45",
+            "o": "a26"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a60",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a39",
+            "target": "a11"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "isof*d"
+          }
+        },
+        {
+          "id": "a61",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a52",
+            "2": "a15",
+            "o": "a60"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a62",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a39",
+            "target": "a20"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "isof*diso"
+          }
+        },
+        {
+          "id": "a63",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a60",
+            "2": "a33",
+            "o": "a62"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a64",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a39",
+            "target": "a24"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "isof*disog*d"
+          }
+        },
+        {
+          "id": "a65",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a62",
+            "2": "a28",
+            "o": "a64"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a66",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a39",
+            "target": "a43"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "isof*disog*diso"
+          }
+        },
+        {
+          "id": "a67",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a64",
+            "2": "a56",
+            "o": "a66"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a68",
+          "sortName": "Equality",
+          "layerId": "root",
+          "dependencies": {
+            "0": "a66",
+            "1": "a47"
+          },
+          "data": {}
+        }
+      ],
+      "isRule": true,
+      "isFirstOrder": true,
+      "rocqProof": "Lemma RProdFunctComp_rule : forall (a b c d a_d b_d b_d_2 c_d a_d_2 c_d_2 : Vertex)(f : Edge a b)(g : Edge b c)(pa : Edge a_d a)(pd : Edge a_d d)(pb : Edge b_d b)(pd_2 : Edge b_d d)(f_d : Edge a_d b_d)(paf : Edge a_d b)(pb_2 : Edge b_d_2 b)(pd_3 : Edge b_d_2 d)(pc : Edge c_d c)(pd_4 : Edge c_d d)(g_d : Edge b_d_2 c_d)(pbg : Edge b_d_2 c)(iso : Edge b_d b_d_2)(fg : Edge a c)(pa_2 : Edge a_d_2 a)(pd_5 : Edge a_d_2 d)(pc_2 : Edge c_d_2 c)(pd_6 : Edge c_d_2 d)(fg_d : Edge a_d_2 c_d_2)(pafg : Edge a_d_2 c)(iso_2 : Edge a_d_2 a_d)(iso_3 : Edge c_d c_d_2)(isof_d : Edge a_d_2 b_d)(isof_diso : Edge a_d_2 b_d_2)(isof_disog_d : Edge a_d_2 c_d)(isof_disog_diso : Edge a_d_2 c_d_2)(eq_isof_disog_diso_fg_d : isof_disog_diso = fg_d), ltac:(subst_all_in (forall (Triangle_2 : Triangle pa f paf)(Triangle_3 : Triangle f_d pb paf)(Triangle_4 : Triangle f_d pd_2 pd)(Triangle_5 : Triangle pb_2 g pbg)(Triangle_6 : Triangle g_d pc pbg)(Triangle_7 : Triangle g_d pd_4 pd_3)(Triangle_8 : Triangle iso pb_2 pb)(Triangle_9 : Triangle iso pd_3 pd_2)(Triangle_10 : Triangle f g fg)(Triangle_11 : Triangle pa_2 fg pafg)(Triangle_12 : Triangle fg_d pc_2 pafg)(Triangle_13 : Triangle fg_d pd_6 pd_5)(Triangle_14 : Triangle iso_2 pa pa_2)(Triangle_15 : Triangle iso_2 pd pd_5)(Triangle_16 : Triangle iso_3 pc_2 pc)(Triangle_17 : Triangle iso_3 pd_6 pd_4)(Triangle_18 : Triangle iso_2 f_d isof_d)(Triangle_19 : Triangle isof_d iso isof_diso)(Triangle_20 : Triangle isof_diso g_d isof_disog_d)(Triangle_21 : Triangle isof_disog_d iso_3 isof_disog_diso)(isProd_2 : isProd a d a_d pa pd)(isProd_3 : isProd b d b_d pb pd_2)(isProd_4 : isProd b d b_d_2 pb_2 pd_3)(isProd_5 : isProd c d c_d pc pd_4)(isProd_6 : isProd a d a_d_2 pa_2 pd_5)(isProd_7 : isProd c d c_d_2 pc_2 pd_6)(isIso_2 : isIso iso)(isIso_3 : isIso iso_2)(isIso_4 : isIso iso_3), True)).\nintros_sigma ().\ndestruct_sigma (@Id_rule d) as d_2 _ idd idd_2 _ isId_2 isId_3.\nexact I.\nQed.\n",
+      "proved": true
+    },
+    {
+      "name": "MonUnitEx",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        },
+        {
+          "id": "layer-mww7wjuc",
+          "name": "Child of Root Layer",
+          "parentId": "root",
+          "color": "#246777",
+          "colorEnabled": true,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "a1",
+          "sortName": "Vertex",
+          "layerId": "layer-mww7wjuc",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              300
+            ],
+            "label": "I"
+          }
+        },
+        {
+          "id": "a2",
+          "sortName": "MonUnit",
+          "layerId": "layer-mww7wjuc",
+          "dependencies": {
+            "I": "a1"
+          },
+          "data": {}
+        }
+      ],
+      "isRule": true,
+      "isFirstOrder": true,
+      "proved": false
+    },
+    {
+      "name": "MonObEx",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        },
+        {
+          "id": "layer-mww7vfn8",
+          "name": "Child of Root Layer",
+          "parentId": "root",
+          "color": "#735eef",
+          "colorEnabled": true,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "a1",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              300
+            ],
+            "label": "a"
+          }
+        },
+        {
+          "id": "a2",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              500,
+              300
+            ],
+            "label": "b"
+          }
+        },
+        {
+          "id": "a3",
+          "sortName": "Vertex",
+          "layerId": "layer-mww7vfn8",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              300
+            ],
+            "label": "$a⊗$b"
+          }
+        },
+        {
+          "id": "a4",
+          "sortName": "MonOb",
+          "layerId": "layer-mww7vfn8",
+          "dependencies": {
+            "left": "a1",
+            "right": "a2",
+            "mon": "a3"
+          },
+          "data": {}
+        }
+      ],
+      "isRule": true,
+      "isFirstOrder": true,
+      "proved": false
+    },
+    {
+      "name": "MonMorEx",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        },
+        {
+          "id": "layer-mww83tb0",
+          "name": "Child of Root Layer",
+          "parentId": "root",
+          "color": "#ac2266",
+          "colorEnabled": true,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "a1",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              300
+            ],
+            "label": "a"
+          }
+        },
+        {
+          "id": "a2",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              500
+            ],
+            "label": "b"
+          }
+        },
+        {
+          "id": "a3",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              500,
+              300
+            ],
+            "label": "a'"
+          }
+        },
+        {
+          "id": "a4",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              500,
+              500
+            ],
+            "label": "b'"
+          }
+        },
+        {
+          "id": "a5",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              300
+            ],
+            "label": "$a⊗$a'"
+          }
+        },
+        {
+          "id": "a6",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a1",
+            "right": "a3",
+            "mon": "a5"
+          },
+          "data": {}
+        },
+        {
+          "id": "a7",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              500
+            ],
+            "label": "$b⊗$b'"
+          }
+        },
+        {
+          "id": "a8",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a2",
+            "right": "a4",
+            "mon": "a7"
+          },
+          "data": {}
+        },
+        {
+          "id": "a9",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a1",
+            "target": "a2"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "f"
+          }
+        },
+        {
+          "id": "a10",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a3",
+            "target": "a4"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "f'"
+          }
+        },
+        {
+          "id": "a11",
+          "sortName": "Edge",
+          "layerId": "layer-mww83tb0",
+          "dependencies": {
+            "source": "a5",
+            "target": "a7"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "$f⊗$f'"
+          }
+        },
+        {
+          "id": "a12",
+          "sortName": "MonMor",
+          "layerId": "layer-mww83tb0",
+          "dependencies": {
+            "left": "a9",
+            "right": "a10",
+            "mon": "a11"
+          },
+          "data": {}
+        }
+      ],
+      "isRule": true,
+      "isFirstOrder": true,
+      "proved": false
+    },
+    {
+      "name": "MonMorUniq",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        },
+        {
+          "id": "layer-mww83tb0",
+          "name": "Child of Root Layer",
+          "parentId": "root",
+          "color": "#ac2266",
+          "colorEnabled": true,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "a1",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              300
+            ],
+            "label": "a"
+          }
+        },
+        {
+          "id": "a2",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              500
+            ],
+            "label": "b"
+          }
+        },
+        {
+          "id": "a3",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              500,
+              300
+            ],
+            "label": "a'"
+          }
+        },
+        {
+          "id": "a4",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              500,
+              500
+            ],
+            "label": "b'"
+          }
+        },
+        {
+          "id": "a5",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              300
+            ],
+            "label": "a⊗a'"
+          }
+        },
+        {
+          "id": "a6",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a1",
+            "right": "a3",
+            "mon": "a5"
+          },
+          "data": {}
+        },
+        {
+          "id": "a7",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              500
+            ],
+            "label": "b⊗b'"
+          }
+        },
+        {
+          "id": "a8",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a2",
+            "right": "a4",
+            "mon": "a7"
+          },
+          "data": {}
+        },
+        {
+          "id": "a9",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a1",
+            "target": "a2"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "f"
+          }
+        },
+        {
+          "id": "a10",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a3",
+            "target": "a4"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "f'"
+          }
+        },
+        {
+          "id": "a11",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a5",
+            "target": "a7"
+          },
+          "data": {
+            "width": 2,
+            "bend": 36,
+            "label": "f⊗f'"
+          }
+        },
+        {
+          "id": "a12",
+          "sortName": "MonMor",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a9",
+            "right": "a10",
+            "mon": "a11"
+          },
+          "data": {}
+        },
+        {
+          "id": "a13",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a5",
+            "target": "a7"
+          },
+          "data": {
+            "width": 2,
+            "bend": -44,
+            "label": "f⊗f'"
+          }
+        },
+        {
+          "id": "a14",
+          "sortName": "MonMor",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a9",
+            "right": "a10",
+            "mon": "a13"
+          },
+          "data": {}
+        },
+        {
+          "id": "a15",
+          "sortName": "Equality",
+          "layerId": "layer-mww83tb0",
+          "dependencies": {
+            "0": "a11",
+            "1": "a13"
+          },
+          "data": {}
+        }
+      ],
+      "isRule": true,
+      "isFirstOrder": true,
+      "proved": false
+    },
+    {
+      "name": "MonFunId",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        },
+        {
+          "id": "layer-mww83tb0",
+          "name": "Child of Root Layer",
+          "parentId": "root",
+          "color": "#ac2266",
+          "colorEnabled": true,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "a1",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              300
+            ],
+            "label": "a"
+          }
+        },
+        {
+          "id": "a2",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              500
+            ],
+            "label": "b"
+          }
+        },
+        {
+          "id": "a3",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              500,
+              300
+            ],
+            "label": "a'"
+          }
+        },
+        {
+          "id": "a4",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              500,
+              500
+            ],
+            "label": "b'"
+          }
+        },
+        {
+          "id": "a5",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              300
+            ],
+            "label": "a⊗a'"
+          }
+        },
+        {
+          "id": "a6",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a1",
+            "right": "a3",
+            "mon": "a5"
+          },
+          "data": {}
+        },
+        {
+          "id": "a7",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              500
+            ],
+            "label": "b⊗b'"
+          }
+        },
+        {
+          "id": "a8",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a2",
+            "right": "a4",
+            "mon": "a7"
+          },
+          "data": {}
+        },
+        {
+          "id": "a9",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a1",
+            "target": "a2"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "f"
+          }
+        },
+        {
+          "id": "a10",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a3",
+            "target": "a4"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "f'"
+          }
+        },
+        {
+          "id": "a11",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a5",
+            "target": "a7"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "f⊗f'"
+          }
+        },
+        {
+          "id": "a12",
+          "sortName": "MonMor",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a9",
+            "right": "a10",
+            "mon": "a11"
+          },
+          "data": {}
+        },
+        {
+          "id": "a13",
+          "sortName": "isId",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a9"
+          },
+          "data": {}
+        },
+        {
+          "id": "a14",
+          "sortName": "isId",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a10"
+          },
+          "data": {}
+        },
+        {
+          "id": "a15",
+          "sortName": "isId",
+          "layerId": "layer-mww83tb0",
+          "dependencies": {
+            "arrow": "a11"
+          },
+          "data": {}
+        }
+      ],
+      "isRule": true,
+      "isFirstOrder": true,
+      "proved": false
+    },
+    {
+      "name": "MonFunComp",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        },
+        {
+          "id": "layer-mww83tb0",
+          "name": "Child of Root Layer",
+          "parentId": "root",
+          "color": "#ac2266",
+          "colorEnabled": true,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "a1",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              300
+            ],
+            "label": "a"
+          }
+        },
+        {
+          "id": "a2",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              500
+            ],
+            "label": "b"
+          }
+        },
+        {
+          "id": "a3",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              500,
+              300
+            ],
+            "label": "a'"
+          }
+        },
+        {
+          "id": "a4",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              500,
+              500
+            ],
+            "label": "b'"
+          }
+        },
+        {
+          "id": "a5",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              300
+            ],
+            "label": "a⊗a'"
+          }
+        },
+        {
+          "id": "a6",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a1",
+            "right": "a3",
+            "mon": "a5"
+          },
+          "data": {}
+        },
+        {
+          "id": "a7",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              500
+            ],
+            "label": "b⊗b'"
+          }
+        },
+        {
+          "id": "a8",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a2",
+            "right": "a4",
+            "mon": "a7"
+          },
+          "data": {}
+        },
+        {
+          "id": "a9",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a1",
+            "target": "a2"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "f"
+          }
+        },
+        {
+          "id": "a10",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a3",
+            "target": "a4"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "f'"
+          }
+        },
+        {
+          "id": "a11",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a5",
+            "target": "a7"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "f⊗f'"
+          }
+        },
+        {
+          "id": "a12",
+          "sortName": "MonMor",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a9",
+            "right": "a10",
+            "mon": "a11"
+          },
+          "data": {}
+        },
+        {
+          "id": "a17",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              700
+            ],
+            "label": "c"
+          }
+        },
+        {
+          "id": "a16",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              500,
+              700
+            ],
+            "label": "c'"
+          }
+        },
+        {
+          "id": "a18",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              700
+            ],
+            "label": "c⊗c'"
+          }
+        },
+        {
+          "id": "a19",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a17",
+            "right": "a16",
+            "mon": "a18"
+          },
+          "data": {}
+        },
+        {
+          "id": "a20",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a2",
+            "target": "a17"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "g"
+          }
+        },
+        {
+          "id": "a21",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a4",
+            "target": "a16"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "g'"
+          }
+        },
+        {
+          "id": "a22",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a7",
+            "target": "a18"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "g⊗g'"
+          }
+        },
+        {
+          "id": "a23",
+          "sortName": "MonMor",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a20",
+            "right": "a21",
+            "mon": "a22"
+          },
+          "data": {}
+        },
+        {
+          "id": "a24",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a1",
+            "target": "a17"
+          },
+          "data": {
+            "width": 2,
+            "bend": 121,
+            "label": "fg"
+          }
+        },
+        {
+          "id": "a25",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a9",
+            "2": "a20",
+            "o": "a24"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a26",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a3",
+            "target": "a16"
+          },
+          "data": {
+            "width": 2,
+            "bend": -130,
+            "label": "f'g'"
+          }
+        },
+        {
+          "id": "a27",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a10",
+            "2": "a21",
+            "o": "a26"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a30",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a5",
+            "target": "a18"
+          },
+          "data": {
+            "width": 2,
+            "bend": -96,
+            "label": "fg⊗f'g'"
+          }
+        },
+        {
+          "id": "a31",
+          "sortName": "MonMor",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a24",
+            "right": "a26",
+            "mon": "a30"
+          },
+          "data": {}
+        },
+        {
+          "id": "a32",
+          "sortName": "Triangle",
+          "layerId": "layer-mww83tb0",
+          "dependencies": {
+            "1": "a11",
+            "2": "a22",
+            "o": "a30"
+          },
+          "data": {
+            "bend": 0
+          }
+        }
+      ],
+      "isRule": true,
+      "isFirstOrder": true,
+      "proved": false
+    },
+    {
+      "name": "MonUnitL",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        },
+        {
+          "id": "layer-mww8p9q2",
+          "name": "Child of Root Layer",
+          "parentId": "root",
+          "color": "#2383f6",
+          "colorEnabled": true,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "a1",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              500,
+              300
+            ],
+            "label": "a"
+          }
+        },
+        {
+          "id": "a2",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              300
+            ],
+            "label": "I"
+          }
+        },
+        {
+          "id": "a3",
+          "sortName": "MonUnit",
+          "layerId": "root",
+          "dependencies": {
+            "I": "a2"
+          },
+          "data": {}
+        },
+        {
+          "id": "a4",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              300
+            ],
+            "label": "I⊗a"
+          }
+        },
+        {
+          "id": "a5",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a2",
+            "right": "a1",
+            "mon": "a4"
+          },
+          "data": {}
+        },
+        {
+          "id": "a7",
+          "sortName": "Edge",
+          "layerId": "layer-mww8p9q2",
+          "dependencies": {
+            "source": "a4",
+            "target": "a1"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "λ$a"
+          }
+        },
+        {
+          "id": "a8",
+          "sortName": "isIso",
+          "layerId": "layer-mww8p9q2",
+          "dependencies": {
+            "arrow": "a7"
+          },
+          "data": {}
+        },
+        {
+          "id": "a9",
+          "sortName": "MonUnitL",
+          "layerId": "layer-mww8p9q2",
+          "dependencies": {
+            "arrow": "a7"
+          },
+          "data": {}
+        }
+      ],
+      "isRule": true,
+      "isFirstOrder": true,
+      "proved": false
+    },
+    {
+      "name": "MonUnitR",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        },
+        {
+          "id": "layer-mww8ryvm",
+          "name": "Child of Root Layer",
+          "parentId": "root",
+          "color": "#eda5ae",
+          "colorEnabled": true,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "a1",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              300
+            ],
+            "label": "a"
+          }
+        },
+        {
+          "id": "a2",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              500,
+              300
+            ],
+            "label": "I"
+          }
+        },
+        {
+          "id": "a3",
+          "sortName": "MonUnit",
+          "layerId": "root",
+          "dependencies": {
+            "I": "a2"
+          },
+          "data": {}
+        },
+        {
+          "id": "a4",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              300
+            ],
+            "label": "a⊗I"
+          }
+        },
+        {
+          "id": "a5",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a1",
+            "right": "a2",
+            "mon": "a4"
+          },
+          "data": {}
+        },
+        {
+          "id": "a6",
+          "sortName": "Edge",
+          "layerId": "layer-mww8ryvm",
+          "dependencies": {
+            "source": "a4",
+            "target": "a1"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "ρ$a"
+          }
+        },
+        {
+          "id": "a7",
+          "sortName": "isIso",
+          "layerId": "layer-mww8ryvm",
+          "dependencies": {
+            "arrow": "a6"
+          },
+          "data": {}
+        },
+        {
+          "id": "a8",
+          "sortName": "MonUnitR",
+          "layerId": "layer-mww8ryvm",
+          "dependencies": {
+            "arrow": "a6"
+          },
+          "data": {}
+        }
+      ],
+      "isRule": true,
+      "isFirstOrder": true,
+      "proved": false
+    },
+    {
+      "name": "MonAss",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        },
+        {
+          "id": "layer-mww8zyrt",
+          "name": "Child of Root Layer",
+          "parentId": "root",
+          "color": "#1e60e1",
+          "colorEnabled": true,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "a1",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              300
+            ],
+            "label": "a"
+          }
+        },
+        {
+          "id": "a2",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              500,
+              300
+            ],
+            "label": "b"
+          }
+        },
+        {
+          "id": "a3",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              700,
+              300
+            ],
+            "label": "c"
+          }
+        },
+        {
+          "id": "a4",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              300
+            ],
+            "label": "ab"
+          }
+        },
+        {
+          "id": "a5",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a1",
+            "right": "a2",
+            "mon": "a4"
+          },
+          "data": {}
+        },
+        {
+          "id": "a6",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              500
+            ],
+            "label": "(ab)c"
+          }
+        },
+        {
+          "id": "a7",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a4",
+            "right": "a3",
+            "mon": "a6"
+          },
+          "data": {}
+        },
+        {
+          "id": "a8",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              600,
+              300
+            ],
+            "label": "bc"
+          }
+        },
+        {
+          "id": "a9",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a2",
+            "right": "a3",
+            "mon": "a8"
+          },
+          "data": {}
+        },
+        {
+          "id": "a10",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              600,
+              500
+            ],
+            "label": "a(bc)"
+          }
+        },
+        {
+          "id": "a11",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a1",
+            "right": "a8",
+            "mon": "a10"
+          },
+          "data": {}
+        },
+        {
+          "id": "a12",
+          "sortName": "Edge",
+          "layerId": "layer-mww8zyrt",
+          "dependencies": {
+            "source": "a6",
+            "target": "a10"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "α($a,$b,$c)"
+          }
+        },
+        {
+          "id": "a13",
+          "sortName": "isIso",
+          "layerId": "layer-mww8zyrt",
+          "dependencies": {
+            "arrow": "a12"
+          },
+          "data": {}
+        },
+        {
+          "id": "a14",
+          "sortName": "MonAss",
+          "layerId": "layer-mww8zyrt",
+          "dependencies": {
+            "arrow": "a12"
+          },
+          "data": {}
+        }
+      ],
+      "isRule": true,
+      "isFirstOrder": true,
+      "proved": false
+    },
+    {
+      "name": "MonTriangle",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        },
+        {
+          "id": "layer-mww9dvxf",
+          "name": "Child of Root Layer",
+          "parentId": "root",
+          "color": "#e36284",
+          "colorEnabled": true,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "a1",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              500,
+              300
+            ],
+            "label": "I"
+          }
+        },
+        {
+          "id": "a2",
+          "sortName": "MonUnit",
+          "layerId": "root",
+          "dependencies": {
+            "I": "a1"
+          },
+          "data": {}
+        },
+        {
+          "id": "a3",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              300
+            ],
+            "label": "a"
+          }
+        },
+        {
+          "id": "a4",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              300
+            ],
+            "label": "aI"
+          }
+        },
+        {
+          "id": "a5",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a3",
+            "right": "a1",
+            "mon": "a4"
+          },
+          "data": {}
+        },
+        {
+          "id": "a6",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              700,
+              300
+            ],
+            "label": "b"
+          }
+        },
+        {
+          "id": "a7",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              500
+            ],
+            "label": "(aI)b"
+          }
+        },
+        {
+          "id": "a8",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a4",
+            "right": "a6",
+            "mon": "a7"
+          },
+          "data": {}
+        },
+        {
+          "id": "a9",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              600,
+              300
+            ],
+            "label": "Ib"
+          }
+        },
+        {
+          "id": "a10",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a1",
+            "right": "a6",
+            "mon": "a9"
+          },
+          "data": {}
+        },
+        {
+          "id": "a11",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              600,
+              500
+            ],
+            "label": "a(Ib)"
+          }
+        },
+        {
+          "id": "a12",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a3",
+            "right": "a9",
+            "mon": "a11"
+          },
+          "data": {}
+        },
+        {
+          "id": "a13",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              500,
+              600
+            ],
+            "label": "ab"
+          }
+        },
+        {
+          "id": "a14",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a3",
+            "right": "a6",
+            "mon": "a13"
+          },
+          "data": {}
+        },
+        {
+          "id": "a15",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a7",
+            "target": "a11"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "α(a,I,b)"
+          }
+        },
+        {
+          "id": "a16",
+          "sortName": "isIso",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a15"
+          },
+          "data": {}
+        },
+        {
+          "id": "a17",
+          "sortName": "MonAss",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a15"
+          },
+          "data": {}
+        },
+        {
+          "id": "a18",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a9",
+            "target": "a6"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "λb"
+          }
+        },
+        {
+          "id": "a19",
+          "sortName": "isIso",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a18"
+          },
+          "data": {}
+        },
+        {
+          "id": "a20",
+          "sortName": "MonUnitL",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a18"
+          },
+          "data": {}
+        },
+        {
+          "id": "a21",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a4",
+            "target": "a3"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "ρa"
+          }
+        },
+        {
+          "id": "a22",
+          "sortName": "isIso",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a21"
+          },
+          "data": {}
+        },
+        {
+          "id": "a23",
+          "sortName": "MonUnitR",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a21"
+          },
+          "data": {}
+        },
+        {
+          "id": "a25",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a3",
+            "target": "a3"
+          },
+          "data": {
+            "width": 2,
+            "bend": -16,
+            "label": "ida"
+          }
+        },
+        {
+          "id": "a26",
+          "sortName": "isId",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a25"
+          },
+          "data": {}
+        },
+        {
+          "id": "a28",
+          "sortName": "isId",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a25"
+          },
+          "data": {}
+        },
+        {
+          "id": "a32",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a6",
+            "target": "a6"
+          },
+          "data": {
+            "width": 2,
+            "bend": -16,
+            "label": "idb"
+          }
+        },
+        {
+          "id": "a33",
+          "sortName": "isId",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a32"
+          },
+          "data": {}
+        },
+        {
+          "id": "a35",
+          "sortName": "isId",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a32"
+          },
+          "data": {}
+        },
+        {
+          "id": "a38",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a7",
+            "target": "a13"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "ρab"
+          }
+        },
+        {
+          "id": "a39",
+          "sortName": "MonMor",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a21",
+            "right": "a32",
+            "mon": "a38"
+          },
+          "data": {}
+        },
+        {
+          "id": "a40",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a11",
+            "target": "a13"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "aλb"
+          }
+        },
+        {
+          "id": "a41",
+          "sortName": "MonMor",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a25",
+            "right": "a18",
+            "mon": "a40"
+          },
+          "data": {}
+        },
+        {
+          "id": "a42",
+          "sortName": "Triangle",
+          "layerId": "layer-mww9dvxf",
+          "dependencies": {
+            "1": "a15",
+            "2": "a40",
+            "o": "a38"
+          },
+          "data": {
+            "bend": 0
+          }
+        }
+      ],
+      "isRule": true,
+      "isFirstOrder": true,
+      "proved": false
+    },
+    {
+      "name": "MonPent",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        },
+        {
+          "id": "layer-mwwa7u5m",
+          "name": "Child of Root Layer",
+          "parentId": "root",
+          "color": "#063fce",
+          "colorEnabled": true,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "a1",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              300
+            ],
+            "label": "a"
+          }
+        },
+        {
+          "id": "a2",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              500,
+              300
+            ],
+            "label": "b"
+          }
+        },
+        {
+          "id": "a3",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              700,
+              300
+            ],
+            "label": "c"
+          }
+        },
+        {
+          "id": "a4",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              900,
+              300
+            ],
+            "label": "d"
+          }
+        },
+        {
+          "id": "a5",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              300
+            ],
+            "label": "ab"
+          }
+        },
+        {
+          "id": "a6",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a1",
+            "right": "a2",
+            "mon": "a5"
+          },
+          "data": {}
+        },
+        {
+          "id": "a7",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              400
+            ],
+            "label": "(ab)c"
+          }
+        },
+        {
+          "id": "a8",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a5",
+            "right": "a3",
+            "mon": "a7"
+          },
+          "data": {}
+        },
+        {
+          "id": "a9",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              700
+            ],
+            "label": "((ab)c)d"
+          }
+        },
+        {
+          "id": "a10",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a7",
+            "right": "a4",
+            "mon": "a9"
+          },
+          "data": {}
+        },
+        {
+          "id": "a11",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              800,
+              300
+            ],
+            "label": "cd"
+          }
+        },
+        {
+          "id": "a12",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a3",
+            "right": "a4",
+            "mon": "a11"
+          },
+          "data": {}
+        },
+        {
+          "id": "a13",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              500,
+              600
+            ],
+            "label": "(ab)(cd)"
+          }
+        },
+        {
+          "id": "a14",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a5",
+            "right": "a11",
+            "mon": "a13"
+          },
+          "data": {}
+        },
+        {
+          "id": "a15",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a9",
+            "target": "a13"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "α(ab,c,d)"
+          }
+        },
+        {
+          "id": "a16",
+          "sortName": "isIso",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a15"
+          },
+          "data": {}
+        },
+        {
+          "id": "a17",
+          "sortName": "MonAss",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a15"
+          },
+          "data": {}
+        },
+        {
+          "id": "a18",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              500,
+              400
+            ],
+            "label": "b(cd)"
+          }
+        },
+        {
+          "id": "a19",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a2",
+            "right": "a11",
+            "mon": "a18"
+          },
+          "data": {}
+        },
+        {
+          "id": "a20",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              700,
+              600
+            ],
+            "label": "a(b(cd))"
+          }
+        },
+        {
+          "id": "a21",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a1",
+            "right": "a18",
+            "mon": "a20"
+          },
+          "data": {}
+        },
+        {
+          "id": "a22",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a13",
+            "target": "a20"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "α(a,b,cd)"
+          }
+        },
+        {
+          "id": "a23",
+          "sortName": "isIso",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a22"
+          },
+          "data": {}
+        },
+        {
+          "id": "a24",
+          "sortName": "MonAss",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a22"
+          },
+          "data": {}
+        },
+        {
+          "id": "a25",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              600,
+              300
+            ],
+            "label": "bc"
+          }
+        },
+        {
+          "id": "a26",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a2",
+            "right": "a3",
+            "mon": "a25"
+          },
+          "data": {}
+        },
+        {
+          "id": "a27",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              400
+            ],
+            "label": "a(bc)"
+          }
+        },
+        {
+          "id": "a28",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a1",
+            "right": "a25",
+            "mon": "a27"
+          },
+          "data": {}
+        },
+        {
+          "id": "a29",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a7",
+            "target": "a27"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "α(a,b,c)"
+          }
+        },
+        {
+          "id": "a30",
+          "sortName": "isIso",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a29"
+          },
+          "data": {}
+        },
+        {
+          "id": "a31",
+          "sortName": "MonAss",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a29"
+          },
+          "data": {}
+        },
+        {
+          "id": "a32",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              500,
+              800
+            ],
+            "label": "(a(bc))d"
+          }
+        },
+        {
+          "id": "a33",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a27",
+            "right": "a4",
+            "mon": "a32"
+          },
+          "data": {}
+        },
+        {
+          "id": "a42",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a4",
+            "target": "a4"
+          },
+          "data": {
+            "width": 2,
+            "bend": -16,
+            "label": "idd"
+          }
+        },
+        {
+          "id": "a43",
+          "sortName": "isId",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a42"
+          },
+          "data": {}
+        },
+        {
+          "id": "a45",
+          "sortName": "isId",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a42"
+          },
+          "data": {}
+        },
+        {
+          "id": "a48",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a9",
+            "target": "a32"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "α(a,b,c)d"
+          }
+        },
+        {
+          "id": "a49",
+          "sortName": "MonMor",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a29",
+            "right": "a42",
+            "mon": "a48"
+          },
+          "data": {}
+        },
+        {
+          "id": "a50",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              600,
+              400
+            ],
+            "label": "(bc)d"
+          }
+        },
+        {
+          "id": "a51",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a25",
+            "right": "a4",
+            "mon": "a50"
+          },
+          "data": {}
+        },
+        {
+          "id": "a52",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a50",
+            "target": "a18"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "α(b,c,d)"
+          }
+        },
+        {
+          "id": "a53",
+          "sortName": "isIso",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a52"
+          },
+          "data": {}
+        },
+        {
+          "id": "a54",
+          "sortName": "MonAss",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a52"
+          },
+          "data": {}
+        },
+        {
+          "id": "a55",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              700,
+              800
+            ],
+            "label": "a((bc)d)"
+          }
+        },
+        {
+          "id": "a56",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a1",
+            "right": "a50",
+            "mon": "a55"
+          },
+          "data": {}
+        },
+        {
+          "id": "a57",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a32",
+            "target": "a55"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "α(a,bc,d)"
+          }
+        },
+        {
+          "id": "a58",
+          "sortName": "isIso",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a57"
+          },
+          "data": {}
+        },
+        {
+          "id": "a59",
+          "sortName": "MonAss",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a57"
+          },
+          "data": {}
+        },
+        {
+          "id": "a61",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a1",
+            "target": "a1"
+          },
+          "data": {
+            "width": 2,
+            "bend": -16,
+            "label": "ida, ida"
+          }
+        },
+        {
+          "id": "a62",
+          "sortName": "isId",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a61"
+          },
+          "data": {}
+        },
+        {
+          "id": "a64",
+          "sortName": "isId",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a61"
+          },
+          "data": {}
+        },
+        {
+          "id": "a67",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a55",
+            "target": "a20"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "aα(b,c,d)"
+          }
+        },
+        {
+          "id": "a68",
+          "sortName": "MonMor",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a61",
+            "right": "a52",
+            "mon": "a67"
+          },
+          "data": {}
+        },
+        {
+          "id": "a69",
+          "sortName": "Edge",
+          "layerId": "layer-mwwa7u5m",
+          "dependencies": {
+            "source": "a9",
+            "target": "a20"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0
+          }
+        },
+        {
+          "id": "a70",
+          "sortName": "Triangle",
+          "layerId": "layer-mwwa7u5m",
+          "dependencies": {
+            "1": "a15",
+            "2": "a22",
+            "o": "a69"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a71",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a9",
+            "target": "a55"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "α(a,bc,d)"
+          }
+        },
+        {
+          "id": "a72",
+          "sortName": "Triangle",
+          "layerId": "root",
+          "dependencies": {
+            "1": "a48",
+            "2": "a57",
+            "o": "a71"
+          },
+          "data": {
+            "bend": 0
+          }
+        },
+        {
+          "id": "a73",
+          "sortName": "Triangle",
+          "layerId": "layer-mwwa7u5m",
+          "dependencies": {
+            "1": "a71",
+            "2": "a67",
+            "o": "a69"
+          },
+          "data": {
+            "bend": 0
+          }
+        }
+      ],
+      "isRule": true,
+      "isFirstOrder": true,
+      "proved": false
+    },
+    {
+      "name": "MonTriangle2",
+      "layers": [
+        {
+          "id": "root",
+          "name": "Root Layer",
+          "parentId": null,
+          "color": "#3498db",
+          "colorEnabled": false,
+          "visible": true
+        },
+        {
+          "id": "layer-mwwajpsu",
+          "name": "Child of Root Layer",
+          "parentId": "root",
+          "color": "#b8449c",
+          "colorEnabled": true,
+          "visible": true
+        }
+      ],
+      "artefacts": [
+        {
+          "id": "a1",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              300
+            ],
+            "label": "I"
+          }
+        },
+        {
+          "id": "a2",
+          "sortName": "MonUnit",
+          "layerId": "root",
+          "dependencies": {
+            "I": "a1"
+          },
+          "data": {}
+        },
+        {
+          "id": "a3",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              500,
+              300
+            ],
+            "label": "a"
+          }
+        },
+        {
+          "id": "a4",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              700,
+              300
+            ],
+            "label": "b"
+          }
+        },
+        {
+          "id": "a5",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              400,
+              300
+            ],
+            "label": "Ia"
+          }
+        },
+        {
+          "id": "a6",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a1",
+            "right": "a3",
+            "mon": "a5"
+          },
+          "data": {}
+        },
+        {
+          "id": "a7",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a5",
+            "target": "a3"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "λa"
+          }
+        },
+        {
+          "id": "a8",
+          "sortName": "isIso",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a7"
+          },
+          "data": {}
+        },
+        {
+          "id": "a9",
+          "sortName": "MonUnitL",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a7"
+          },
+          "data": {}
+        },
+        {
+          "id": "a10",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              500
+            ],
+            "label": "(Ia)b"
+          }
+        },
+        {
+          "id": "a11",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a5",
+            "right": "a4",
+            "mon": "a10"
+          },
+          "data": {}
+        },
+        {
+          "id": "a12",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              500,
+              500
+            ],
+            "label": "ab"
+          }
+        },
+        {
+          "id": "a13",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a3",
+            "right": "a4",
+            "mon": "a12"
+          },
+          "data": {}
+        },
+        {
+          "id": "a15",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a4",
+            "target": "a4"
+          },
+          "data": {
+            "width": 2,
+            "bend": -16,
+            "label": "idb"
+          }
+        },
+        {
+          "id": "a16",
+          "sortName": "isId",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a15"
+          },
+          "data": {}
+        },
+        {
+          "id": "a18",
+          "sortName": "isId",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a15"
+          },
+          "data": {}
+        },
+        {
+          "id": "a21",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a10",
+            "target": "a12"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0
+          }
+        },
+        {
+          "id": "a22",
+          "sortName": "MonMor",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a7",
+            "right": "a15",
+            "mon": "a21"
+          },
+          "data": {}
+        },
+        {
+          "id": "a23",
+          "sortName": "Vertex",
+          "layerId": "root",
+          "dependencies": {},
+          "data": {
+            "position": [
+              300,
+              700
+            ],
+            "label": "I(ab)"
+          }
+        },
+        {
+          "id": "a24",
+          "sortName": "MonOb",
+          "layerId": "root",
+          "dependencies": {
+            "left": "a1",
+            "right": "a12",
+            "mon": "a23"
+          },
+          "data": {}
+        },
+        {
+          "id": "a25",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a23",
+            "target": "a12"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "λab"
+          }
+        },
+        {
+          "id": "a26",
+          "sortName": "isIso",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a25"
+          },
+          "data": {}
+        },
+        {
+          "id": "a27",
+          "sortName": "MonUnitL",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a25"
+          },
+          "data": {}
+        },
+        {
+          "id": "a28",
+          "sortName": "Edge",
+          "layerId": "root",
+          "dependencies": {
+            "source": "a10",
+            "target": "a23"
+          },
+          "data": {
+            "width": 2,
+            "bend": 0,
+            "label": "α(I,a,b)"
+          }
+        },
+        {
+          "id": "a29",
+          "sortName": "isIso",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a28"
+          },
+          "data": {}
+        },
+        {
+          "id": "a30",
+          "sortName": "MonAss",
+          "layerId": "root",
+          "dependencies": {
+            "arrow": "a28"
+          },
+          "data": {}
+        },
+        {
+          "id": "a31",
+          "sortName": "Triangle",
+          "layerId": "layer-mwwajpsu",
+          "dependencies": {
+            "1": "a28",
+            "2": "a25",
+            "o": "a21"
+          },
+          "data": {
+            "bend": 0
+          }
         }
       ],
       "isRule": false,
-      "isFirstOrder": false
+      "isFirstOrder": false,
+      "rocqProof": "Lemma MonTriangle2_rule : forall (I a b Ia x_Ia_b ab I_ab_ : Vertex)(x_a : Edge Ia a)(idb : Edge b b)(Edge_2 : Edge x_Ia_b ab)(x_ab : Edge I_ab_ ab)(x__I_a_b_ : Edge x_Ia_b I_ab_)(isId_2 isId_3 : isId idb)(isIso_2 : isIso x_a)(isIso_3 : isIso x_ab)(isIso_4 : isIso x__I_a_b_)(MonOb_2 : MonOb I a Ia)(MonOb_3 : MonOb Ia b x_Ia_b)(MonOb_4 : MonOb a b ab)(MonOb_5 : MonOb I ab I_ab_)(MonMor_2 : MonMor x_a idb Edge_2)(MonUnit_2 : MonUnit I)(MonAss_2 : MonAss x__I_a_b_)(MonUnitL_2 : MonUnitL x_a)(MonUnitL_3 : MonUnitL x_ab), Triangle x__I_a_b_ x_ab Edge_2.\nintros_sigma ().\nAdmitted.\n"
     }
   ]
 }
