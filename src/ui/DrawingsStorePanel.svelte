@@ -2,6 +2,7 @@
     import DrawingNode from './DrawingNode.svelte';
     import ProofEditorModal from './ProofEditorModal.svelte';
     import ExportModal from './ExportModal.svelte';
+    import HrxImportModal from './HrxImportModal.svelte';
     import {
         allDrawings,
         ui
@@ -106,6 +107,7 @@
     {/if}
 
     <ProofEditorModal />
+    <HrxImportModal />
 
     {#if ui.codeExport}
         <ExportModal />

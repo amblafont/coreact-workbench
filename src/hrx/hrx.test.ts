@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { DrawingStore, SortStore } from '../index.svelte.ts';
+import { Drawing, DrawingStore, SortStore } from '../index.svelte.ts';
 import { registerDefaultSorts } from '../default_sorts/index.ts';
+import { makeEdge, makeVertex, newSortStore } from '../demo/helpers.ts';
 import { parseHrx, serializeHrx } from './codec';
 import { buildModuleApi, parseRequires } from './moduleRuntime';
-import { loadHrxArchive } from './load';
+import { analyseHrxArchive, applyHrxImportPlan, loadHrxArchive, validateHrxPlan } from './load';
 import { exportHrx } from './export';
 
 const EXAMPLE = readFileSync(new URL('../../examples/newformat.hrx', import.meta.url), 'utf8');
@@ -201,5 +202,210 @@ describe('HRX merge policy', () => {
         });
         expect(replaced.drawings[0].action).toBe('replaced');
         expect(drawingStore.getDrawing('Example')!.drawing.getArtefacts()[0].data.position).toEqual([999, 999]);
+    });
+});
+
+describe('HRX import preview', () => {
+    it('defaults new sorts and drawings to Add, and existing rows to unchanged or Skip', () => {
+        const freshSorts = new SortStore();
+        const freshDrawings = new DrawingStore();
+        const freshPlan = analyseHrxArchive(EXAMPLE, freshSorts, freshDrawings, { ui: true });
+        expect(freshPlan.sorts.map(row => [row.name, row.kind, row.decision])).toEqual([
+            ['Vertex', 'new', 'add'],
+            ['Edge', 'new', 'add']
+        ]);
+        expect(freshPlan.drawings[0]).toMatchObject({ name: 'Example', kind: 'new', decision: 'add' });
+        expect(validateHrxPlan(freshPlan, freshSorts, freshDrawings).hasErrors).toBe(false);
+
+        const sortStore = new SortStore();
+        registerDefaultSorts(sortStore);
+        const drawingStore = new DrawingStore();
+        loadHrxArchive(EXAMPLE, sortStore, drawingStore);
+
+        const plan = analyseHrxArchive(EXAMPLE, sortStore, drawingStore, { ui: true });
+        expect(plan.sorts.map(row => [row.name, row.kind])).toEqual([
+            ['Vertex', 'existing'],
+            ['Edge', 'existing']
+        ]);
+        expect(plan.sorts.every(row =>
+            row.keepEquations && !row.replaceDrawFunctions && row.equationsEqual && !row.weakerEquations
+        )).toBe(true);
+        // The built-in sources differ textually from the ones in the example archive.
+        expect(plan.sorts.every(row => !row.drawFunctionsEqual)).toBe(true);
+        expect(plan.drawings[0]).toMatchObject({ requestedName: 'Example', kind: 'existing', decision: 'skip' });
+    });
+
+    it('commits only accepted rows and leaves the stores untouched on Skips', () => {
+        const sortStore = new SortStore();
+        const drawingStore = new DrawingStore();
+        const plan = analyseHrxArchive(EXAMPLE, sortStore, drawingStore, { ui: true });
+
+        for (const row of plan.sorts) row.decision = 'skip';
+        plan.drawings[0].decision = 'skip';
+        expect(validateHrxPlan(plan, sortStore, drawingStore).hasErrors).toBe(false);
+
+        applyHrxImportPlan(EXAMPLE, plan, sortStore, drawingStore);
+        expect(sortStore.getSortNames()).toEqual([]);
+        expect(drawingStore.getAllNames()).toEqual([]);
+    });
+
+    it('reports and blocks a skipped sort needed by a kept drawing', () => {
+        const sortStore = new SortStore();
+        const drawingStore = new DrawingStore();
+        const plan = analyseHrxArchive(EXAMPLE, sortStore, drawingStore, { ui: true });
+        for (const row of plan.sorts) row.decision = 'skip';
+
+        const validation = validateHrxPlan(plan, sortStore, drawingStore);
+        expect(validation.hasErrors).toBe(true);
+        expect(validation.drawingErrors[0]).toMatch(/Sort 'Vertex' is not available/);
+        expect(() => applyHrxImportPlan(EXAMPLE, plan, sortStore, drawingStore))
+            .toThrow(/Sort 'Vertex' is not available/);
+        expect(sortStore.getSortNames()).toEqual([]);
+    });
+
+    it('shows error reasons and refuses to apply an archive with a missing sort source', () => {
+        const sections = parseHrx(EXAMPLE).sections;
+        sections.delete('sorts/Edge.js');
+        const archive = serializeHrx(sections);
+        const sortStore = new SortStore();
+        const drawingStore = new DrawingStore();
+
+        const plan = analyseHrxArchive(archive, sortStore, drawingStore, { ui: true });
+        expect(plan.sorts.find(row => row.name === 'Edge')!.error)
+            .toMatch(/has no sorts\/Edge\.js section/);
+        expect(validateHrxPlan(plan, sortStore, drawingStore).hasErrors).toBe(true);
+        expect(() => applyHrxImportPlan(archive, plan, sortStore, drawingStore))
+            .toThrow(/has no sorts\/Edge\.js section/);
+        expect(sortStore.getSortNames()).toEqual([]);
+    });
+
+    it('renames or replaces an existing drawing on request', () => {
+        function modifiedExample(): string {
+            const sections = parseHrx(EXAMPLE).sections;
+            const drawings = JSON.parse(sections.get('drawings.json')!);
+            drawings.drawings[0].artefacts[0].data.position = [999, 999];
+            sections.set('drawings.json', JSON.stringify(drawings));
+            return serializeHrx(sections);
+        }
+
+        const renamedSorts = new SortStore();
+        registerDefaultSorts(renamedSorts);
+        const renamedDrawings = new DrawingStore();
+        loadHrxArchive(EXAMPLE, renamedSorts, renamedDrawings);
+        const archive = modifiedExample();
+        const renamePlan = analyseHrxArchive(archive, renamedSorts, renamedDrawings, { ui: true });
+        expect(renamePlan.drawings[0].decision).toBe('skip');
+        renamePlan.drawings[0].decision = 'rename';
+        renamePlan.drawings[0].renameTo = 'Imported copy';
+        applyHrxImportPlan(archive, renamePlan, renamedSorts, renamedDrawings);
+        expect(renamedDrawings.getDrawing('Imported copy')).toBeDefined();
+        expect(renamedDrawings.getDrawing('Example')!.drawing.getArtefacts()[0].data.position)
+            .toEqual([218, 345]);
+
+        const replaceSorts = new SortStore();
+        registerDefaultSorts(replaceSorts);
+        const replaceDrawings = new DrawingStore();
+        loadHrxArchive(EXAMPLE, replaceSorts, replaceDrawings);
+        const replacePlan = analyseHrxArchive(archive, replaceSorts, replaceDrawings, { ui: true });
+        replacePlan.drawings[0].decision = 'replace';
+        applyHrxImportPlan(archive, replacePlan, replaceSorts, replaceDrawings);
+        expect(replaceDrawings.getDrawing('Example')!.drawing.getArtefacts()[0].data.position)
+            .toEqual([999, 999]);
+    });
+
+    it('suggests unique names for duplicate drawing names inside one archive', () => {
+        const sections = parseHrx(EXAMPLE).sections;
+        const drawings = JSON.parse(sections.get('drawings.json')!);
+        drawings.drawings.push(structuredClone(drawings.drawings[0]));
+        sections.set('drawings.json', JSON.stringify(drawings));
+        const archive = serializeHrx(sections);
+
+        const sortStore = new SortStore();
+        const drawingStore = new DrawingStore();
+        const plan = analyseHrxArchive(archive, sortStore, drawingStore, { ui: true });
+        expect(plan.drawings.map(row => row.name)).toEqual(['Example', 'Example (1)']);
+
+        applyHrxImportPlan(archive, plan, sortStore, drawingStore);
+        expect(drawingStore.getDrawing('Example')).toBeDefined();
+        expect(drawingStore.getDrawing('Example (1)')).toBeDefined();
+    });
+
+    it('applies the two existing-sort toggles independently', () => {
+        const archiveSorts = newSortStore();
+        const archiveDrawing = new Drawing(archiveSorts);
+        const v = makeVertex(archiveDrawing, 'v');
+        const e1 = makeEdge(archiveDrawing, 'e1', v, v);
+        const e2 = makeEdge(archiveDrawing, 'e2', v, v);
+        const e3 = makeEdge(archiveDrawing, 'e3', v, v);
+        archiveDrawing.newArtefact('Triangle', { '1': e1, '2': e2, o: e3 }, { bend: 0 }, 'root');
+        const archiveStore = new DrawingStore();
+        archiveStore.addDrawing('TriangleDrawing', archiveDrawing);
+
+        const sections = parseHrx(exportHrx(['TriangleDrawing'], archiveSorts, archiveStore)).sections;
+        sections.set('sorts/Vertex.js', `${sections.get('sorts/Vertex.js')}\n// preview marker\n`);
+        const records = JSON.parse(sections.get('sorts.json')!);
+        records.find((record: { name: string }) => record.name === 'Triangle').equations = [];
+        sections.set('sorts.json', JSON.stringify(records));
+        const archive = serializeHrx(sections);
+
+        const workspace = newSortStore();
+        const originalEquations = workspace.getSort('Triangle')!.equations.length;
+        const originalBody = workspace.getSortSource('Vertex')!.drawBody;
+        const plan = analyseHrxArchive(archive, workspace, new DrawingStore(), { ui: true });
+
+        const triangle = plan.sorts.find(row => row.name === 'Triangle')!;
+        expect(triangle.equationsEqual).toBe(false);
+        expect(triangle.weakerEquations).toBe(true);
+        expect(triangle.keepEquations).toBe(true);
+        triangle.keepEquations = false;
+        const vertex = plan.sorts.find(row => row.name === 'Vertex')!;
+        expect(vertex.equationsEqual).toBe(true);
+        expect(vertex.drawFunctionsEqual).toBe(false);
+        vertex.replaceDrawFunctions = true;
+
+        applyHrxImportPlan(archive, plan, workspace, new DrawingStore());
+        expect(workspace.getSort('Triangle')!.equations.length).toBeLessThan(originalEquations);
+        expect(workspace.getSortSource('Vertex')!.drawBody).toContain('preview marker');
+        expect(workspace.getSortSource('Vertex')!.drawBody).not.toBe(originalBody);
+    });
+
+    it('reports incompatible equations without marking them as weaker', () => {
+        const sortStore = newSortStore();
+        const drawing = new Drawing(sortStore);
+        const v = makeVertex(drawing, 'v');
+        const e1 = makeEdge(drawing, 'e1', v, v);
+        const e2 = makeEdge(drawing, 'e2', v, v);
+        const e3 = makeEdge(drawing, 'e3', v, v);
+        drawing.newArtefact('Triangle', { '1': e1, '2': e2, o: e3 }, { bend: 0 }, 'root');
+        const drawingStore = new DrawingStore();
+        drawingStore.addDrawing('TriangleDrawing', drawing);
+
+        const sections = parseHrx(exportHrx(['TriangleDrawing'], sortStore, drawingStore)).sections;
+        const records = JSON.parse(sections.get('sorts.json')!);
+        records.find((record: { name: string }) => record.name === 'Triangle').equations = ['1.source = 1.target'];
+        sections.set('sorts.json', JSON.stringify(records));
+        const archive = serializeHrx(sections);
+
+        const plan = analyseHrxArchive(archive, sortStore, new DrawingStore(), { ui: true });
+        const triangle = plan.sorts.find(row => row.name === 'Triangle')!;
+        expect(triangle.equationsEqual).toBe(false);
+        expect(triangle.weakerEquations).toBe(false);
+        expect(triangle.error).toMatch(/different dependencies, data fields, or equations/);
+    });
+
+    it('never imports an identical drawing even if the plan requests a change', () => {
+        const sortStore = new SortStore();
+        registerDefaultSorts(sortStore);
+        const drawingStore = new DrawingStore();
+        loadHrxArchive(EXAMPLE, sortStore, drawingStore);
+        const before = drawingStore.exportDrawingJSON('Example');
+
+        const plan = analyseHrxArchive(EXAMPLE, sortStore, drawingStore, { ui: true });
+        expect(plan.drawings[0]).toMatchObject({ collision: 'duplicate', decision: 'skip' });
+        plan.drawings[0].decision = 'replace';
+        applyHrxImportPlan(EXAMPLE, plan, sortStore, drawingStore);
+
+        expect(drawingStore.getAllNames()).toEqual(['Example']);
+        expect(drawingStore.exportDrawingJSON('Example')).toBe(before);
     });
 });

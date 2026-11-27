@@ -300,6 +300,15 @@ export class SortStore {
         def.source = source;
     }
 
+    /** Replace the equations of an existing sort, validating them as on declaration. */
+    setSortEquations(name: string, equations: string[]): void {
+        const def = this.sorts.get(name);
+        if (!def) {
+            throw new Error(`Consistency Check Failed: Cannot set equations for unknown sort '${name}'.`);
+        }
+        def.equations = parseSortEquations(name, def.dependencies, equations, key => this.sorts.get(key));
+    }
+
     getSortSource(name: string): SortSource | undefined {
         return this.sorts.get(name)?.source;
     }
@@ -2184,15 +2193,63 @@ export class DrawingStore {
         };
     }
 
-    private uniqueName(requestedName: string): string {
-        if (!this.drawings.has(requestedName)) {
+    /** First name derived from `requestedName` not used in the store or reserved elsewhere. */
+    public suggestUniqueName(requestedName: string, reservedNames: Iterable<string> = []): string {
+        const reserved = new Set(reservedNames);
+        if (!this.drawings.has(requestedName) && !reserved.has(requestedName)) {
             return requestedName;
         }
         let i = 1;
-        while (this.drawings.has(`${requestedName} (${i})`)) {
+        while (this.drawings.has(`${requestedName} (${i})`) || reserved.has(`${requestedName} (${i})`)) {
             i++;
         }
         return `${requestedName} (${i})`;
+    }
+
+    private uniqueName(requestedName: string): string {
+        return this.suggestUniqueName(requestedName);
+    }
+
+    /**
+     * Inspect an imported drawing without mutating the store. Reports whether
+     * the name is new, an exact duplicate, a data-only collision or a
+     * structural collision, and suggests a non-conflicting name.
+     */
+    public inspectDrawingImport(
+        parsed: unknown,
+        _sortStore: SortStore,
+        reservedNames: Iterable<string> = []
+    ): {
+        requestedName: string;
+        suggestedName: string;
+        collision: 'new' | 'duplicate' | 'dataOnly' | 'structural';
+        built: SavedDrawing;
+        existing?: SavedDrawing;
+    } {
+        const built = DrawingStore.validateAndBuildDrawing(parsed);
+        const requestedName = built.name;
+        const reserved = new Set(reservedNames);
+        const inStore = this.drawings.has(requestedName);
+        if (!inStore && !reserved.has(requestedName)) {
+            return { requestedName, suggestedName: requestedName, collision: 'new', built };
+        }
+
+        const suggestedName = this.suggestUniqueName(requestedName, reserved);
+        if (!inStore) {
+            // Another drawing in the same archive already reserved the name.
+            return { requestedName, suggestedName, collision: 'structural', built };
+        }
+
+        const existing = DrawingStore.validateAndBuildDrawing(
+            JSON.parse(this.exportDrawingJSON(requestedName))
+        );
+        if (DrawingStore.canonicalDrawing(existing, false) === DrawingStore.canonicalDrawing(built, false)) {
+            return { requestedName, suggestedName, collision: 'duplicate', built, existing };
+        }
+        if (DrawingStore.canonicalDrawing(existing, true) === DrawingStore.canonicalDrawing(built, true)) {
+            return { requestedName, suggestedName, collision: 'dataOnly', built, existing };
+        }
+        return { requestedName, suggestedName, collision: 'structural', built, existing };
     }
 
     private storeImportedDrawing(parsed: unknown, sortStore: SortStore): { name: string; requestedName: string; renamed: boolean } {
@@ -2322,6 +2379,28 @@ export class DrawingStore {
         const actualName = this.uniqueName(requestedName);
         this.storeHydratedDrawing(actualName, built, sortStore);
         return { name: actualName, requestedName, action: 'renamed' };
+    }
+
+    /**
+     * Import one drawing using the decision made in the HRX preview dialog.
+     * Unlike `importSavedDrawingWithPolicy`, this never prompts and never
+     * silently renames: the caller specifies exactly what to do.
+     */
+    public importSavedDrawingWithDecision(
+        parsed: unknown,
+        sortStore: SortStore,
+        decision: { kind: 'add' | 'replace' | 'rename'; name?: string }
+    ): { name: string; action: 'added' | 'replaced' | 'renamed' } {
+        const built = DrawingStore.validateAndBuildDrawing(parsed);
+        const name = decision.kind === 'replace' ? built.name : (decision.name ?? '').trim();
+        if (!name) {
+            throw new Error("Consistency Check Failed: Renamed drawing must have a non-empty name.");
+        }
+        this.storeHydratedDrawing(name, built, sortStore);
+        return {
+            name,
+            action: decision.kind === 'rename' ? 'renamed' : decision.kind === 'replace' ? 'replaced' : 'added'
+        };
     }
 
     public getDrawing(name: string): DrawingStoreEntry | undefined {

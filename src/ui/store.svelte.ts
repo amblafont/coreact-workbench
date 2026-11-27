@@ -29,7 +29,12 @@ import {
     getRelativePositionMeta
 } from '../index.svelte.ts';
 import { RocqRecorder } from '../rocq_recording.svelte.ts';
-import { loadHrxArchive } from '../hrx/load';
+import {
+    analyseHrxArchive,
+    applyHrxImportPlan,
+    validateHrxPlan,
+    type HrxImportPlan
+} from '../hrx/load';
 import { exportHrx } from '../hrx/export';
 import { exportDrawingsToRocq, drawingExportNames, ruleTypeInfo, newExportRegistry, NameRegistry } from '../rocq_export';
 import type { DrawingExportNames } from '../rocq_export';
@@ -64,6 +69,13 @@ export interface CodeExport {
     names: string[];
     ruleCount: number;
     rocq: string;
+}
+
+/** The archive currently being reviewed in the HRX import dialog. */
+export interface HrxImportSession {
+    fileName: string;
+    text: string;
+    plan: HrxImportPlan;
 }
 
 // The recorder that owns the live recording. With a single registered prover it
@@ -142,6 +154,7 @@ export const ui = $state({
     proofEditorName: null as string | null,
     proofEditorRocqDraft: null as string | null,
     codeExport: null as CodeExport | null,
+    hrxImport: null as HrxImportSession | null,
     drawingsStoreCollapsed: false,
     leftPanelWidth: 270,
     rightPanelWidth: 270,
@@ -1418,40 +1431,40 @@ export async function importDrawingsFile(file: File): Promise<void> {
     }
 }
 
-function formatEquationList(equations: string[]): string {
-    return equations.length > 0
-        ? equations.map(equation => `  - ${equation}`).join('\n')
-        : '  (none)';
-}
-
 export async function importHrxFile(file: File): Promise<void> {
     const text = await file.text();
     try {
-        const result = loadHrxArchive(text, sortStore, drawingStore, {
-            resolveDrawingConflict: (name, _existing, _imported) => {
-                const message = [
-                    `Drawing '${name}' already exists with different data fields.`,
-                    'OK: keep the imported data.',
-                    'Cancel: keep the existing data.'
-                ].join('\n\n');
-                return confirm(message) ? 'keepImported' : 'keepExisting';
-            },
-            resolveSortEquationConflict: (name, existingEquations, importedEquations) => {
-                const message = [
-                    `Sort '${name}' in the archive has fewer equations than the existing sort.`,
-                    `Existing equations:\n${formatEquationList(existingEquations)}`,
-                    `Imported equations:\n${formatEquationList(importedEquations)}`,
-                    '',
-                    'OK: keep the existing sort and its equations.',
-                    'Cancel: abort the import.'
-                ].join('\n\n');
-                return confirm(message);
-            }
-        });
+        const plan = analyseHrxArchive(text, sortStore, drawingStore, { ui: true });
+        ui.hrxImport = { fileName: file.name, text, plan };
+    } catch (err) {
+        pushToast('error', `Error importing HRX archive:\n${(err as Error).message}`);
+    }
+}
+
+export function cancelHrxImport(): void {
+    ui.hrxImport = null;
+}
+
+export function applyHrxImport(): void {
+    const session = ui.hrxImport;
+    if (!session) return;
+    if (validateHrxPlan(session.plan, sortStore, drawingStore).hasErrors) return;
+
+    try {
+        const { plan } = session;
+        const result = applyHrxImportPlan(session.text, plan, sortStore, drawingStore);
 
         const parts: string[] = [];
         if (result.sortsAdded.length > 0) {
             parts.push(`added sorts: ${result.sortsAdded.join(', ')}`);
+        }
+        const replacedDrawFunctions = plan.sorts.filter(row => row.kind === 'existing' && row.replaceDrawFunctions);
+        if (replacedDrawFunctions.length > 0) {
+            parts.push(`replaced draw functions for sorts: ${replacedDrawFunctions.map(row => row.name).join(', ')}`);
+        }
+        const replacedEquations = plan.sorts.filter(row => row.kind === 'existing' && !row.keepEquations && row.weakerEquations);
+        if (replacedEquations.length > 0) {
+            parts.push(`replaced equations for sorts: ${replacedEquations.map(row => row.name).join(', ')}`);
         }
         if (result.sortsKeptWithExistingEquations.length > 0) {
             parts.push(`kept existing equations for sorts: ${result.sortsKeptWithExistingEquations.join(', ')}`);
@@ -1460,9 +1473,8 @@ export async function importHrxFile(file: File): Promise<void> {
             parts.push(`added modules: ${result.modulesAdded.join(', ')}`);
         }
         for (const drawing of result.drawings) {
-            if (drawing.action === 'kept') {
-                parts.push(`kept '${drawing.name}'`);
-            } else if (drawing.action === 'replaced') {
+            if (drawing.action === 'kept') continue;
+            if (drawing.action === 'replaced') {
                 parts.push(`replaced '${drawing.name}' with imported data`);
             } else if (drawing.action === 'renamed') {
                 parts.push(`renamed '${drawing.requestedName}' -> '${drawing.name}'`);
@@ -1474,6 +1486,7 @@ export async function importHrxFile(file: File): Promise<void> {
             setActiveDrawing(ui.activeDrawingName!);
         }
         pushToast('info', `Imported HRX archive.\n${parts.join('\n')}`);
+        ui.hrxImport = null;
     } catch (err) {
         pushToast('error', `Error importing HRX archive:\n${(err as Error).message}`);
     }
